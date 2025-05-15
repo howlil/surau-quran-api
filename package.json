@@ -1,0 +1,26 @@
+{
+  "name": "surau-quran",
+  "version": "1.0.0",
+  "description": "service surau quran ",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "school",
+    "information",
+    "system"
+  ],
+  "author": "howlil",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "prisma": "^6.8.0"
+  }
+}
