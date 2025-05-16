@@ -1,4 +1,3 @@
-
 name: Deploy Express API with Prisma to cPanel
 
 on:
@@ -16,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '18.18' 
           cache: 'npm'
           
       - name: Install dependencies
@@ -27,58 +26,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
-      - name: Debug - List directory structure
+      - name: Create deployment package
         run: |
-          echo "Current directory structure:"
-          ls -la
-          echo "\nChecking if src directory exists:"
-          if [ -d "src" ]; then 
-            echo "src/ directory found"
-            ls -la src/
-          else 
-            echo "src/ directory not found!" 
-            echo "Looking for other source directories:"
-            find . -type d -not -path "*/node_modules/*" -not -path "*/.git/*" | sort
-          fi
-          
-      # Mencoba metode explicit include daripada exclude
-      - name: Compress all source files
-        run: |
-          # Mencari semua folder dan file penting
-          echo "Creating explicit list of important folders"
-          
-          # Buat daftar semua file dan folder kecuali node_modules dan .git
-          find . -type d -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.github/*" > important_dirs.txt
-          find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.github/*" -not -name ".env" > important_files.txt
-          
-          # Debug - tampilkan daftar file/folder penting
-          echo "Important directories to include:"
-          cat important_dirs.txt
-          
-          echo "Important files to include (sample):"
-          head -n 20 important_files.txt
-          
-          # Buat archive dengan semua file/folder penting
-          mkdir -p /tmp/deploy-files
-          
-          # Copy semua folder penting
-          cat important_dirs.txt | xargs -I{} mkdir -p "/tmp/deploy-files/{}"
-          
-          # Copy semua file penting
-          cat important_files.txt | xargs -I{} cp --parents "{}" /tmp/deploy-files/
-          
-          # Debug - cek hasil copy
-          echo "Files ready for deployment:"
-          find /tmp/deploy-files -type f | sort | head -n 20
-          
-          # Create tar archive of all copied files
-          cd /tmp/deploy-files
-          tar -czf /tmp/build.tar.gz .
-          cp /tmp/build.tar.gz $GITHUB_WORKSPACE/build.tar.gz
-          
-          # Debug - verify tar contents
-          echo "Tar contents (sample):"
-          tar -tvf build.tar.gz | head -n 20
+          # Cara langsung: buat tar langsung dengan seluruh repository (kecuali node_modules & git)
+          tar --exclude='./node_modules' --exclude='./.git' --exclude='./.github' --exclude='./.env' -czvf build.tar.gz .
           
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
@@ -91,7 +42,7 @@ jobs:
           source: "build.tar.gz"
           target: "/home/metrosof/api/surau-quran-staging-api"
           
-      - name: Setup application in cPanel
+      - name: Setup Node.js and deploy on cPanel
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -102,32 +53,15 @@ jobs:
           script: |
             cd /home/metrosof/api/surau-quran-staging-api
             
-            # Backup .env dan node_modules
+            # Backup .env jika sudah ada
             if [ -f .env ]; then
               cp .env .env.backup
             fi
-            if [ -d node_modules ]; then
-              mv node_modules node_modules_backup
-            fi
-            
-            # Debug - lihat isi tar sebelum extract
-            echo "Checking tar contents before extracting:"
-            tar -tvf build.tar.gz | grep -E "src|index.js|app.js" || echo "src/ or main files not found in archive!"
             
             # Extract files
-            tar -xzf build.tar.gz
+            tar -xzvf build.tar.gz
             
-            # Debug - periksa struktur direktori setelah extract
-            echo "Directory structure after extract:"
-            ls -la
-            if [ -d "src" ]; then
-              echo "src/ directory found after extract"
-              ls -la src/
-            else
-              echo "src/ directory still not found after extract!"
-            fi
-            
-            # Restore .env dari backup
+            # Restore .env jika ada backup
             if [ -f .env.backup ]; then
               cp .env.backup .env
               rm .env.backup
@@ -135,36 +69,73 @@ jobs:
               echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
             fi
             
-            # Restore node_modules jika ada backup
-            if [ -d node_modules_backup ]; then
-              rm -rf node_modules
-              mv node_modules_backup node_modules
-            else
-              npm ci --only=production
+            # Install NVM jika belum ada
+            if [ ! -d "$HOME/.nvm" ]; then
+              echo "Installing NVM..."
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
             fi
+            
+            # Load NVM
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Install Node.js versi yang kompatibel dengan Prisma
+            echo "Installing Node.js 18.18 (required by Prisma)..."
+            nvm install 18.18
+            nvm use 18.18
+            
+            # Verifikasi versi Node.js
+            echo "Current Node.js version:"
+            node -v
+            
+            # Pastikan dotenv dan semua dependensi terinstal
+            echo "Installing dependencies..."
+            npm install
+            
+            # Khusus memastikan dotenv terinstal
+            npm install dotenv --save
             
             # Generate Prisma client
+            echo "Generating Prisma client..."
             npx prisma generate
             
-            # Restart atau mulai aplikasi dengan PM2
-            ENTRY_POINT="index.js"
-            if [ ! -f "$ENTRY_POINT" ]; then
-              if [ -f "app.js" ]; then
-                ENTRY_POINT="app.js"
-              elif [ -f "server.js" ]; then
-                ENTRY_POINT="server.js"
-              elif [ -f "src/index.js" ]; then
-                ENTRY_POINT="src/index.js"
-              fi
+            # Setup PM2 untuk menggunakan versi Node.js yang benar
+            echo "Setting up PM2..."
+            
+            # Jika PM2 belum terinstal, install secara global
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
             fi
             
-            echo "Using entry point: $ENTRY_POINT"
+            # Buat atau update file ecosystem.config.js
+            cat > ecosystem.config.js << 'EOL'
+            module.exports = {
+              apps: [{
+                name: "surau-quran-api",
+                script: "index.js",
+                exec_mode: "fork",
+                instances: 1,
+                autorestart: true,
+                watch: false,
+                max_memory_restart: "300M",
+                env: {
+                  NODE_ENV: "production",
+                  PORT: 8080
+                },
+                interpreter: "$HOME/.nvm/versions/node/v18.18.0/bin/node"  // Explicit Node.js path
+              }]
+            };
+            EOL
             
-            if [ -f ~/.pm2/pm2.pid ]; then 
-              pm2 restart surau-quran-api || pm2 start $ENTRY_POINT --name surau-quran-api
-            else 
-              pm2 start $ENTRY_POINT --name surau-quran-api
+            # Restart atau start aplikasi menggunakan PM2 dengan file konfigurasi baru
+            if pm2 list | grep -q "surau-quran-api"; then
+              pm2 delete surau-quran-api
             fi
+            
+            pm2 start ecosystem.config.js
+            
+            # Simpan konfigurasi PM2 agar berjalan setelah reboot
+            pm2 save
             
             # Bersihkan file tar
             rm build.tar.gz
