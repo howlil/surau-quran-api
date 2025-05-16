@@ -1,5 +1,5 @@
 const morgan = require('morgan');
-const { stream } = require('@config/logger.config');
+const { stream } = require('../../lib/config/logger.config');
 
 
 class HttpLoggerMiddleware {

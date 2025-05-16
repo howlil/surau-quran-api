@@ -1,6 +1,6 @@
 
 
-const { ValidationError } = require('@http/HttpErrors');
+const { ValidationError } = require('../../lib/http/errors.http');
 
 
 class ValidationMiddleware {

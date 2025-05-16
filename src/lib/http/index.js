@@ -1,7 +1,7 @@
-const HttpRequest = require('./HttpRequest');
-const HttpResponse = require('./HttpResponse');
-const HttpErrors = require('./HttpErrors');
-const ErrorHandler = require('./ErrorHandler');
+const HttpRequest = require('./request.http');
+const HttpResponse = require('./response.http');
+const HttpErrors = require('./errors.http');
+const ErrorHandler = require('./error.handler.htttp');
 
 
 class Http {

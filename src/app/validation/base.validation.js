@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { ValidationError } = require('@http/HttpErrors');
+const { ValidationError } = require('../../lib/http/errors.http');
 
 
 class ValidationBase {

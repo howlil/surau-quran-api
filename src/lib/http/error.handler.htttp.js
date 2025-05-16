@@ -1,4 +1,4 @@
-const HttpResponse = require('./HttpResponse');
+const HttpResponse = require('./response.http');
 
 
 class ErrorHandler {
