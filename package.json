@@ -15,9 +15,13 @@
   "author": "howlil",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.8.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.5.0",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "joi": "^17.13.3",
+    "morgan": "^1.10.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
