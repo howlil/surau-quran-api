@@ -25,31 +25,19 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      
-      - name: Deploy to cPanel via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          port: ${{ secrets.PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: |
-            DEPLOY_PATH="/home/metrosof/api/surau-quran-staging-api"
-            mkdir -p $DEPLOY_PATH
-            cd $DEPLOY_PATH
-            
-            # Dapatkan artifact terbaru (cara alternatif tanpa menggunakan tar langsung)
-            # Bersihkan file lama jika perlu, tapi simpan node_modules dan .env
-            find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
-            
-            # Jika ingin menjaga node_modules tetap utuh
-            #find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
-            
-      - name: Compress build directory
+
+      - name: Compress project files
         run: |
-          tar -czf build.tar.gz dist/ package.json package-lock.json ecosystem.config.js prisma/
+          # Exclude files/directories yang tidak perlu di-deploy
+          echo "node_modules/" > .deployignore
+          echo ".git/" >> .deployignore
+          echo ".github/" >> .deployignore
+          echo ".env" >> .deployignore
+          echo ".gitignore" >> .deployignore
           
+          # Create tar archive dengan exclude list
+          tar --exclude-from=.deployignore -czf deploy.tar.gz .
+      
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
         with:
@@ -58,9 +46,9 @@ jobs:
           port: ${{ secrets.PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "build.tar.gz"
+          source: "deploy.tar.gz"
           target: "/home/metrosof/api/surau-quran-staging-api"
-
+            
 
       - name: Setup application in cPanel
         uses: appleboy/ssh-action@master
@@ -72,13 +60,47 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             cd /home/metrosof/api/surau-quran-staging-api
-            tar -xzf build.tar.gz
-            npm ci --only=production
-            echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
-            npx prisma generate
-            if [ -f ~/.pm2/pm2.pid ]; then 
-              pm2 restart surau-quran-api || pm2 start index.js --name surau-quran-api
-            else 
-              pm2 start index.js --name surau-quran-api
+            
+            # Backup .env jika sudah ada
+            if [ -f .env ]; then
+              cp .env .env.backup
             fi
-            rm build.tar.gz
+            
+            # Extract files
+            tar -xzf deploy.tar.gz
+            
+            # Restore .env dari backup
+            if [ -f .env.backup ]; then
+              cp .env.backup .env
+            else
+              # Buat .env baru jika tidak ada backup
+              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            fi
+            
+            # Install dependencies
+            npm ci --only=production
+            
+            # Generate Prisma client di server
+            npx prisma generate
+            
+            # Tentukan file entry point (index.js, app.js, atau server.js)
+            ENTRY_POINT="index.js"
+            if [ ! -f "$ENTRY_POINT" ]; then
+              if [ -f "app.js" ]; then
+                ENTRY_POINT="app.js"
+              elif [ -f "server.js" ]; then
+                ENTRY_POINT="server.js"
+              fi
+            fi
+            
+            echo "Using entry point: $ENTRY_POINT"
+            
+            # Restart atau mulai aplikasi dengan PM2
+            if pm2 list | grep -q "surau-quran-api"; then
+              pm2 restart surau-quran-api
+            else
+              pm2 start $ENTRY_POINT --name surau-quran-api
+            fi
+            
+            # Bersihkan file tar
+            rm deploy.tar.gz
