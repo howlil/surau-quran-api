@@ -1,4 +1,4 @@
-ame: Deploy Express API with Prisma to cPanel
+name: Deploy Express API with Prisma to cPanel
 
 on:
   push:
