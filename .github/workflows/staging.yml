@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.18' 
+          node-version: '18.18' # Sesuaikan dengan versi yang dibutuhkan Prisma
           cache: 'npm'
           
       - name: Install dependencies
@@ -26,10 +26,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
+      # Pendekatan yang lebih aman untuk membuat tar file
       - name: Create deployment package
         run: |
-          # Cara langsung: buat tar langsung dengan seluruh repository (kecuali node_modules & git)
-          tar --exclude='./node_modules' --exclude='./.git' --exclude='./.github' --exclude='./.env' -czvf build.tar.gz .
+          # Buat tar dengan flag untuk mengabaikan warning "file changed"
+          tar --exclude='./node_modules' --exclude='./.git' --exclude='./.github' --exclude='./.env' --warning=no-file-changed -czf build.tar.gz .
+          
+          # Verifikasi bahwa tar file dibuat
+          ls -la build.tar.gz
           
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
@@ -58,16 +62,32 @@ jobs:
               cp .env .env.backup
             fi
             
-            # Extract files
-            tar -xzvf build.tar.gz
+            # Untuk mencegah masalah dengan file yang berubah, buat direktori temp untuk extract
+            mkdir -p /tmp/app-extract
+            tar -xzf build.tar.gz -C /tmp/app-extract
             
-            # Restore .env jika ada backup
-            if [ -f .env.backup ]; then
-              cp .env.backup .env
-              rm .env.backup
-            else
-              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            # Pindahkan file dari direktori temp ke direktori aplikasi
+            # Pastikan untuk tidak menghapus node_modules dan .env jika sudah ada
+            if [ -d node_modules ]; then
+              mkdir -p /tmp/app-extract/node_modules
+              cp -r node_modules/* /tmp/app-extract/node_modules/
             fi
+            
+            if [ -f .env.backup ]; then
+              cp .env.backup /tmp/app-extract/.env
+            else
+              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > /tmp/app-extract/.env
+            fi
+            
+            # Hapus direktori lama kecuali node_modules dan file .env
+            find . -mindepth 1 -not -name "node_modules" -not -name ".env" -not -name "build.tar.gz" -not -name ".env.backup" -exec rm -rf {} +
+            
+            # Pindahkan isi extract ke direktori aplikasi
+            cp -r /tmp/app-extract/* .
+            cp -r /tmp/app-extract/.* . 2>/dev/null || true
+            
+            # Bersihkan direktori temp
+            rm -rf /tmp/app-extract
             
             # Install NVM jika belum ada
             if [ ! -d "$HOME/.nvm" ]; then
@@ -99,6 +119,12 @@ jobs:
             echo "Generating Prisma client..."
             npx prisma generate
             
+            # Periksa struktur direktori
+            echo "Directory structure:"
+            ls -la
+            echo "Src directory:"
+            ls -la src
+            
             # Setup PM2 untuk menggunakan versi Node.js yang benar
             echo "Setting up PM2..."
             
@@ -122,7 +148,7 @@ jobs:
                   NODE_ENV: "production",
                   PORT: 8080
                 },
-                interpreter: "$HOME/.nvm/versions/node/v18.18.0/bin/node"  // Explicit Node.js path
+                interpreter: "$HOME/.nvm/versions/node/v18.18.0/bin/node"
               }]
             };
             EOL
