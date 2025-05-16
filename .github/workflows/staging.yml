@@ -1,3 +1,4 @@
+
 name: Deploy Express API with Prisma to cPanel
 
 on:
@@ -25,32 +26,59 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-        
-      - name: Deploy to cPanel via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          port: ${{ secrets.PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: |
-            # Menentukan path deploy
-            DEPLOY_PATH="/home/metrosof/api/surau-quran-staging-api"
-            mkdir -p $DEPLOY_PATH
-            cd $DEPLOY_PATH
-            
-            # Dapatkan artifact terbaru (cara alternatif tanpa menggunakan tar langsung)
-            # Bersihkan file lama jika perlu, tapi simpan node_modules dan .env
-            find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
-            
-            # Jika ingin menjaga node_modules tetap utuh
-            #find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
-            
-      - name: Compress build directory
+      
+      - name: Debug - List directory structure
         run: |
-          tar -czf build.tar.gz  package.json package-lock.json ecosystem.config.js prisma/
+          echo "Current directory structure:"
+          ls -la
+          echo "\nChecking if src directory exists:"
+          if [ -d "src" ]; then 
+            echo "src/ directory found"
+            ls -la src/
+          else 
+            echo "src/ directory not found!" 
+            echo "Looking for other source directories:"
+            find . -type d -not -path "*/node_modules/*" -not -path "*/.git/*" | sort
+          fi
+          
+      # Mencoba metode explicit include daripada exclude
+      - name: Compress all source files
+        run: |
+          # Mencari semua folder dan file penting
+          echo "Creating explicit list of important folders"
+          
+          # Buat daftar semua file dan folder kecuali node_modules dan .git
+          find . -type d -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.github/*" > important_dirs.txt
+          find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.github/*" -not -name ".env" > important_files.txt
+          
+          # Debug - tampilkan daftar file/folder penting
+          echo "Important directories to include:"
+          cat important_dirs.txt
+          
+          echo "Important files to include (sample):"
+          head -n 20 important_files.txt
+          
+          # Buat archive dengan semua file/folder penting
+          mkdir -p /tmp/deploy-files
+          
+          # Copy semua folder penting
+          cat important_dirs.txt | xargs -I{} mkdir -p "/tmp/deploy-files/{}"
+          
+          # Copy semua file penting
+          cat important_files.txt | xargs -I{} cp --parents "{}" /tmp/deploy-files/
+          
+          # Debug - cek hasil copy
+          echo "Files ready for deployment:"
+          find /tmp/deploy-files -type f | sort | head -n 20
+          
+          # Create tar archive of all copied files
+          cd /tmp/deploy-files
+          tar -czf /tmp/build.tar.gz .
+          cp /tmp/build.tar.gz $GITHUB_WORKSPACE/build.tar.gz
+          
+          # Debug - verify tar contents
+          echo "Tar contents (sample):"
+          tar -tvf build.tar.gz | head -n 20
           
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
@@ -73,13 +101,70 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }} 
           script: |
             cd /home/metrosof/api/surau-quran-staging-api
-            tar -xzf build.tar.gz
-            npm ci --only=production
-            echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
-            npx prisma generate
-            if [ -f ~/.pm2/pm2.pid ]; then 
-              pm2 restart surau-quran-api || pm2 start index.js --name surau-quran-api
-            else 
-              pm2 start index.js --name surau-quran-api
+            
+            # Backup .env dan node_modules
+            if [ -f .env ]; then
+              cp .env .env.backup
             fi
+            if [ -d node_modules ]; then
+              mv node_modules node_modules_backup
+            fi
+            
+            # Debug - lihat isi tar sebelum extract
+            echo "Checking tar contents before extracting:"
+            tar -tvf build.tar.gz | grep -E "src|index.js|app.js" || echo "src/ or main files not found in archive!"
+            
+            # Extract files
+            tar -xzf build.tar.gz
+            
+            # Debug - periksa struktur direktori setelah extract
+            echo "Directory structure after extract:"
+            ls -la
+            if [ -d "src" ]; then
+              echo "src/ directory found after extract"
+              ls -la src/
+            else
+              echo "src/ directory still not found after extract!"
+            fi
+            
+            # Restore .env dari backup
+            if [ -f .env.backup ]; then
+              cp .env.backup .env
+              rm .env.backup
+            else
+              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            fi
+            
+            # Restore node_modules jika ada backup
+            if [ -d node_modules_backup ]; then
+              rm -rf node_modules
+              mv node_modules_backup node_modules
+            else
+              npm ci --only=production
+            fi
+            
+            # Generate Prisma client
+            npx prisma generate
+            
+            # Restart atau mulai aplikasi dengan PM2
+            ENTRY_POINT="index.js"
+            if [ ! -f "$ENTRY_POINT" ]; then
+              if [ -f "app.js" ]; then
+                ENTRY_POINT="app.js"
+              elif [ -f "server.js" ]; then
+                ENTRY_POINT="server.js"
+              elif [ -f "src/index.js" ]; then
+                ENTRY_POINT="src/index.js"
+              fi
+            fi
+            
+            echo "Using entry point: $ENTRY_POINT"
+            
+            if [ -f ~/.pm2/pm2.pid ]; then 
+              pm2 restart surau-quran-api || pm2 start $ENTRY_POINT --name surau-quran-api
+            else 
+              pm2 start $ENTRY_POINT --name surau-quran-api
+            fi
+            
+            # Bersihkan file tar
             rm build.tar.gz
