@@ -1,4 +1,4 @@
-name: Deploy Express API with Prisma to cPanel
+ame: Deploy Express API with Prisma to cPanel
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.18' # Sesuaikan dengan versi yang dibutuhkan Prisma
+          node-version: '18.18'
           cache: 'npm'
           
       - name: Install dependencies
@@ -26,14 +26,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
-      # Pendekatan yang lebih aman untuk membuat tar file
+      # Gunakan zip daripada tar
       - name: Create deployment package
         run: |
-          # Buat tar dengan flag untuk mengabaikan warning "file changed"
-          tar --exclude='./node_modules' --exclude='./.git' --exclude='./.github' --exclude='./.env' --warning=no-file-changed -czf build.tar.gz .
+          # Buat zip (lebih stabil daripada tar)
+          zip -r build.zip . -x "node_modules/*" ".git/*" ".github/*" ".env"
           
-          # Verifikasi bahwa tar file dibuat
-          ls -la build.tar.gz
+          # Verifikasi
+          ls -la build.zip
           
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
@@ -43,10 +43,10 @@ jobs:
           port: ${{ secrets.PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }} 
-          source: "build.tar.gz"
+          source: "build.zip"
           target: "/home/metrosof/api/surau-quran-staging-api"
           
-      - name: Setup Node.js and deploy on cPanel
+      - name: Deploy on cPanel
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -57,84 +57,57 @@ jobs:
           script: |
             cd /home/metrosof/api/surau-quran-staging-api
             
-            # Backup .env jika sudah ada
+            # Backup .env dan node_modules
             if [ -f .env ]; then
               cp .env .env.backup
             fi
-            
-            # Untuk mencegah masalah dengan file yang berubah, buat direktori temp untuk extract
-            mkdir -p /tmp/app-extract
-            tar -xzf build.tar.gz -C /tmp/app-extract
-            
-            # Pindahkan file dari direktori temp ke direktori aplikasi
-            # Pastikan untuk tidak menghapus node_modules dan .env jika sudah ada
             if [ -d node_modules ]; then
-              mkdir -p /tmp/app-extract/node_modules
-              cp -r node_modules/* /tmp/app-extract/node_modules/
+              mv node_modules node_modules_backup
             fi
             
+            # Unzip file
+            unzip -o build.zip
+            
+            # Restore .env
             if [ -f .env.backup ]; then
-              cp .env.backup /tmp/app-extract/.env
+              cp .env.backup .env
+              rm .env.backup
             else
-              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > /tmp/app-extract/.env
+              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
             fi
             
-            # Hapus direktori lama kecuali node_modules dan file .env
-            find . -mindepth 1 -not -name "node_modules" -not -name ".env" -not -name "build.tar.gz" -not -name ".env.backup" -exec rm -rf {} +
-            
-            # Pindahkan isi extract ke direktori aplikasi
-            cp -r /tmp/app-extract/* .
-            cp -r /tmp/app-extract/.* . 2>/dev/null || true
-            
-            # Bersihkan direktori temp
-            rm -rf /tmp/app-extract
-            
-            # Install NVM jika belum ada
-            if [ ! -d "$HOME/.nvm" ]; then
-              echo "Installing NVM..."
-              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+            # Restore node_modules atau install dependencies
+            if [ -d node_modules_backup ]; then
+              rm -rf node_modules
+              mv node_modules_backup node_modules
+            else
+              # Setup NVM dan Node.js 18.18
+              if [ ! -d "$HOME/.nvm" ]; then
+                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+              fi
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+              nvm install 18.18
+              nvm use 18.18
+              
+              # Install dependencies
+              npm install
+              npm install dotenv --save
             fi
             
-            # Load NVM
+            # Generate Prisma
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            
-            # Install Node.js versi yang kompatibel dengan Prisma
-            echo "Installing Node.js 18.18 (required by Prisma)..."
-            nvm install 18.18
             nvm use 18.18
-            
-            # Verifikasi versi Node.js
-            echo "Current Node.js version:"
-            node -v
-            
-            # Pastikan dotenv dan semua dependensi terinstal
-            echo "Installing dependencies..."
-            npm install
-            
-            # Khusus memastikan dotenv terinstal
-            npm install dotenv --save
-            
-            # Generate Prisma client
-            echo "Generating Prisma client..."
             npx prisma generate
             
-            # Periksa struktur direktori
-            echo "Directory structure:"
-            ls -la
-            echo "Src directory:"
-            ls -la src
-            
-            # Setup PM2 untuk menggunakan versi Node.js yang benar
-            echo "Setting up PM2..."
-            
-            # Jika PM2 belum terinstal, install secara global
+            # Setup PM2
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
             fi
             
-            # Buat atau update file ecosystem.config.js
-            cat > ecosystem.config.js << 'EOL'
+            # Create PM2 config
+            cat > ecosystem.config.js << EOL
             module.exports = {
               apps: [{
                 name: "surau-quran-api",
@@ -153,15 +126,21 @@ jobs:
             };
             EOL
             
-            # Restart atau start aplikasi menggunakan PM2 dengan file konfigurasi baru
+            # Start app
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 18.18
             if pm2 list | grep -q "surau-quran-api"; then
               pm2 delete surau-quran-api
             fi
-            
             pm2 start ecosystem.config.js
-            
-            # Simpan konfigurasi PM2 agar berjalan setelah reboot
             pm2 save
             
-            # Bersihkan file tar
-            rm build.tar.gz
+            # Clean up
+            rm build.zip
+            
+            # Check structure
+            echo "Directory contents:"
+            ls -la
+            echo "Src directory contents:"
+            ls -la src
