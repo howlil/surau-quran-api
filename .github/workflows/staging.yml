@@ -25,7 +25,6 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
         
       - name: Deploy to cPanel via SSH
         uses: appleboy/ssh-action@master
@@ -41,16 +40,27 @@ jobs:
             mkdir -p $DEPLOY_PATH
             cd $DEPLOY_PATH
             
-            # Dapatkan artifact terbaru (cara alternatif tanpa menggunakan tar langsung)
-            # Bersihkan file lama jika perlu, tapi simpan node_modules dan .env
-            find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
+            # Backup .env jika sudah ada
+            if [ -f .env ]; then
+              cp .env .env.backup
+            fi
             
-            # Jika ingin menjaga node_modules tetap utuh
-            #find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
-            
-      - name: Compress build directory
+            # Backup node_modules jika ada
+            if [ -d node_modules ]; then
+              mv node_modules node_modules_backup
+            fi
+      
+      - name: Compress entire project (excluding node_modules and git files)
         run: |
-          tar -czf build.tar.gz  package.json package-lock.json ecosystem.config.js prisma/
+          # Exclude files/directories yang tidak perlu di-deploy
+          echo "node_modules/" > .deployignore
+          echo ".git/" >> .deployignore
+          echo ".github/" >> .deployignore
+          echo ".gitignore" >> .deployignore
+          echo ".env" >> .deployignore
+          
+          # Compress seluruh project kecuali yang di-exclude
+          tar --exclude-from=.deployignore -czf build.tar.gz .
           
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
@@ -73,13 +83,35 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }} 
           script: |
             cd /home/metrosof/api/surau-quran-staging-api
+            
+            # Extract files
             tar -xzf build.tar.gz
-            npm ci --only=production
-            echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            
+            # Restore .env dari backup
+            if [ -f .env.backup ]; then
+              cp .env.backup .env
+              rm .env.backup
+            else
+              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            fi
+            
+            # Restore node_modules jika ada backup
+            if [ -d node_modules_backup ]; then
+              rm -rf node_modules
+              mv node_modules_backup node_modules
+            else
+              npm ci --only=production
+            fi
+            
+            # Generate Prisma client
             npx prisma generate
+            
+            # Restart atau mulai aplikasi dengan PM2
             if [ -f ~/.pm2/pm2.pid ]; then 
               pm2 restart surau-quran-api || pm2 start index.js --name surau-quran-api
             else 
               pm2 start index.js --name surau-quran-api
             fi
+            
+            # Bersihkan file tar
             rm build.tar.gz
