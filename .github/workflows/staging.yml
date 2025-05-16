@@ -1,0 +1,76 @@
+name: Deploy Express API with Prisma to cPanel
+
+on:
+  push:
+    branches: [main]  
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      # Generate Prisma client
+      - name: Generate Prisma
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      
+      # Opsional: Jalankan migration jika diperlukan
+      # - name: Run Prisma migrations
+      #   run: npx prisma migrate deploy
+      #   env:
+      #     DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Setup known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Deploy to cPanel via SSH
+        run: |
+          DEPLOY_PATH="/home/metrosof/api/surau-quran-staging-api"
+          
+          # Exclude file yang tidak perlu di-deploy
+          echo "node_modules/" > .deployignore
+          echo ".git/" >> .deployignore
+          echo ".github/" >> .deployignore
+          echo ".env" >> .deployignore
+          
+          # Buat archive dari project (exclude node_modules dan file git)
+          tar --exclude-from=.deployignore -czf deploy.tar.gz .
+          
+          # Buat direktori deploy jika belum ada
+          ssh -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "mkdir -p ${DEPLOY_PATH}"
+          
+          # Upload archive
+          scp -P ${{ secrets.PORT }} deploy.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${DEPLOY_PATH}
+          
+          # Extract dan setup aplikasi
+          ssh -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd ${DEPLOY_PATH} && \
+            tar -xzf deploy.tar.gz && \
+            npm ci --only=production && \
+            # Setup env file
+            echo \"DATABASE_URL='${{ secrets.DATABASE_URL }}'\" > .env && \
+            # Generate prisma client (di server)
+            npx prisma generate && \
+            # Restart aplikasi
+            if [ -f ~/.pm2/pm2.pid ]; then pm2 restart index.js || pm2 start index.js --name surau-quran-api; else pm2 start index.js --name surau-quran-api; fi && \
+            rm deploy.tar.gz"
