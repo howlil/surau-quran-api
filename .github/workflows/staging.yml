@@ -21,56 +21,64 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      # Generate Prisma client
       - name: Generate Prisma
         run: npx prisma generate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
-      # Opsional: Jalankan migration jika diperlukan
-      # - name: Run Prisma migrations
-      #   run: npx prisma migrate deploy
-      #   env:
-      #     DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        
-
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-      - name: Setup known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts
-          
       - name: Deploy to cPanel via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            DEPLOY_PATH="/home/metrosof/api/surau-quran-staging-api"
+            mkdir -p $DEPLOY_PATH
+            cd $DEPLOY_PATH
+            
+            # Dapatkan artifact terbaru (cara alternatif tanpa menggunakan tar langsung)
+            # Bersihkan file lama jika perlu, tapi simpan node_modules dan .env
+            find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
+            
+            # Jika ingin menjaga node_modules tetap utuh
+            #find . -type f -not -path "./node_modules/*" -not -name ".env" -delete
+            
+      - name: Compress build directory
         run: |
-          DEPLOY_PATH="/home/metrosof/api/surau-quran-staging-api"
+          tar -czf build.tar.gz dist/ package.json package-lock.json ecosystem.config.js prisma/
           
-          # Exclude file yang tidak perlu di-deploy
-          echo "node_modules/" > .deployignore
-          echo ".git/" >> .deployignore
-          echo ".github/" >> .deployignore
-          echo ".env" >> .deployignore
-          
-          # Buat archive dari project (exclude node_modules dan file git)
-          tar --exclude-from=.deployignore -czf deploy.tar.gz .
-          
-          # Buat direktori deploy jika belum ada
-          ssh -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "mkdir -p ${DEPLOY_PATH}"
-          
-          # Upload archive
-          scp -P ${{ secrets.PORT }} deploy.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:${DEPLOY_PATH}
-          
-          # Extract dan setup aplikasi
-          ssh -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd ${DEPLOY_PATH} && \
-            tar -xzf deploy.tar.gz && \
-            npm ci --only=production && \
-            # Setup env file
-            echo \"DATABASE_URL='${{ secrets.DATABASE_URL }}'\" > .env && \
-            # Generate prisma client (di server)
-            npx prisma generate && \
-            # Restart aplikasi
-            if [ -f ~/.pm2/pm2.pid ]; then pm2 restart index.js || pm2 start index.js --name surau-quran-api; else pm2 start index.js --name surau-quran-api; fi && \
-            rm deploy.tar.gz"
+      - name: Deploy files to cPanel
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "build.tar.gz"
+          target: "/home/metrosof/api/surau-quran-staging-api"
+
+
+      - name: Setup application in cPanel
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd /home/metrosof/api/surau-quran-staging-api
+            tar -xzf build.tar.gz
+            npm ci --only=production
+            echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+            npx prisma generate
+            if [ -f ~/.pm2/pm2.pid ]; then 
+              pm2 restart surau-quran-api || pm2 start index.js --name surau-quran-api
+            else 
+              pm2 start index.js --name surau-quran-api
+            fi
+            rm build.tar.gz
