@@ -1,5 +1,5 @@
-const { prisma } = require('../../config/prisma.config');
-const { logger } = require('../../config/logger.config');
+const { prisma } = require('../config/prisma.config');
+const { logger } = require('../config/logger.config');
 
 class PrismaUtils {
   static async transaction(callback) {
@@ -27,6 +27,11 @@ class PrismaUtils {
       include = {}
     } = options;
 
+    // Exclude createdAt and updatedAt from select if they exist
+    const excludedFields = ['createdAt', 'updatedAt'];
+    const filteredSelect = Object.fromEntries(
+      Object.entries(select).filter(([key]) => !excludedFields.includes(key))
+    );
     const skip = (page - 1) * limit;
 
     const [total, data] = await prisma.$transaction([
@@ -36,19 +41,24 @@ class PrismaUtils {
         take: limit,
         where,
         orderBy,
-        select: Object.keys(select).length ? select : undefined,
+        select: Object.keys(filteredSelect).length ? filteredSelect : undefined,
         include: Object.keys(include).length ? include : undefined
       })
     ]);
 
+    const filteredData = data.map(item => {
+      const { createdAt, updatedAt, ...rest } = item;
+      return rest;
+    });
+    
     return {
-      data,
+      data: filteredData,
       meta: {
         total,
         page: Number(page),
         limit: Number(limit),
         totalPages: Math.ceil(total / limit),
-        hasNextPage: skip + data.length < total,
+        hasNextPage: skip + filteredData.length < total,
         hasPreviousPage: page > 1
       }
     };
@@ -56,10 +66,14 @@ class PrismaUtils {
 
   static buildWhereClause(filters = {}) {
     const where = {};
-    
+
     Object.entries(filters).forEach(([key, value]) => {
+      // Exclude createdAt and updatedAt from where clause
+      if (key === 'createdAt' || key === 'updatedAt') {
+        return;
+      }
+
       if (value !== undefined && value !== null && value !== '') {
-        // Handle different data types appropriately
         if (typeof value === 'string' && !isNaN(value) && !isNaN(parseFloat(value))) {
           if (value.includes('.')) {
             where[key] = parseFloat(value);
@@ -67,7 +81,6 @@ class PrismaUtils {
             where[key] = parseInt(value, 10);
           }
         } else if (typeof value === 'string') {
-          // String search with case insensitivity
           where[key] = { contains: value, mode: 'insensitive' };
         } else {
           where[key] = value;
