@@ -1,13 +1,20 @@
 const { logger } = require('../../lib/config/logger.config');
 const AdminSeeder = require('./admin.seed');
+const KelasSeeder = require('./kelas.seed');
+const ProgramSeeder = require('./program.seed');
+const JamMengajarSeeder = require('./jam-mengajar.seed');
 
 async function seedDatabase() {
   try {
     logger.info('Starting database seeding...');
-    
+
+    await KelasSeeder.seed();
+    await ProgramSeeder.seed();
+    await JamMengajarSeeder.seed();
     await AdminSeeder.seed();
-   
-    
+
+
+
     logger.info('Database seeding completed successfully');
   } catch (error) {
     logger.error('Error seeding database:', error);
@@ -18,9 +25,9 @@ async function seedDatabase() {
 if (require.main === module) {
   // Load environment variables
   require('dotenv').config();
-  
+
   const { prismaConfig } = require('../../lib/config/prisma.config');
-  
+
   prismaConfig.connect()
     .then(() => seedDatabase())
     .then(() => prismaConfig.disconnect())

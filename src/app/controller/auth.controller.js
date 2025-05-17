@@ -29,16 +29,7 @@ class AuthController {
     }
   }
 
-  async createGuru(req, res, next) {
-    try {
-      const guruData = req.body;
-      const result = await authService.createGuru(guruData);
-      
-      return Http.Response.created(res, result, 'Akun guru berhasil dibuat');
-    } catch (error) {
-      next(error);
-    }
-  }
+ 
 }
 
 module.exports = new AuthController();

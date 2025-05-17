@@ -61,7 +61,6 @@ const PAGINATION = {
 
 const DATE_FORMATS = {
   DEFAULT: 'DD-MM-YYYY',
-  DATETIME: 'DD-MM-YYYY HH:mm:ss',
   TIME: 'HH:mm',
   MONTH_YEAR: 'MMMM YYYY'
 };

@@ -42,7 +42,7 @@ model Siswa {
   noWhatsapp       String?
   namaMurid        String
   namaPanggilan    String?
-  tanggalLahir     DateTime? @db.Date
+  tanggalLahir     String?
   jenisKelamin     Gender
   alamat           String?
   strataPendidikan SPM?
@@ -98,7 +98,7 @@ model Guru {
 
 model Kelas {
   id        String    @id @default(uuid())
-  namaKelas TipeKelas
+  namaKelas String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -108,7 +108,7 @@ model Kelas {
 
 model Program {
   id          String       @id @default(uuid())
-  namaProgram TIPE_Program
+  namaProgram String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -119,8 +119,8 @@ model Program {
 
 model JamMengajar {
   id         String   @id @default(uuid())
-  jamMulai   DateTime @db.Time()
-  jamSelesai DateTime @db.Time()
+  jamMulai   String
+  jamSelesai String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -133,9 +133,9 @@ model KelasProgram {
   kelasId       String
   programId     String
   jamMengajarId String
-  hari          Hari
+  hari          String
   guruId        String
-  tipeKelas     TipeKelas
+  tipeKelas     String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -183,7 +183,7 @@ model RiwayatStatusSiswa {
   programSiswaId   String
   statusLama       StatusSiswa
   statusBaru       StatusSiswa
-  tanggalPerubahan DateTime    @default(now())
+  tanggalPerubahan String
   keterangan       String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -195,7 +195,7 @@ model RiwayatStatusSiswa {
 model AbsensiSiswa {
   id              String          @id @default(uuid())
   jadwalSiswaId   String
-  tanggal         DateTime        @db.Date
+  tanggal         String
   statusKehadiran StatusKehadiran
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -208,9 +208,9 @@ model AbsensiGuru {
   id              String          @id @default(uuid())
   kelasProgramId  String
   payrollId       String?
-  tanggal         DateTime        @db.Date
-  jamMasuk        DateTime        @db.Time()
-  jamKeluar       DateTime        @db.Time()
+  tanggal         String
+  jamMasuk        String
+  jamKeluar       String
   sks             Int
   suratIzin       String?
   statusKehadiran StatusKehadiran
@@ -243,7 +243,7 @@ model Pendaftaran {
   programSiswaId   String
   pembayaranId     String?          @unique
   biayaPendaftaran Decimal          @db.Decimal(10, 2)
-  tanggalDaftar    DateTime         @db.Date
+  tanggalDaftar    String
   voucherId        String?
   diskon           Decimal          @db.Decimal(10, 2)
   totalBiaya       Decimal          @db.Decimal(10, 2)
@@ -263,8 +263,8 @@ model PeriodeSpp {
   programSiswaId    String
   bulan             String
   tahun             Int
-  tanggalTagihan    DateTime         @db.Date
-  tanggalJatuhTempo DateTime         @db.Date
+  tanggalTagihan    String
+  tanggalJatuhTempo String
   jumlahTagihan     Decimal          @db.Decimal(10, 2)
   voucherId         String?
   diskon            Decimal          @db.Decimal(10, 2)
@@ -286,7 +286,7 @@ model Pembayaran {
   metodePembayaran  MetodePembayaran
   jumlahTagihan     Decimal          @db.Decimal(10, 2)
   statusPembayaran  StatusPembayaran
-  tanggalPembayaran DateTime         @db.Date
+  tanggalPembayaran String
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -303,8 +303,8 @@ model XenditPayment {
   xenditExternalId     String
   xenditPaymentUrl     String
   xenditPaymentChannel String
-  xenditExpireDate     DateTime
-  xenditPaidAt         DateTime?
+  xenditExpireDate     String
+  xenditPaidAt         String?
   xenditStatus         XenditStatus
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
@@ -367,7 +367,7 @@ model PayrollDisbursement {
   id                   String                   @id @default(uuid())
   payrollId            String                   @unique
   amount               Decimal                  @db.Decimal(10, 2)
-  tanggalProses        DateTime                 @db.Date
+  tanggalProses        String
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
 
@@ -383,8 +383,8 @@ model XenditDisbursement {
   xenditExternalId      String
   xenditAmount          Decimal                  @db.Decimal(10, 2)
   xenditStatus          XenditDisbursementStatus
-  xenditCreatedAt       DateTime
-  xenditUpdatedAt       DateTime?
+  xenditCreatedAt       String
+  xenditUpdatedAt       String?
   rawResponse           Json?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
@@ -394,7 +394,7 @@ model XenditDisbursement {
   xenditCallbackDisbursement XenditCallbackDisbursement[]
 }
 
-// ENUMS
+
 enum Role {
   ADMIN
   SISWA
@@ -416,41 +416,6 @@ enum SPM {
   UMUM
 }
 
-enum TIPE_Kelas {
-  MAKKAH
-  MADINAH
-  ALAQSA
-  PUSTAKA
-  NABAWI
-  SHAFA
-  MARWAH
-  PRIVATE
-  TAHSIN
-  TAHFIDZ
-}
-
-enum TIPE_Program {
-  PRE_BTA
-  BTA_LVL_1
-  BTA_LVL_2
-  TAHSIN
-  TAHFIDZ
-  PRIVATE
-}
-
-enum TipeKelas {
-  GROUP
-  PRIVATE
-}
-
-enum Hari {
-  SENIN
-  SELASA
-  RABU
-  KAMIS
-  JUMAT
-  SABTU
-}
 
 enum StatusPembayaran {
   PENDING
