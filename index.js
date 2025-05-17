@@ -4,7 +4,6 @@ const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
-const initializeDatabase = require('./src/database/init');
 
 
 
@@ -37,7 +36,6 @@ class Application {
 
   async connectDatabase() {
     try {
-      await initializeDatabase({ alter: process.env.NODE_ENV === 'development' });
 
     } catch (error) {
       logger.error('Failed to start server:', error);
