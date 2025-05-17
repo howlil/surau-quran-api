@@ -6,11 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "migrate": "sequelize-cli db:migrate",
-    "migrate:undo": "sequelize-cli db:migrate:undo",
-    "seed": "sequelize-cli db:seed:all",
-    "model:generate": "sequelize-cli model:generate",
-    "db:reset": "sequelize-cli db:drop && sequelize-cli db:create && npm run migrate && npm run seed"
+    "seed": "node src/database/seeders/index.js",
+    "generate": "prisma generate"
   },
   "keywords": [
     "school",
@@ -25,6 +22,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",

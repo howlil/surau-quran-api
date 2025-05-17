@@ -4,7 +4,10 @@ const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
+const SecurityMiddleware = require('./src/app/middleware/security.middleware');
+
 const { prismaConfig } = require('./src/lib/config/prisma.config');
+const routes = require('./src/app/routes');
 
 
 class Application {
@@ -17,12 +20,16 @@ class Application {
   }
 
   setupMiddleware() {
+
+    SecurityMiddleware.setup(this.app);
+
     this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.urlencoded({ extended: true }));    
     this.app.use(loggerMiddleware);
   }
 
   setupRoutes() {
+    this.app.use('/api', routes);
 
     this.app.get('/', (req, res) => {
       Http.Response.success(res, { status: 'ok', timestamp: new Date() }, 'API is running');
@@ -51,6 +58,7 @@ class Application {
 
       this.server = this.app.listen(this.port, () => {
         logger.info(`Server running on port ${this.port}`);
+        logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       });
 
       this.setupGracefulShutdown();
@@ -60,14 +68,30 @@ class Application {
     }
   }
 
+
   setupGracefulShutdown() {
     const shutdown = async () => {
       logger.info('Shutting down server...');
+
       if (this.server) {
         this.server.close(() => {
-          logger.info('Server closed');
-          process.exit(0);
+          logger.info('HTTP server closed');
+
+          prismaConfig.disconnect()
+            .then(() => {
+              logger.info('Database connection closed');
+              process.exit(0);
+            })
+            .catch((error) => {
+              logger.error('Error closing database connection:', error);
+              process.exit(1);
+            });
         });
+
+        setTimeout(() => {
+          logger.error('Forced shutdown after timeout');
+          process.exit(1);
+        }, 30000);
       }
     };
 

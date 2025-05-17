@@ -1,0 +1,61 @@
+const Joi = require('joi');
+const ValidatorFactory = require('./factory.validation');
+
+class AuthValidation {
+  static login() {
+    return ValidatorFactory.create({
+      email: Joi.string().email().required()
+        .messages({
+          'string.email': 'Email harus valid',
+          'any.required': 'Email wajib diisi'
+        }),
+      password: Joi.string()
+        .min(6)
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        .required()
+        .messages({
+          'string.min': 'Password minimal 6 karakter',
+          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+          'any.required': 'Password wajib diisi'
+        })
+    });
+  }
+
+  static createGuru() {
+    return ValidatorFactory.create({
+      email: Joi.string().email().required()
+        .messages({
+          'string.email': 'Email harus valid',
+          'any.required': 'Email wajib diisi'
+        }),
+   password: Joi.string()
+        .min(6)
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        .required()
+        .messages({
+          'string.min': 'Password minimal 6 karakter',
+          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+          'any.required': 'Password wajib diisi'
+        }),
+      nama: Joi.string().required()
+        .messages({
+          'any.required': 'Nama wajib diisi'
+        }),
+      noWhatsapp: Joi.string().optional(),
+      alamat: Joi.string().optional(),
+      jenisKelamin: Joi.string().valid('LAKI_LAKI', 'PEREMPUAN').optional(),
+      keahlian: Joi.string().optional(),
+      pendidikanTerakhir: Joi.string().optional(),
+      noRekening: Joi.string().optional(),
+      namaBank: Joi.string().optional(),
+      tarifPerJam: Joi.number().precision(2).positive().required()
+        .messages({
+          'number.base': 'Tarif per jam harus berupa angka',
+          'number.positive': 'Tarif per jam harus lebih dari 0',
+          'any.required': 'Tarif per jam wajib diisi'
+        })
+    });
+  }
+}
+
+module.exports = AuthValidation;
