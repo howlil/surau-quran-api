@@ -3,7 +3,6 @@ const { UnauthorizedError, ConflictError } = require('../../lib/http/errors.http
 const { logger } = require('../../lib/config/logger.config');
 const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
-const CONSTANT = require('../../lib/constants/enum');
 
 class AuthService {
     async login(email, password) {
