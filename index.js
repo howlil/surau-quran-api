@@ -2,9 +2,11 @@
 require('dotenv').config();
 const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
-const { connect: connectDb } = require('./src/lib/config/prisma.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
+const initializeDatabase = require('./src/database/init');
+
+
 
 class Application {
   constructor() {
@@ -22,7 +24,7 @@ class Application {
   }
 
   setupRoutes() {
-    
+
     this.app.get('/', (req, res) => {
       Http.Response.success(res, { status: 'ok', timestamp: new Date() }, 'API is running');
     });
@@ -32,20 +34,22 @@ class Application {
     Http.setupErrorHandling(this.app);
   }
 
+
   async connectDatabase() {
     try {
-      await connectDb();
-      logger.info('Database connection established');
+      await initializeDatabase({ alter: process.env.NODE_ENV === 'development' });
+
     } catch (error) {
-      logger.error('Failed to connect to database:', error);
+      logger.error('Failed to start server:', error);
       process.exit(1);
     }
   }
 
+
   async start() {
     try {
       await this.connectDatabase();
-      
+
       this.server = this.app.listen(this.port, () => {
         logger.info(`Server running on port ${this.port}`);
       });
