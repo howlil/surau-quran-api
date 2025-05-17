@@ -1,15 +1,520 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "rhel-openssl-1.0.x", "windows"]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  siswa Siswa?
+  admin Admin?
+  guru  Guru?
+  token Token[]
+}
+
+model Token {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+// Student model
+model Siswa {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  noWhatsapp       String?
+  namaMurid        String
+  namaPanggilan    String?
+  tanggalLahir     DateTime? @db.Date
+  jenisKelamin     Gender
+  alamat           String?
+  strataPendidikan SPM?
+  kelasSekolah     String?
+  namaSekolah      String?
+  namaOrangTua     String?
+  namaPenjemput    String?
+  isRegistered     Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id])
+  programSiswa ProgramSiswa[]
+  pendaftaran  Pendaftaran[]
+}
+
+// Admin model
+model Admin {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  nama      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+// Teacher model
+model Guru {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  nama               String
+  noWhatsapp         String?
+  alamat             String?
+  jenisKelamin       Gender?
+  fotoProfile        String?
+  keahlian           String?
+  pendidikanTerakhir String?
+  noRekening         String?
+  namaBank           String?
+  tarifPerJam        Decimal  @db.Decimal(10, 2)
+  suratKontrak       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id])
+  kelasProgram KelasProgram[]
+  payroll      Payroll[]
+}
+
+model Kelas {
+  id        String    @id @default(uuid())
+  namaKelas TipeKelas
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  kelasProgram KelasProgram[]
+}
+
+model Program {
+  id          String       @id @default(uuid())
+  namaProgram TIPE_Program
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  kelasProgram KelasProgram[]
+  programSiswa ProgramSiswa[]
+}
+
+model JamMengajar {
+  id         String   @id @default(uuid())
+  jamMulai   DateTime @db.Time()
+  jamSelesai DateTime @db.Time()
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  kelasProgram KelasProgram[]
+}
+
+model KelasProgram {
+  id            String    @id @default(uuid())
+  kelasId       String
+  programId     String
+  jamMengajarId String
+  hari          Hari
+  guruId        String
+  tipeKelas     TipeKelas
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  kelas       Kelas         @relation(fields: [kelasId], references: [id])
+  program     Program       @relation(fields: [programId], references: [id])
+  jamMengajar JamMengajar   @relation(fields: [jamMengajarId], references: [id])
+  guru        Guru          @relation(fields: [guruId], references: [id])
+  jadwalSiswa JadwalSiswa[]
+  absensiGuru AbsensiGuru[]
+}
+
+model ProgramSiswa {
+  id        String      @id @default(uuid())
+  siswaId   String
+  programId String
+  status    StatusSiswa
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  siswa              Siswa                @relation(fields: [siswaId], references: [id])
+  program            Program              @relation(fields: [programId], references: [id])
+  jadwalSiswa        JadwalSiswa[]
+  riwayatStatusSiswa RiwayatStatusSiswa[]
+  pendaftaran        Pendaftaran[]
+  periodeSpp         PeriodeSpp[]
+}
+
+model JadwalSiswa {
+  id             String   @id @default(uuid())
+  programSiswaId String
+  kelasProgramId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  programSiswa ProgramSiswa   @relation(fields: [programSiswaId], references: [id])
+  kelasProgram KelasProgram   @relation(fields: [kelasProgramId], references: [id])
+  absensiSiswa AbsensiSiswa[]
+}
+
+model RiwayatStatusSiswa {
+  id               String      @id @default(uuid())
+  programSiswaId   String
+  statusLama       StatusSiswa
+  statusBaru       StatusSiswa
+  tanggalPerubahan DateTime    @default(now())
+  keterangan       String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
+}
+
+model AbsensiSiswa {
+  id              String          @id @default(uuid())
+  jadwalSiswaId   String
+  tanggal         DateTime        @db.Date
+  statusKehadiran StatusKehadiran
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  jadwalSiswa JadwalSiswa @relation(fields: [jadwalSiswaId], references: [id])
+}
+
+model AbsensiGuru {
+  id              String          @id @default(uuid())
+  kelasProgramId  String
+  payrollId       String?
+  tanggal         DateTime        @db.Date
+  jamMasuk        DateTime        @db.Time()
+  jamKeluar       DateTime        @db.Time()
+  sks             Int
+  suratIzin       String?
+  statusKehadiran StatusKehadiran
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  payroll      Payroll?     @relation(fields: [payrollId], references: [id])
+  kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
+}
+
+model Voucher {
+  id               String      @id @default(uuid())
+  kodeVoucher      String      @unique
+  tipe             TipeVoucher
+  nominal          Decimal     @db.Decimal(10, 2)
+  isActive         Boolean     @default(true)
+  jumlahPenggunaan Int
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  pendaftaran Pendaftaran[]
+  periodeSpp  PeriodeSpp[]
+}
+
+model Pendaftaran {
+  id               String           @id @default(uuid())
+  siswaId          String
+  programSiswaId   String
+  pembayaranId     String?          @unique
+  biayaPendaftaran Decimal          @db.Decimal(10, 2)
+  tanggalDaftar    DateTime         @db.Date
+  voucherId        String?
+  diskon           Decimal          @db.Decimal(10, 2)
+  totalBiaya       Decimal          @db.Decimal(10, 2)
+  statusVerifikasi StatusVerifikasi
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  siswa        Siswa        @relation(fields: [siswaId], references: [id])
+  voucher      Voucher?     @relation(fields: [voucherId], references: [id])
+  programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
+  pembayaran   Pembayaran?  @relation(fields: [pembayaranId], references: [id])
+}
+
+model PeriodeSpp {
+  id                String           @id @default(uuid())
+  programSiswaId    String
+  bulan             String
+  tahun             Int
+  tanggalTagihan    DateTime         @db.Date
+  tanggalJatuhTempo DateTime         @db.Date
+  jumlahTagihan     Decimal          @db.Decimal(10, 2)
+  voucherId         String?
+  diskon            Decimal          @db.Decimal(10, 2)
+  totalTagihan      Decimal          @db.Decimal(10, 2)
+  statusPembayaran  StatusPembayaran
+  pembayaranId      String?          @unique
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
+  voucher      Voucher?     @relation(fields: [voucherId], references: [id])
+  pembayaran   Pembayaran?  @relation(fields: [pembayaranId], references: [id])
+}
+
+model Pembayaran {
+  id                String           @id @default(uuid())
+  tipePembayaran    TipePembayaran
+  metodePembayaran  MetodePembayaran
+  jumlahTagihan     Decimal          @db.Decimal(10, 2)
+  statusPembayaran  StatusPembayaran
+  tanggalPembayaran DateTime         @db.Date
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  periodeSpp    PeriodeSpp?
+  pendaftaran   Pendaftaran?
+  xenditPayment XenditPayment?
+}
+
+model XenditPayment {
+  id                   String       @id @default(uuid())
+  pembayaranId         String       @unique
+  xenditInvoiceId      String       @unique
+  xenditExternalId     String
+  xenditPaymentUrl     String
+  xenditPaymentChannel String
+  xenditExpireDate     DateTime
+  xenditPaidAt         DateTime?
+  xenditStatus         XenditStatus
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  
+  // Relations
+  pembayaran           Pembayaran   @relation(fields: [pembayaranId], references: [id])
+  xenditCallbackInvoice XenditCallbackInvoice[]
+}
+
+// Separate callback models for different reference types
+model XenditCallbackInvoice {
+  id              String          @id @default(uuid())
+  xenditPaymentId String
+  eventType       String
+  rawResponse     Json
+  amount          Decimal         @db.Decimal(10, 2)
+  status          XenditStatus
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  xenditPayment   XenditPayment   @relation(fields: [xenditPaymentId], references: [id])
+}
+
+model XenditCallbackDisbursement {
+  id                   String                   @id @default(uuid())
+  xenditDisbursementId String
+  eventType            String
+  rawResponse          Json
+  amount               Decimal                  @db.Decimal(10, 2)
+  status               XenditDisbursementStatus
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  // Relations
+  xenditDisbursement XenditDisbursement @relation(fields: [xenditDisbursementId], references: [id])
+}
+
+model Payroll {
+  id        String        @id @default(uuid())
+  guruId    String
+  periode   String
+  bulan     String
+  tahun     Int
+  gajiPokok Decimal       @db.Decimal(10, 2)
+  insentif  Decimal       @db.Decimal(10, 2)
+  potongan  Decimal       @db.Decimal(10, 2)
+  totalGaji Decimal       @db.Decimal(10, 2)
+  status    StatusPayroll
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relations
+  guru                Guru                  @relation(fields: [guruId], references: [id])
+  payrollDisbursement PayrollDisbursement?
+  absensiGuru         AbsensiGuru[]
+}
+
+model PayrollDisbursement {
+  id                   String                   @id @default(uuid())
+  payrollId            String                   @unique
+  amount               Decimal                  @db.Decimal(10, 2)
+  tanggalProses        DateTime                 @db.Date
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  // Relations
+  payroll            Payroll             @relation(fields: [payrollId], references: [id])
+  xenditDisbursement XenditDisbursement?
+}
+
+model XenditDisbursement {
+  id                    String                   @id @default(uuid())
+  payrollDisbursementId String                   @unique
+  xenditDisbursementId  String                   @unique
+  xenditExternalId      String
+  xenditAmount          Decimal                  @db.Decimal(10, 2)
+  xenditStatus          XenditDisbursementStatus
+  xenditCreatedAt       DateTime
+  xenditUpdatedAt       DateTime?
+  rawResponse           Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  // Relations
+  payrollDisbursement      PayrollDisbursement         @relation(fields: [payrollDisbursementId], references: [id])
+  xenditCallbackDisbursement XenditCallbackDisbursement[]
+}
+
+// ENUMS
+enum Role {
+  ADMIN
+  SISWA
+  GURU
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum SPM {
+  PAUD
+  TK
+  SD
+  SMP
+  SMA
+  KULIAH
+  UMUM
+}
+
+enum TIPE_Kelas {
+  MAKKAH
+  MADINAH
+  ALAQSA
+  PUSTAKA
+  NABAWI
+  SHAFA
+  MARWAH
+  PRIVATE
+  TAHSIN
+  TAHFIDZ
+}
+
+enum TIPE_Program {
+  PRE_BTA
+  BTA_LVL_1
+  BTA_LVL_2
+  TAHSIN
+  TAHFIDZ
+  PRIVATE
+}
+
+enum TipeKelas {
+  GROUP
+  PRIVATE
+}
+
+enum Hari {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+}
+
+enum StatusPembayaran {
+  PENDING
+  MENUNGGU_PEMBAYARAN
+  LUNAS
+  BELUM_BAYAR
+  KADALUARSA
+  DIBATALKAN
+}
+
+enum StatusVerifikasi {
+  MENUNGGU
+  DIVERIFIKASI
+}
+
+enum StatusKehadiran {
+  HADIR
+  TIDAK_HADIR
+  IZIN
+  SAKIT
+}
+
+enum StatusSiswa {
+  AKTIF
+  TIDAK_AKTIF
+  CUTI
+}
+
+enum StatusPayroll {
+  DRAFT
+  DIPROSES
+  SELESAI
+  GAGAL
+}
+
+enum MetodePembayaran {
+  TUNAI
+  VIRTUAL_ACCOUNT
+  EWALLET
+  RETAIL_OUTLET
+  CREDIT_CARD
+  QRIS
+}
+
+enum TipePembayaran {
+  PENDAFTARAN
+  SPP
+}
+
+enum TipeVoucher {
+  PERSENTASE
+  NOMINAL
+}
+
+enum XenditStatus {
+  PENDING
+  PAID
+  SETTLED
+  EXPIRED
+  FAILED
+}
+
+enum XenditDisbursementStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

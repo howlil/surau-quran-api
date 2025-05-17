@@ -4,7 +4,7 @@ const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
-
+const { prismaConfig } = require('./src/lib/config/prisma.config');
 
 
 class Application {
@@ -36,7 +36,8 @@ class Application {
 
   async connectDatabase() {
     try {
-
+      await prismaConfig.connect();
+      logger.info('Database connected successfully');
     } catch (error) {
       logger.error('Failed to start server:', error);
       process.exit(1);
