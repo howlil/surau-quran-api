@@ -84,15 +84,12 @@ class GuruValidation {
       pendidikanTerakhir: Joi.string().optional(),
       noRekening: Joi.string().optional(),
       namaBank: Joi.string().optional(),
-      tarifPerJam: Joi.number().precision(2).positive().optional()
+      tarifPerJam: Joi.number().positive().optional()
         .messages({
           'number.base': 'Tarif per jam harus berupa angka',
           'number.positive': 'Tarif per jam harus lebih dari 0'
         }),
-      suratKontrak: Joi.string().uri().optional()
-        .messages({
-          'string.uri': 'Surat kontrak harus berupa URL yang valid'
-        })
+      
     });
   }
 
@@ -120,22 +117,11 @@ class GuruValidation {
       pendidikanTerakhir: Joi.string().optional(),
       noRekening: Joi.string().optional(),
       namaBank: Joi.string().optional(),
-      suratKontrak: Joi.string().uri().optional()
-        .messages({
-          'string.uri': 'Surat kontrak harus berupa URL yang valid'
-        })
+    
     });
   }
 
-  static getById() {
-    return ValidatorFactory.create({
-      id: Joi.string().required()
-        .messages({
-          'string.empty': 'ID guru tidak boleh kosong',
-          'any.required': 'ID guru wajib diisi'
-        })
-    });
-  }
+  
 
   static getAll() {
     return ValidatorFactory.create({
@@ -152,10 +138,7 @@ class GuruValidation {
           'number.min': 'Batas minimal 1',
           'number.max': 'Batas maksimal 100'
         }),
-      nama: Joi.string().allow('', null),
-      noWhatsapp: Joi.string().allow('', null),
-      jenisKelamin: Joi.string().valid('LAKI_LAKI', 'PEREMPUAN').allow('', null),
-      keahlian: Joi.string().allow('', null)
+
     });
   }
 }

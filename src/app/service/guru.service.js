@@ -4,8 +4,11 @@ const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
+const { id } = require('../validation/factory.validation');
 
 class GuruService {
+
+  //create guru 
   async create(data) {
     try {
       const { email, password, ...guruData } = data;
@@ -19,6 +22,7 @@ class GuruService {
           throw new ConflictError(`User dengan email ${email} sudah ada`);
         }
 
+        const NIP = Math.floor(Math.random() * 1000000);
         const hashedPassword = await PasswordUtils.hash(password);
 
         const user = await tx.user.create({
@@ -32,7 +36,8 @@ class GuruService {
         const guru = await tx.guru.create({
           data: {
             ...guruData,
-            userId: user.id
+            userId: user.id,
+            nip: NIP
           },
           include: {
             user: {
@@ -54,6 +59,7 @@ class GuruService {
     }
   }
 
+  //admin update guru
   async update(id, data) {
     try {
       const guru = await prisma.guru.findUnique({
@@ -119,6 +125,7 @@ class GuruService {
     }
   }
 
+  //admin delete guru
   async delete(id) {
     try {
       const guru = await prisma.guru.findUnique({
@@ -159,70 +166,35 @@ class GuruService {
     }
   }
 
-  async getById(id) {
-    try {
-      const guru = await prisma.guru.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              role: true
-            }
-          },
-          kelasProgram: {
-            include: {
-              kelas: true,
-              program: true,
-              jamMengajar: true
-            }
-          }
-        }
-      });
 
-      if (!guru) {
-        throw new NotFoundError(`Guru dengan ID ${id} tidak ditemukan`);
-      }
-
-      return guru;
-    } catch (error) {
-      logger.error(`Error getting guru with ID ${id}:`, error);
-      throw error;
-    }
-  }
-
+  //admin
   async getAll(filters = {}) {
     try {
-      const { page = 1, limit = 10, nama, noWhatsapp, jenisKelamin, keahlian } = filters;
-      
-      const where = {};
-      if (nama) {
-        where.nama = { contains: nama, mode: 'insensitive' };
-      }
-      if (noWhatsapp) {
-        where.noWhatsapp = { contains: noWhatsapp };
-      }
-      if (jenisKelamin) {
-        where.jenisKelamin = jenisKelamin;
-      }
-      if (keahlian) {
-        where.keahlian = { contains: keahlian, mode: 'insensitive' };
-      }
+      const { page = 1, limit = 10 } = filters;
 
       return await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
         where,
-        include: {
+        select: {
+          id: true,
+          nama: true,
+          nip: true,
+          noWhatsapp: true,
+          alamat: true,
+          jenisKelamin: true,
+          fotoProfile: true,
+          keahlian: true,
+          pendidikanTerakhir: true,
+          noRekening: true,
+          namaBank: true,
           user: {
             select: {
-              id: true,
               email: true,
-              role: true
             }
           }
         },
+
         orderBy: { nama: 'asc' }
       });
     } catch (error) {
@@ -231,92 +203,10 @@ class GuruService {
     }
   }
 
-  async getProfile(userId) {
-    try {
-      const guru = await prisma.guru.findUnique({
-        where: { userId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              role: true
-            }
-          },
-          kelasProgram: {
-            include: {
-              kelas: true,
-              program: true,
-              jamMengajar: true
-            }
-          }
-        }
-      });
-
-      if (!guru) {
-        throw new NotFoundError('Profil guru tidak ditemukan');
-      }
-
-      return guru;
-    } catch (error) {
-      logger.error(`Error getting guru profile for user ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  async updateProfile(userId, data) {
-    try {
-      const guru = await prisma.guru.findUnique({
-        where: { userId }
-      });
-
-      if (!guru) {
-        throw new NotFoundError('Profil guru tidak ditemukan');
-      }
-
-      const { email, ...guruData } = data;
-
-      return await PrismaUtils.transaction(async (tx) => {
-        if (email) {
-          const existingUser = await tx.user.findFirst({
-            where: {
-              email,
-              id: { not: userId }
-            }
-          });
-
-          if (existingUser) {
-            throw new ConflictError(`Email ${email} sudah digunakan`);
-          }
-
-          await tx.user.update({
-            where: { id: userId },
-            data: { email }
-          });
-        }
-
-        const updated = await tx.guru.update({
-          where: { userId },
-          data: guruData,
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                role: true
-              }
-            }
-          }
-        });
-
-        logger.info(`Updated guru profile for user: ${userId}`);
-        return updated;
-      });
-    } catch (error) {
-      logger.error(`Error updating guru profile for user ${userId}:`, error);
-      throw error;
-    }
-  }
+ //TODO : admin bisa lihat list guru dan jadwal guru
+ 
+ //TODO : guru bisa lihat jadwal guru disinra sendiri
+ 
 }
 
 module.exports = new GuruService();

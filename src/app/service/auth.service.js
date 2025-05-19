@@ -39,7 +39,8 @@ class AuthService {
         }
     }
 
-   
+    
+    // TODO : lupa password send ke email link passwordnya nanti redirect ke frontend
 }
 
 module.exports = new AuthService();
