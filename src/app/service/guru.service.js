@@ -37,7 +37,7 @@ class GuruService {
           data: {
             ...guruData,
             userId: user.id,
-            nip: NIP
+             nip: NIP.toString().padStart(6, '0'),
           },
           include: {
             user: {
@@ -172,10 +172,10 @@ class GuruService {
     try {
       const { page = 1, limit = 10 } = filters;
 
+
       return await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
-        where,
         select: {
           id: true,
           nama: true,
@@ -204,7 +204,7 @@ class GuruService {
   }
 
  //TODO : admin bisa lihat list guru dan jadwal guru
- 
+
  //TODO : guru bisa lihat jadwal guru disinra sendiri
  
 }
