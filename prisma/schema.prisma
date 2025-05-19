@@ -37,8 +37,8 @@ model Token {
 
 // Student model
 model Siswa {
-  id               String    @id @default(uuid())
-  userId           String    @unique
+  id               String   @id @default(uuid())
+  userId           String   @unique
   noWhatsapp       String?
   namaMurid        String
   namaPanggilan    String?
@@ -50,9 +50,9 @@ model Siswa {
   namaSekolah      String?
   namaOrangTua     String?
   namaPenjemput    String?
-  isRegistered     Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  isRegistered     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   user         User           @relation(fields: [userId], references: [id])
@@ -76,6 +76,7 @@ model Admin {
 model Guru {
   id                 String   @id @default(uuid())
   userId             String   @unique
+  nip                String?  @unique
   nama               String
   noWhatsapp         String?
   alamat             String?
@@ -97,20 +98,20 @@ model Guru {
 }
 
 model Kelas {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   namaKelas String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   kelasProgram KelasProgram[]
 }
 
 model Program {
-  id          String       @id @default(uuid())
+  id          String   @id @default(uuid())
   namaProgram String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   kelasProgram KelasProgram[]
@@ -125,27 +126,29 @@ model JamMengajar {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  kelasProgram KelasProgram[]
+  kelasProgram      KelasProgram[]
+  PendaftaranJadwal PendaftaranJadwal[]
 }
 
 model KelasProgram {
-  id            String    @id @default(uuid())
-  kelasId       String
+  id            String   @id @default(uuid())
+  kelasId       String?
   programId     String
   jamMengajarId String
   hari          String
-  guruId        String
-  tipeKelas     String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  guruId        String?
+  tipeKelas     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  kelas       Kelas         @relation(fields: [kelasId], references: [id])
-  program     Program       @relation(fields: [programId], references: [id])
-  jamMengajar JamMengajar   @relation(fields: [jamMengajarId], references: [id])
-  guru        Guru          @relation(fields: [guruId], references: [id])
-  jadwalSiswa JadwalSiswa[]
-  absensiGuru AbsensiGuru[]
+  kelas        Kelas?         @relation(fields: [kelasId], references: [id])
+  program      Program        @relation(fields: [programId], references: [id])
+  jamMengajar  JamMengajar    @relation(fields: [jamMengajarId], references: [id])
+  guru         Guru?          @relation(fields: [guruId], references: [id])
+  jadwalSiswa  JadwalSiswa[]
+  absensiGuru  AbsensiGuru[]
+  AbsensiSiswa AbsensiSiswa[]
 }
 
 model ProgramSiswa {
@@ -173,9 +176,8 @@ model JadwalSiswa {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  programSiswa ProgramSiswa   @relation(fields: [programSiswaId], references: [id])
-  kelasProgram KelasProgram   @relation(fields: [kelasProgramId], references: [id])
-  absensiSiswa AbsensiSiswa[]
+  programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
+  kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
 
 model RiwayatStatusSiswa {
@@ -194,14 +196,14 @@ model RiwayatStatusSiswa {
 
 model AbsensiSiswa {
   id              String          @id @default(uuid())
-  jadwalSiswaId   String
+  kelasProgramId  String
   tanggal         String
   statusKehadiran StatusKehadiran
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   // Relations
-  jadwalSiswa JadwalSiswa @relation(fields: [jadwalSiswaId], references: [id])
+  kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
 
 model AbsensiGuru {
@@ -252,10 +254,25 @@ model Pendaftaran {
   updatedAt        DateTime         @updatedAt
 
   // Relations
-  siswa        Siswa        @relation(fields: [siswaId], references: [id])
-  voucher      Voucher?     @relation(fields: [voucherId], references: [id])
-  programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
-  pembayaran   Pembayaran?  @relation(fields: [pembayaranId], references: [id])
+  siswa             Siswa               @relation(fields: [siswaId], references: [id])
+  voucher           Voucher?            @relation(fields: [voucherId], references: [id])
+  programSiswa      ProgramSiswa        @relation(fields: [programSiswaId], references: [id])
+  pembayaran        Pembayaran?         @relation(fields: [pembayaranId], references: [id])
+  PendaftaranJadwal PendaftaranJadwal[]
+}
+
+model PendaftaranJadwal {
+  id            String   @id @default(uuid())
+  pendaftaranId String
+  hari          String
+  jamMengajarId String
+  prioritas     Int      @default(1) // 1 = first choice, 2 = second choice, etc.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  pendaftarah Pendaftaran @relation(fields: [pendaftaranId], references: [id])
+  jamMengajar JamMengajar @relation(fields: [jamMengajarId], references: [id])
 }
 
 model PeriodeSpp {
@@ -308,25 +325,25 @@ model XenditPayment {
   xenditStatus         XenditStatus
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
-  
+
   // Relations
-  pembayaran           Pembayaran   @relation(fields: [pembayaranId], references: [id])
+  pembayaran            Pembayaran              @relation(fields: [pembayaranId], references: [id])
   xenditCallbackInvoice XenditCallbackInvoice[]
 }
 
 // Separate callback models for different reference types
 model XenditCallbackInvoice {
-  id              String          @id @default(uuid())
+  id              String       @id @default(uuid())
   xenditPaymentId String
   eventType       String
   rawResponse     Json
-  amount          Decimal         @db.Decimal(10, 2)
+  amount          Decimal      @db.Decimal(10, 2)
   status          XenditStatus
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   // Relations
-  xenditPayment   XenditPayment   @relation(fields: [xenditPaymentId], references: [id])
+  xenditPayment XenditPayment @relation(fields: [xenditPaymentId], references: [id])
 }
 
 model XenditCallbackDisbursement {
@@ -358,18 +375,18 @@ model Payroll {
   updatedAt DateTime      @updatedAt
 
   // Relations
-  guru                Guru                  @relation(fields: [guruId], references: [id])
+  guru                Guru                 @relation(fields: [guruId], references: [id])
   payrollDisbursement PayrollDisbursement?
   absensiGuru         AbsensiGuru[]
 }
 
 model PayrollDisbursement {
-  id                   String                   @id @default(uuid())
-  payrollId            String                   @unique
-  amount               Decimal                  @db.Decimal(10, 2)
-  tanggalProses        String
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
+  id            String   @id @default(uuid())
+  payrollId     String   @unique
+  amount        Decimal  @db.Decimal(10, 2)
+  tanggalProses String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   payroll            Payroll             @relation(fields: [payrollId], references: [id])
@@ -390,10 +407,9 @@ model XenditDisbursement {
   updatedAt             DateTime                 @updatedAt
 
   // Relations
-  payrollDisbursement      PayrollDisbursement         @relation(fields: [payrollDisbursementId], references: [id])
+  payrollDisbursement        PayrollDisbursement          @relation(fields: [payrollDisbursementId], references: [id])
   xenditCallbackDisbursement XenditCallbackDisbursement[]
 }
-
 
 enum Role {
   ADMIN
@@ -415,7 +431,6 @@ enum SPM {
   KULIAH
   UMUM
 }
-
 
 enum StatusPembayaran {
   PENDING
