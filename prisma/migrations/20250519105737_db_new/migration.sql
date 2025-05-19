@@ -234,7 +234,6 @@ CREATE TABLE `PendaftaranJadwal` (
     `pendaftaranId` VARCHAR(191) NOT NULL,
     `hari` VARCHAR(191) NOT NULL,
     `jamMengajarId` VARCHAR(191) NOT NULL,
-    `prioritas` INTEGER NOT NULL DEFAULT 1,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -253,7 +252,7 @@ CREATE TABLE `PeriodeSpp` (
     `voucherId` VARCHAR(191) NULL,
     `diskon` DECIMAL(10, 2) NOT NULL,
     `totalTagihan` DECIMAL(10, 2) NOT NULL,
-    `statusPembayaran` ENUM('PENDING', 'MENUNGGU_PEMBAYARAN', 'LUNAS', 'BELUM_BAYAR', 'KADALUARSA', 'DIBATALKAN') NOT NULL,
+    `statusPembayaran` ENUM('UNPAID', 'PENDING', 'PAID', 'SETTLED', 'EXPIRED', 'INACTIVE', 'ACTIVE', 'STOPPED') NOT NULL,
     `pembayaranId` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -266,9 +265,9 @@ CREATE TABLE `PeriodeSpp` (
 CREATE TABLE `Pembayaran` (
     `id` VARCHAR(191) NOT NULL,
     `tipePembayaran` ENUM('PENDAFTARAN', 'SPP') NOT NULL,
-    `metodePembayaran` ENUM('TUNAI', 'VIRTUAL_ACCOUNT', 'EWALLET', 'RETAIL_OUTLET', 'CREDIT_CARD', 'QRIS') NOT NULL,
+    `metodePembayaran` ENUM('TUNAI', 'VIRTUAL_ACCOUNT', 'EWALLET', 'RETAIL_OUTLET', 'CREDIT_CARD', 'QR_CODE') NOT NULL,
     `jumlahTagihan` DECIMAL(10, 2) NOT NULL,
-    `statusPembayaran` ENUM('PENDING', 'MENUNGGU_PEMBAYARAN', 'LUNAS', 'BELUM_BAYAR', 'KADALUARSA', 'DIBATALKAN') NOT NULL,
+    `statusPembayaran` ENUM('UNPAID', 'PENDING', 'PAID', 'SETTLED', 'EXPIRED', 'INACTIVE', 'ACTIVE', 'STOPPED') NOT NULL,
     `tanggalPembayaran` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -287,11 +286,32 @@ CREATE TABLE `XenditPayment` (
     `xenditExpireDate` VARCHAR(191) NOT NULL,
     `xenditPaidAt` VARCHAR(191) NULL,
     `xenditStatus` ENUM('PENDING', 'PAID', 'SETTLED', 'EXPIRED', 'FAILED') NOT NULL,
+    `tempRegistrationId` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `XenditPayment_pembayaranId_key`(`pembayaranId`),
     UNIQUE INDEX `XenditPayment_xenditInvoiceId_key`(`xenditInvoiceId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `TempRegistration` (
+    `id` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `siswaData` JSON NOT NULL,
+    `programId` VARCHAR(191) NOT NULL,
+    `kelasProgramId` VARCHAR(191) NULL,
+    `jadwalPreferences` JSON NULL,
+    `biayaPendaftaran` DECIMAL(10, 2) NOT NULL,
+    `voucherId` VARCHAR(191) NULL,
+    `diskon` DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    `totalBiaya` DECIMAL(10, 2) NOT NULL,
+    `successRedirectUrl` VARCHAR(191) NULL,
+    `failureRedirectUrl` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -450,6 +470,18 @@ ALTER TABLE `PeriodeSpp` ADD CONSTRAINT `PeriodeSpp_pembayaranId_fkey` FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE `XenditPayment` ADD CONSTRAINT `XenditPayment_pembayaranId_fkey` FOREIGN KEY (`pembayaranId`) REFERENCES `Pembayaran`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `XenditPayment` ADD CONSTRAINT `XenditPayment_tempRegistrationId_fkey` FOREIGN KEY (`tempRegistrationId`) REFERENCES `TempRegistration`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `TempRegistration` ADD CONSTRAINT `TempRegistration_voucherId_fkey` FOREIGN KEY (`voucherId`) REFERENCES `Voucher`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `TempRegistration` ADD CONSTRAINT `TempRegistration_programId_fkey` FOREIGN KEY (`programId`) REFERENCES `Program`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `TempRegistration` ADD CONSTRAINT `TempRegistration_kelasProgramId_fkey` FOREIGN KEY (`kelasProgramId`) REFERENCES `KelasProgram`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `XenditCallbackInvoice` ADD CONSTRAINT `XenditCallbackInvoice_xenditPaymentId_fkey` FOREIGN KEY (`xenditPaymentId`) REFERENCES `XenditPayment`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

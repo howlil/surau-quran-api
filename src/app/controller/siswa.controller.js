@@ -1,13 +1,26 @@
+
 const siswaService = require('../service/siswa.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 
 class SiswaController {
+  preRegisterSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+    const data = HttpRequest.getBodyParams(req);
+    const result = await siswaService.preRegisterSiswa(data);
+    return Http.Response.created(res, result, 'Pre-registrasi berhasil, silakan lakukan pembayaran');
+  });
+
   registerSiswa = ErrorHandler.asyncHandler(async (req, res) => {
     const data = HttpRequest.getBodyParams(req);
     const result = await siswaService.registerSiswa(data);
-    return Http.Response.created(res, result, 'Pendaftaran siswa berhasil');
+    return Http.Response.created(res, result, 'Pendaftaran siswa berhasil, silakan lakukan pembayaran');
+  });
+
+  getRegistrationStatus = ErrorHandler.asyncHandler(async (req, res) => {
+    const { tempId } = HttpRequest.getUrlParams(req);
+    const result = await siswaService.getRegistrationStatus(tempId);
+    return Http.Response.success(res, result);
   });
 
   getById = ErrorHandler.asyncHandler(async (req, res) => {

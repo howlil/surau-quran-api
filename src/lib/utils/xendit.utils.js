@@ -11,6 +11,7 @@ class XenditUtils {
         description,
         successRedirectUrl,
         failureRedirectUrl,
+        items = [],
         paymentMethods = ['BANK_TRANSFER', 'EWALLET', 'RETAIL_OUTLET', 'CREDIT_CARD', 'QR_CODE']
       } = data;
 
@@ -19,13 +20,14 @@ class XenditUtils {
         amount,
         payerEmail,
         description,
-        invoiceDuration: 86400, 
+        invoiceDuration: 86400,
         successRedirectUrl,
         failureRedirectUrl,
         paymentMethods,
         currency: 'IDR',
         shouldSendEmail: true,
-        reminderTime: 1
+        reminderTime: 1,
+        items
       };
 
       const invoice = await xendit.Invoice.createInvoice(invoiceData);
@@ -114,13 +116,25 @@ class XenditUtils {
     return `${prefix}-${timestamp}-${random}`;
   }
 
-  static mapXenditStatus(xenditStatus) {
+  static mapXenditInvoiceStatus(xenditStatus) {
     const statusMap = {
       'PENDING': 'PENDING',
-      'PAID': 'LUNAS',
-      'SETTLED': 'LUNAS',
-      'EXPIRED': 'KADALUARSA',
-      'FAILED': 'GAGAL'
+      'PAID': 'PAID',
+      'SETTLED': 'SETTLED',
+      'EXPIRED': 'EXPIRED',
+      'FAILED': 'FAILED'
+    };
+
+    return statusMap[xenditStatus] || 'PENDING';
+  }
+
+  static mapXenditStatusToPembayaran(xenditStatus) {
+    const statusMap = {
+      'PENDING': 'PENDING',
+      'PAID': 'PAID',
+      'SETTLED': 'PAID',
+      'EXPIRED': 'EXPIRED',
+      'FAILED': 'EXPIRED'
     };
 
     return statusMap[xenditStatus] || 'PENDING';
@@ -134,6 +148,37 @@ class XenditUtils {
     };
 
     return statusMap[xenditStatus] || 'PENDING';
+  }
+
+  static validateCallbackSignature(rawBody, callbackToken, xenditCallbackToken) {
+    return callbackToken === xenditCallbackToken;
+  }
+
+  static processInvoiceCallback(callbackData) {
+    return {
+      invoiceId: callbackData.id,
+      externalId: callbackData.external_id,
+      status: this.mapXenditInvoiceStatus(callbackData.status),
+      paidAmount: callbackData.paid_amount || 0,
+      paidAt: callbackData.paid_at,
+      paymentChannel: callbackData.payment_channel,
+      paymentMethod: callbackData.payment_method,
+      paymentDestination: callbackData.payment_destination,
+      bankCode: callbackData.bank_code,
+      eventType: 'invoice.paid'
+    };
+  }
+
+  static processDisbursementCallback(callbackData) {
+    return {
+      disbursementId: callbackData.id,
+      externalId: callbackData.external_id,
+      status: this.mapXenditDisbursementStatus(callbackData.status),
+      amount: callbackData.amount,
+      bankCode: callbackData.bank_code,
+      accountHolderName: callbackData.account_holder_name,
+      eventType: 'disbursement.completed'
+    };
   }
 }
 

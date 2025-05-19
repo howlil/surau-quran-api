@@ -114,8 +114,9 @@ model Program {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  kelasProgram KelasProgram[]
-  programSiswa ProgramSiswa[]
+  kelasProgram     KelasProgram[]
+  programSiswa     ProgramSiswa[]
+  tempRegistration TempRegistration[]
 }
 
 model JamMengajar {
@@ -142,13 +143,14 @@ model KelasProgram {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  kelas        Kelas?         @relation(fields: [kelasId], references: [id])
-  program      Program        @relation(fields: [programId], references: [id])
-  jamMengajar  JamMengajar    @relation(fields: [jamMengajarId], references: [id])
-  guru         Guru?          @relation(fields: [guruId], references: [id])
-  jadwalSiswa  JadwalSiswa[]
-  absensiGuru  AbsensiGuru[]
-  AbsensiSiswa AbsensiSiswa[]
+  kelas            Kelas?             @relation(fields: [kelasId], references: [id])
+  program          Program            @relation(fields: [programId], references: [id])
+  jamMengajar      JamMengajar        @relation(fields: [jamMengajarId], references: [id])
+  guru             Guru?              @relation(fields: [guruId], references: [id])
+  jadwalSiswa      JadwalSiswa[]
+  absensiGuru      AbsensiGuru[]
+  AbsensiSiswa     AbsensiSiswa[]
+  tempRegistration TempRegistration[]
 }
 
 model ProgramSiswa {
@@ -235,8 +237,9 @@ model Voucher {
   updatedAt        DateTime    @updatedAt
 
   // Relations
-  pendaftaran Pendaftaran[]
-  periodeSpp  PeriodeSpp[]
+  pendaftaran      Pendaftaran[]
+  periodeSpp       PeriodeSpp[]
+  tempRegistration TempRegistration[]
 }
 
 model Pendaftaran {
@@ -266,7 +269,6 @@ model PendaftaranJadwal {
   pendaftaranId String
   hari          String
   jamMengajarId String
-  prioritas     Int      @default(1) // 1 = first choice, 2 = second choice, etc.
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -323,12 +325,37 @@ model XenditPayment {
   xenditExpireDate     String
   xenditPaidAt         String?
   xenditStatus         XenditStatus
+  tempRegistrationId   String?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
   // Relations
   pembayaran            Pembayaran              @relation(fields: [pembayaranId], references: [id])
   xenditCallbackInvoice XenditCallbackInvoice[]
+  tempRegistration      TempRegistration?       @relation(fields: [tempRegistrationId], references: [id])
+}
+
+model TempRegistration {
+  id                 String   @id @default(uuid())
+  email              String
+  siswaData          Json
+  programId          String
+  kelasProgramId     String?
+  jadwalPreferences  Json?
+  biayaPendaftaran   Decimal  @db.Decimal(10, 2)
+  voucherId          String?
+  diskon             Decimal  @default(0) @db.Decimal(10, 2)
+  totalBiaya         Decimal  @db.Decimal(10, 2)
+  successRedirectUrl String?
+  failureRedirectUrl String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  voucher       Voucher?        @relation(fields: [voucherId], references: [id])
+  program       Program         @relation(fields: [programId], references: [id])
+  kelasProgram  KelasProgram?   @relation(fields: [kelasProgramId], references: [id])
+  xenditPayment XenditPayment[]
 }
 
 // Separate callback models for different reference types
@@ -433,12 +460,14 @@ enum SPM {
 }
 
 enum StatusPembayaran {
+  UNPAID
   PENDING
-  MENUNGGU_PEMBAYARAN
-  LUNAS
-  BELUM_BAYAR
-  KADALUARSA
-  DIBATALKAN
+  PAID
+  SETTLED
+  EXPIRED
+  INACTIVE
+  ACTIVE
+  STOPPED
 }
 
 enum StatusVerifikasi {
@@ -472,7 +501,7 @@ enum MetodePembayaran {
   EWALLET
   RETAIL_OUTLET
   CREDIT_CARD
-  QRIS
+  QR_CODE
 }
 
 enum TipePembayaran {

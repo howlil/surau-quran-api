@@ -1,24 +1,47 @@
-const {Xendit} = require('xendit-node');
 
 class XenditConfig {
-  #client;
+  #baseURL;
+  #secretKey;
+  #callbackToken;
   static #instance;
 
   constructor() {
-    const secretKey = process.env.XENDIT_SECRET_KEY;
+    this.#secretKey = process.env.XENDIT_SECRET_KEY;
+    this.#callbackToken = process.env.XENDIT_CALLBACK_TOKEN;
+    this.#baseURL = process.env.XENDIT_URL ;
     
-    if (!secretKey) {
+    if (!this.#secretKey) {
       throw new Error('XENDIT_SECRET_KEY is required');
     }
 
-    this.#client = new Xendit({
-      secretKey,
-      xenditURL: process.env.XENDIT_URL,
-    });
+    if (!this.#callbackToken) {
+      throw new Error('XENDIT_CALLBACK_TOKEN is required');
+    }
   }
 
-  getClient() {
-    return this.#client;
+  getAxiosConfig() {
+    return {
+      timeout: 10000,
+      auth: {
+        username: this.#secretKey,
+        password: ''
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+  }
+
+  getBaseURL() {
+    return this.#baseURL;
+  }
+
+  getCallbackToken() {
+    return this.#callbackToken;
+  }
+
+  validateCallbackToken(token) {
+    return token === this.#callbackToken;
   }
 
   static getInstance() {
@@ -30,6 +53,5 @@ class XenditConfig {
 }
 
 module.exports = {
-  xendit: XenditConfig.getInstance().getClient(),
   xenditConfig: XenditConfig.getInstance()
 };

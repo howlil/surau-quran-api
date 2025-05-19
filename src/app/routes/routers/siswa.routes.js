@@ -11,6 +11,17 @@ router.post(
   siswaController.registerSiswa
 );
 
+router.post(
+  '/v1/siswa/pre-register',
+  validationMiddleware.validateBody(siswaValidation.preRegisterSiswa()),
+  siswaController.preRegisterSiswa
+);
+
+router.get(
+  '/v1/siswa/registration-status/:tempId',
+  siswaController.getRegistrationStatus
+);
+
 router.get(
   '/v1/siswa/:id',
   authMiddleware.authenticate,
