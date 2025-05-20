@@ -58,4 +58,27 @@ router.delete(
   siswaController.delete
 );
 
+router.get(
+  '/v1/siswa/detail/all',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(siswaValidation.getAllDetailed()),
+  siswaController.getAllDetailed
+);
+
+router.get(
+  '/v1/siswa/detail/:id',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  siswaController.getDetailedById
+);
+
+router.patch(
+  '/v1/siswa/detail/:id',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateBody(siswaValidation.updateDetailedSiswa()),
+  siswaController.updateDetailedSiswa
+);
+
 module.exports = router;

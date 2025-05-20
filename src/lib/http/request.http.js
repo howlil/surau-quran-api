@@ -1,15 +1,17 @@
 class HttpRequest {
 
   static getQueryParams(req, allowed = []) {
+    // Use validatedQuery when available, otherwise fallback to regular query
+    const querySource = req.validatedQuery || req.query;
     const query = {};
 
     if (allowed.length === 0) {
-      return { ...req.query };
+      return { ...querySource };
     }
 
     allowed.forEach(param => {
-      if (req.query[param] !== undefined) {
-        query[param] = req.query[param];
+      if (querySource[param] !== undefined) {
+        query[param] = querySource[param];
       }
     });
 
@@ -50,12 +52,12 @@ class HttpRequest {
 
 
   static getIpAddress(req) {
-    return req.ip || 
-           (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 
-           req.connection.remoteAddress;
+    return req.ip ||
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.connection.remoteAddress;
   }
 
- 
+
   static getUserAgent(req) {
     return req.headers['user-agent'] || '';
   }
@@ -65,10 +67,10 @@ class HttpRequest {
     return req.files || {};
   }
 
- 
+
   static isAjax(req) {
-    return req.xhr || 
-           req.headers['x-requested-with'] === 'XMLHttpRequest';
+    return req.xhr ||
+      req.headers['x-requested-with'] === 'XMLHttpRequest';
   }
 
 

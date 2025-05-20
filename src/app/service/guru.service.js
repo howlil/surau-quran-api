@@ -1,7 +1,6 @@
-
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
+const { NotFoundError, ConflictError, ForbiddenError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const { id } = require('../validation/factory.validation');
@@ -37,7 +36,7 @@ class GuruService {
           data: {
             ...guruData,
             userId: user.id,
-             nip: NIP.toString().padStart(6, '0'),
+            nip: NIP.toString().padStart(6, '0'),
           },
           include: {
             user: {
@@ -198,15 +197,155 @@ class GuruService {
         orderBy: { nama: 'asc' }
       });
     } catch (error) {
-      logger.error('Error getting all guru:', error);
+      logger.error('Error getting all gurus:', error);
       throw error;
     }
   }
 
- //TODO : admin bisa lihat list guru dan jadwal guru
+  // Get all teachers with their schedules for admin
+  async getAllGuruWithSchedules(filters = {}) {
+    try {
+      const { page = 1, limit = 10 } = filters;
 
- //TODO : guru bisa lihat jadwal guru disinra sendiri
- 
+      return await PrismaUtils.paginate(prisma.guru, {
+        page,
+        limit,
+        select: {
+          id: true,
+          nama: true,
+          nip: true,
+          noWhatsapp: true,
+          keahlian: true,
+          tarifPerJam: true,
+          user: {
+            select: {
+              email: true
+            }
+          },
+          kelasProgram: {
+            select: {
+              id: true,
+              hari: true,
+              tipeKelas: true,
+              kelas: {
+                select: {
+                  id: true,
+                  namaKelas: true
+                }
+              },
+              program: {
+                select: {
+                  id: true,
+                  namaProgram: true
+                }
+              },
+              jamMengajar: {
+                select: {
+                  id: true,
+                  jamMulai: true,
+                  jamSelesai: true
+                }
+              }
+            },
+            orderBy: [
+              {
+                hari: 'asc',
+              },
+              {
+                jamMengajar: {
+                  jamMulai: 'asc',
+                }
+              }
+            ]
+          }
+        },
+        orderBy: { nama: 'asc' }
+      });
+    } catch (error) {
+      logger.error('Error getting all gurus with schedules:', error);
+      throw error;
+    }
+  }
+
+  // Get schedule for a specific teacher
+  async getGuruSchedule(guruId) {
+    try {
+      const guru = await prisma.guru.findUnique({
+        where: { id: guruId },
+        select: {
+          id: true,
+          nama: true,
+          nip: true,
+          keahlian: true,
+          kelasProgram: {
+            select: {
+              id: true,
+              hari: true,
+              tipeKelas: true,
+              kelas: {
+                select: {
+                  id: true,
+                  namaKelas: true
+                }
+              },
+              program: {
+                select: {
+                  id: true,
+                  namaProgram: true
+                }
+              },
+              jamMengajar: {
+                select: {
+                  id: true,
+                  jamMulai: true,
+                  jamSelesai: true
+                }
+              }
+            },
+            orderBy: [
+              {
+                hari: 'asc',
+              },
+              {
+                jamMengajar: {
+                  jamMulai: 'asc',
+                }
+              }
+            ]
+          }
+        }
+      });
+
+      if (!guru) {
+        throw new NotFoundError(`Guru dengan ID ${guruId} tidak ditemukan`);
+      }
+
+      // Group schedules by day for easier frontend rendering
+      const scheduledDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      const groupedSchedule = {};
+
+      scheduledDays.forEach(day => {
+        const daySchedules = guru.kelasProgram.filter(kp => kp.hari === day);
+        if (daySchedules.length > 0) {
+          groupedSchedule[day] = daySchedules;
+        }
+      });
+
+      return {
+        guru: {
+          id: guru.id,
+          nama: guru.nama,
+          nip: guru.nip,
+          keahlian: guru.keahlian,
+        },
+        jadwal: groupedSchedule,
+        totalKelas: guru.kelasProgram.length
+      };
+    } catch (error) {
+      logger.error(`Error getting schedule for guru ${guruId}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new GuruService();

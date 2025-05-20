@@ -23,8 +23,6 @@ class GuruController {
     return Http.Response.success(res, { id }, 'Guru berhasil dihapus');
   });
 
-
-
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
       'page', 'limit'
@@ -33,6 +31,28 @@ class GuruController {
     return Http.Response.success(res, result);
   });
 
+  // Admin: Get all teachers with their schedules
+  getAllWithSchedules = ErrorHandler.asyncHandler(async (req, res) => {
+    const filters = HttpRequest.getQueryParams(req, [
+      'page', 'limit'
+    ]);
+    const result = await guruService.getAllGuruWithSchedules(filters);
+    return Http.Response.success(res, result, 'Data guru dan jadwal berhasil diambil');
+  });
+
+  // Admin: Get specific teacher's schedule
+  getGuruScheduleAdmin = ErrorHandler.asyncHandler(async (req, res) => {
+    const { id } = HttpRequest.getUrlParams(req);
+    const result = await guruService.getGuruSchedule(id);
+    return Http.Response.success(res, result, 'Jadwal guru berhasil diambil');
+  });
+
+  // Teacher: Get own schedule
+  getOwnSchedule = ErrorHandler.asyncHandler(async (req, res) => {
+    const { guru } = req.user;
+    const result = await guruService.getGuruSchedule(guru.id);
+    return Http.Response.success(res, result, 'Jadwal mengajar berhasil diambil');
+  });
 }
 
 module.exports = new GuruController();

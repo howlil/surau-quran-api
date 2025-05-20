@@ -7,7 +7,10 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node src/database/seeders/index.js",
-    "generate": "prisma generate"
+    "seed:custom": "node src/database/seeders/seed-custom-accounts.js",
+    "generate": "prisma generate",
+    "fix:xendit-callbacks": "node src/database/scripts/fix-xendit-payments.js",
+    "verify:xendit-invoices": "node src/database/scripts/verify-xendit-invoices.js"
   },
   "keywords": [
     "school",

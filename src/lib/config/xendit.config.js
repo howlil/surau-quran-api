@@ -1,38 +1,52 @@
+const { Xendit } = require('xendit-node');
+const { logger } = require('./logger.config');
+
 class XenditConfig {
-  #baseURL;
   #secretKey;
   #callbackToken;
+  #xenditClient;
   static #instance;
 
   constructor() {
-  this.#secretKey = process.env.XENDIT_SECRET_KEY;
+    this.#secretKey = process.env.XENDIT_SECRET_KEY;
     this.#callbackToken = process.env.XENDIT_CALLBACK_TOKEN;
-    this.#baseURL = process.env.XENDIT_URL ;
-    
+
     if (!this.#secretKey) {
-      throw new Error('XENDIT_SECRET_KEY is required');
+      logger.error('XENDIT_SECRET_KEY is not set! Xendit integration will not work properly');
+      throw new Error('XENDIT_SECRET_KEY environment variable is required');
     }
 
     if (!this.#callbackToken) {
-      throw new Error('XENDIT_CALLBACK_TOKEN is required');
+      logger.error('XENDIT_CALLBACK_TOKEN is not set! Webhook callbacks will not be validated');
+      throw new Error('XENDIT_CALLBACK_TOKEN environment variable is required');
     }
-  }
 
-  getAxiosConfig() {
-    return {
-      timeout: 10000,
-      auth: {
-        username: this.#secretKey,
-        password: ''
-      },
-      headers: {
-        'Content-Type': 'application/json'
+    // Initialize the Xendit client
+    try {
+      logger.info('Initializing Xendit with secret key...');
+
+      // Create with specific options
+      this.#xenditClient = new Xendit({
+        secretKey: this.#secretKey,
+        xenditApiVersion: '2019-02-04',
+        xenditRegion: 'ID'
+      });
+
+      // Test if the client is initialized correctly
+      if (!this.#xenditClient) {
+        throw new Error('Xendit client initialization failed');
       }
-    };
-  }
 
-  getBaseURL() {
-    return this.#baseURL;
+      // Verify necessary API methods are available
+      if (!this.#xenditClient.Invoice) {
+        throw new Error('Xendit Invoice API not available');
+      }
+
+      logger.info('Xendit client initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize Xendit client:', error);
+      throw new Error(`Failed to initialize Xendit client: ${error.message}`);
+    }
   }
 
   getCallbackToken() {
@@ -43,14 +57,36 @@ class XenditConfig {
     return token === this.#callbackToken;
   }
 
+  getXenditClient() {
+    if (!this.#xenditClient) {
+      throw new Error('Xendit client not initialized');
+    }
+    return this.#xenditClient;
+  }
+
   static getInstance() {
     if (!XenditConfig.#instance) {
-      XenditConfig.#instance = new XenditConfig();
+      try {
+        XenditConfig.#instance = new XenditConfig();
+      } catch (error) {
+        logger.error('Error creating Xendit config instance:', error);
+        throw error;
+      }
     }
     return XenditConfig.#instance;
   }
 }
 
+// Pre-validate the instance
+try {
+  const config = XenditConfig.getInstance();
+  logger.info('Xendit configuration loaded successfully');
+} catch (error) {
+  logger.error('Failed to initialize Xendit configuration:', error);
+  // Do not throw here, let the application handle the error when it tries to use Xendit
+}
+
 module.exports = {
-  xenditConfig: XenditConfig.getInstance()
+  xenditConfig: XenditConfig.getInstance(),
+  xendit: XenditConfig.getInstance().getXenditClient()
 };

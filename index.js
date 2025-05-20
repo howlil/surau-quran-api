@@ -1,7 +1,7 @@
-
 require('dotenv').config();
 const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
+const EnvironmentConfig = require('./src/lib/config/env.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
 const SecurityMiddleware = require('./src/app/middleware/security.middleware');
@@ -20,11 +20,10 @@ class Application {
   }
 
   setupMiddleware() {
-
     SecurityMiddleware.setup(this.app);
 
     this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));    
+    this.app.use(express.urlencoded({ extended: true }));
     this.app.use(loggerMiddleware);
   }
 
@@ -46,14 +45,26 @@ class Application {
       await prismaConfig.connect();
       logger.info('Database connected successfully');
     } catch (error) {
-      logger.error('Failed to start server:', error);
-      process.exit(1);
+      logger.error('Failed to connect to database:', error);
+      throw error;
     }
   }
 
+  validateEnvironment() {
+    try {
+      EnvironmentConfig.validateEnv();
+    } catch (error) {
+      logger.error('Environment validation failed:', error);
+      throw error;
+    }
+  }
 
   async start() {
     try {
+      // Validate environment variables first
+      this.validateEnvironment();
+
+      // Then connect to database
       await this.connectDatabase();
 
       this.server = this.app.listen(this.port, () => {

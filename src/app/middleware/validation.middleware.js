@@ -1,7 +1,4 @@
-
-
 const { ValidationError } = require('../../lib/http/errors.http');
-
 
 class ValidationMiddleware {
 
@@ -19,14 +16,13 @@ class ValidationMiddleware {
   static validateQuery(validator) {
     return (req, res, next) => {
       try {
-        req.query = validator.validate(req.query);
+        req.validatedQuery = validator.validate(req.query);
         next();
       } catch (error) {
         next(error);
       }
     };
   }
-
 
   static validateParams(validator) {
     return (req, res, next) => {
@@ -39,29 +35,27 @@ class ValidationMiddleware {
     };
   }
 
-
   static validate(validators = {}) {
     return (req, res, next) => {
       try {
         if (validators.body) {
           req.body = validators.body.validate(req.body);
         }
-        
+
         if (validators.query) {
-          req.query = validators.query.validate(req.query);
+          req.validatedQuery = validators.query.validate(req.query);
         }
-        
+
         if (validators.params) {
           req.params = validators.params.validate(req.params);
         }
-        
+
         next();
       } catch (error) {
         next(error);
       }
     };
   }
-
 
   static handleErrors(err, req, res, next) {
     if (err instanceof ValidationError) {
@@ -71,7 +65,7 @@ class ValidationMiddleware {
         errors: err.data
       });
     }
-    
+
     next(err);
   }
 }
