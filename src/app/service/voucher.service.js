@@ -85,7 +85,7 @@ class VoucherService {
       });
 
       logger.info(`Deleted voucher with ID: ${id}`);
-      return { id };
+      return { message: 'Voucher berhasil dihapus' };
     } catch (error) {
       logger.error(`Error deleting voucher with ID ${id}:`, error);
       throw error;

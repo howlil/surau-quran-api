@@ -1,4 +1,3 @@
-
 class XenditConfig {
   #baseURL;
   #secretKey;
@@ -6,7 +5,7 @@ class XenditConfig {
   static #instance;
 
   constructor() {
-    this.#secretKey = process.env.XENDIT_SECRET_KEY;
+  this.#secretKey = process.env.XENDIT_SECRET_KEY;
     this.#callbackToken = process.env.XENDIT_CALLBACK_TOKEN;
     this.#baseURL = process.env.XENDIT_URL ;
     

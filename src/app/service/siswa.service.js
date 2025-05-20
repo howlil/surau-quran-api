@@ -1,4 +1,3 @@
-
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
@@ -7,6 +6,11 @@ const PasswordUtils = require('../../lib/utils/password.utils');
 const paymentService = require('./payment.service');
 
 class SiswaService {
+  constructor() {
+    // Initialize memory storage for temp registrations
+    this.tempStorage = new Map();
+  }
+
   async preRegisterSiswa(data) {
     try {
       const {
@@ -98,23 +102,7 @@ class SiswaService {
           totalBiaya = Math.max(0, biayaPendaftaran - diskon);
         }
 
-        // Create pending registration record (temporary)
-        const tempRegistration = await tx.$executeRaw`
-          INSERT INTO temp_registration (
-            email, siswa_data, program_id, kelas_program_id, 
-            jadwal_preferences, biaya_pendaftaran, voucher_id, 
-            diskon, total_biaya, success_redirect_url, failure_redirect_url
-          ) VALUES (
-            ${email}, ${JSON.stringify(siswaData)}, ${programId}, 
-            ${kelasProgramId}, ${JSON.stringify(jadwalPreferences)}, 
-            ${biayaPendaftaran}, ${voucher?.id}, ${diskon}, ${totalBiaya},
-            ${successRedirectUrl}, ${failureRedirectUrl}
-          )
-        `;
-
-        const tempId = tempRegistration.insertId;
-
-        // Create payment record
+        // Create payment record first
         const pembayaran = await tx.pembayaran.create({
           data: {
             tipePembayaran: 'PENDAFTARAN',
@@ -125,6 +113,25 @@ class SiswaService {
           }
         });
 
+        // Store temp data in memory with pembayaran ID as key
+        const tempData = {
+          email,
+          siswaData,
+          programId,
+          kelasProgramId,
+          jadwalPreferences: jadwalPreferences || [],
+          biayaPendaftaran,
+          voucherId: voucher?.id,
+          diskon,
+          totalBiaya,
+          successRedirectUrl,
+          failureRedirectUrl,
+          isTemporary: true,
+          createdAt: new Date().toISOString()
+        };
+
+        this.tempStorage.set(pembayaran.id, tempData);
+
         // Create Xendit invoice
         const externalId = paymentService.generateExternalId('REG');
         const xenditInvoice = await paymentService.createInvoice({
@@ -132,11 +139,11 @@ class SiswaService {
           amount: totalBiaya,
           payerEmail: email,
           description: `Pendaftaran ${siswaData.namaMurid} - Program ${program.namaProgram}`,
-          successRedirectUrl: successRedirectUrl || `${process.env.FRONTEND_URL}/payment/success?temp_id=${tempId}`,
-          failureRedirectUrl: failureRedirectUrl || `${process.env.FRONTEND_URL}/payment/failure?temp_id=${tempId}`
+          successRedirectUrl: successRedirectUrl || `${process.env.FRONTEND_URL}/payment/success?temp_id=${pembayaran.id}`,
+          failureRedirectUrl: failureRedirectUrl || `${process.env.FRONTEND_URL}/payment/failure?temp_id=${pembayaran.id}`
         });
 
-        // Create Xendit payment record with temp_id reference
+        // Create Xendit payment record
         const xenditPayment = await tx.xenditPayment.create({
           data: {
             pembayaranId: pembayaran.id,
@@ -149,16 +156,10 @@ class SiswaService {
           }
         });
 
-        // Store temp_id in xendit payment for callback reference
-        await tx.$executeRaw`
-          UPDATE xendit_payment SET temp_registration_id = ${tempId} 
-          WHERE id = ${xenditPayment.id}
-        `;
-
-        logger.info(`Created pre-registration for ${email}, Payment URL: ${xenditInvoice.invoice_url}`);
+        logger.info(`Pre-registered siswa for ${email}, Payment URL: ${xenditInvoice.invoice_url}`);
 
         return {
-          tempRegistrationId: tempId,
+          tempRegistrationId: pembayaran.id,
           program: {
             id: program.id,
             namaProgram: program.namaProgram
@@ -198,7 +199,7 @@ class SiswaService {
   async completeRegistrationFromCallback(callbackData) {
     try {
       return await PrismaUtils.transaction(async (tx) => {
-        // Get xendit payment and temp registration
+        // Get xendit payment
         const xenditPayment = await tx.xenditPayment.findUnique({
           where: { xenditInvoiceId: callbackData.invoiceId },
           include: {
@@ -210,27 +211,21 @@ class SiswaService {
           throw new NotFoundError('Xendit payment not found');
         }
 
-        // Get temp registration data
-        const tempRegResult = await tx.$queryRaw`
-          SELECT * FROM temp_registration WHERE id = ${xenditPayment.temp_registration_id}
-        `;
-
-        if (!tempRegResult || tempRegResult.length === 0) {
-          throw new NotFoundError('Temporary registration not found');
+        // Get temp registration data from memory
+        const tempData = this.tempStorage.get(xenditPayment.pembayaranId);
+        if (!tempData || !tempData.isTemporary) {
+          return null;
         }
 
-        const tempReg = tempRegResult[0];
-        const siswaData = JSON.parse(tempReg.siswa_data);
-        const jadwalPreferences = JSON.parse(tempReg.jadwal_preferences);
+        const { siswaData, programId, kelasProgramId, jadwalPreferences, voucherId } = tempData;
 
-        // Generate default password
         const defaultPassword = this.generateDefaultPassword();
         const hashedPassword = await PasswordUtils.hash(defaultPassword);
 
         // Create user
         const user = await tx.user.create({
           data: {
-            email: tempReg.email,
+            email: tempData.email,
             password: hashedPassword,
             role: 'SISWA'
           }
@@ -249,7 +244,7 @@ class SiswaService {
         const programSiswa = await tx.programSiswa.create({
           data: {
             siswaId: siswa.id,
-            programId: tempReg.program_id,
+            programId: programId,
             status: 'AKTIF'
           }
         });
@@ -260,21 +255,21 @@ class SiswaService {
             siswaId: siswa.id,
             programSiswaId: programSiswa.id,
             pembayaranId: xenditPayment.pembayaranId,
-            biayaPendaftaran: tempReg.biaya_pendaftaran,
+            biayaPendaftaran: tempData.biayaPendaftaran,
             tanggalDaftar: new Date().toISOString().split('T')[0],
-            voucherId: tempReg.voucher_id,
-            diskon: tempReg.diskon,
-            totalBiaya: tempReg.total_biaya,
+            voucherId: voucherId,
+            diskon: tempData.diskon,
+            totalBiaya: tempData.totalBiaya,
             statusVerifikasi: 'DIVERIFIKASI'
           }
         });
 
         // If specific kelas program chosen, create jadwal siswa
-        if (tempReg.kelas_program_id) {
+        if (kelasProgramId) {
           await tx.jadwalSiswa.create({
             data: {
               programSiswaId: programSiswa.id,
-              kelasProgramId: tempReg.kelas_program_id
+              kelasProgramId: kelasProgramId
             }
           });
         }
@@ -287,15 +282,14 @@ class SiswaService {
                 pendaftaranId: pendaftaran.id,
                 hari: preference.hari,
                 jamMengajarId: preference.jamMengajarId,
+                prioritas: preference.prioritas || 1
               }
             });
           }
         }
 
-        // Clean up temp registration
-        await tx.$executeRaw`
-          DELETE FROM temp_registration WHERE id = ${tempReg.id}
-        `;
+        // Clean up temp registration from memory
+        this.tempStorage.delete(xenditPayment.pembayaranId);
 
         logger.info(`Completed registration for siswa ID: ${siswa.id}`);
 
@@ -337,33 +331,108 @@ class SiswaService {
 
   async getRegistrationStatus(tempId) {
     try {
-      const tempRegResult = await prisma.$queryRaw`
-        SELECT tr.*, p.status_pembayaran, xp.xendit_status, xp.xendit_payment_url
-        FROM temp_registration tr
-        LEFT JOIN xendit_payment xp ON xp.temp_registration_id = tr.id
-        LEFT JOIN pembayaran p ON p.id = xp.pembayaran_id
-        WHERE tr.id = ${tempId}
-      `;
-
-      if (!tempRegResult || tempRegResult.length === 0) {
+      const tempData = this.tempStorage.get(tempId);
+      
+      if (!tempData) {
         throw new NotFoundError('Registration not found');
       }
 
-      const tempReg = tempRegResult[0];
+      // Get payment status from pembayaran table
+      const pembayaran = await prisma.pembayaran.findUnique({
+        where: { id: tempId },
+        include: {
+          xenditPayment: true
+        }
+      });
 
+      if (!pembayaran) {
+        throw new NotFoundError('Payment not found');
+      }
+      
       return {
-        tempRegistrationId: tempReg.id,
-        email: tempReg.email,
-        siswaData: JSON.parse(tempReg.siswa_data),
-        paymentStatus: tempReg.status_pembayaran,
-        xenditStatus: tempReg.xendit_status,
-        paymentUrl: tempReg.xendit_payment_url,
-        totalBiaya: tempReg.total_biaya,
-        isCompleted: false
+        tempRegistrationId: tempId,
+        email: tempData.email,
+        siswaData: tempData.siswaData,
+        paymentStatus: pembayaran.statusPembayaran,
+        xenditStatus: pembayaran.xenditPayment?.xenditStatus,
+        paymentUrl: pembayaran.xenditPayment?.xenditPaymentUrl,
+        totalBiaya: tempData.totalBiaya,
+        isCompleted: !tempData.isTemporary
       };
     } catch (error) {
       logger.error(`Error getting registration status ${tempId}:`, error);
       throw error;
+    }
+  }
+
+  async simulatePaymentCallback(tempId) {
+    try {
+      // For development/testing - simulate successful payment
+      const tempData = this.tempStorage.get(tempId);
+      if (!tempData) {
+        throw new NotFoundError('Registration not found');
+      }
+
+      const pembayaran = await prisma.pembayaran.findUnique({
+        where: { id: tempId },
+        include: {
+          xenditPayment: true
+        }
+      });
+
+      if (!pembayaran?.xenditPayment) {
+        throw new NotFoundError('Payment not found');
+      }
+
+      // Update payment status
+      await prisma.$transaction(async (tx) => {
+        await tx.pembayaran.update({
+          where: { id: tempId },
+          data: { statusPembayaran: 'PAID' }
+        });
+
+        await tx.xenditPayment.update({
+          where: { id: pembayaran.xenditPayment.id },
+          data: {
+            xenditStatus: 'PAID',
+            xenditPaidAt: new Date().toISOString()
+          }
+        });
+      });
+
+      // Complete registration
+      const result = await this.completeRegistrationFromCallback({
+        invoiceId: pembayaran.xenditPayment.xenditInvoiceId,
+        status: 'PAID'
+      });
+
+      logger.info(`Simulated payment completion for temp ID: ${tempId}`);
+      return result;
+    } catch (error) {
+      logger.error(`Error simulating payment callback ${tempId}:`, error);
+      throw error;
+    }
+  }
+
+  async cleanupExpiredRegistrations() {
+    try {
+      const now = new Date();
+      const expiredThreshold = 24 * 60 * 60 * 1000; // 24 hours
+
+      let cleanedCount = 0;
+      for (const [id, data] of this.tempStorage.entries()) {
+        const createdAt = new Date(data.createdAt);
+        if (now - createdAt > expiredThreshold) {
+          this.tempStorage.delete(id);
+          cleanedCount++;
+        }
+      }
+
+      if (cleanedCount > 0) {
+        logger.info(`Cleaned up ${cleanedCount} expired registrations`);
+      }
+    } catch (error) {
+      logger.error('Error cleaning up expired registrations:', error);
     }
   }
 
@@ -448,7 +517,7 @@ class SiswaService {
   async getAll(filters = {}) {
     try {
       const { page = 1, limit = 10, namaMurid, isRegistered, strataPendidikan, jenisKelamin } = filters;
-
+      
       const where = {};
       if (namaMurid) {
         where.namaMurid = { contains: namaMurid, mode: 'insensitive' };

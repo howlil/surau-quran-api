@@ -113,7 +113,7 @@ class GuruValidation {
         .messages({
           'string.uri': 'Foto profile harus berupa URL yang valid'
         }),
-      keahlian: Joi.string().optional(),
+    keahlian: Joi.string().optional(),
       pendidikanTerakhir: Joi.string().optional(),
       noRekening: Joi.string().optional(),
       namaBank: Joi.string().optional(),

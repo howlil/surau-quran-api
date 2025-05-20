@@ -1,4 +1,3 @@
-
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { xenditConfig } = require('../../lib/config/xendit.config');
@@ -14,6 +13,8 @@ class PaymentService {
 
   async createInvoice(data) {
     try {
+
+
       const {
         externalId,
         amount,
@@ -22,7 +23,11 @@ class PaymentService {
         successRedirectUrl,
         failureRedirectUrl,
         items = [],
-        paymentMethods = ['BANK_TRANSFER', 'EWALLET', 'RETAIL_OUTLET', 'CREDIT_CARD', 'QR_CODE']
+        paymentMethods = [
+            "CREDIT_CARD", "BCA", "BNI", "BRI", 
+            "MANDIRI", "BSI", "PERMATA", 
+            "ALFAMART", "INDOMARET"
+        ],
       } = data;
 
       const invoiceData = {
@@ -34,6 +39,7 @@ class PaymentService {
         success_redirect_url: successRedirectUrl,
         failure_redirect_url: failureRedirectUrl,
         payment_methods: paymentMethods,
+        
         currency: 'IDR',
         should_send_email: true,
         reminder_time: 1,
@@ -53,9 +59,14 @@ class PaymentService {
       return response.data;
     } catch (error) {
       logger.error('Failed to create Xendit invoice:', error.response?.data || error.message);
+
+
+
       throw error;
     }
   }
+
+
 
   async getInvoice(invoiceId) {
     try {
@@ -240,9 +251,7 @@ class PaymentService {
 
       await prisma.$transaction(async (tx) => {
         // Check if this is a temp registration payment
-        const tempRegResult = await tx.$queryRaw`
-          SELECT temp_registration_id FROM xendit_payment WHERE id = ${xenditPayment.id}
-        `;
+        const tempData = global.tempRegistrations?.[xenditPayment.pembayaranId];
 
         await tx.xenditCallbackInvoice.create({
           data: {
@@ -263,7 +272,7 @@ class PaymentService {
         });
 
         const newPaymentStatus = this.mapXenditStatusToPembayaran(processedData.status);
-        
+
         await tx.pembayaran.update({
           where: { id: xenditPayment.pembayaranId },
           data: {
@@ -273,7 +282,7 @@ class PaymentService {
 
         if (processedData.status === 'PAID' || processedData.status === 'SETTLED') {
           // If this is a temp registration, complete the registration
-          if (tempRegResult && tempRegResult.length > 0 && tempRegResult[0].temp_registration_id) {
+          if (tempData && tempData.isTemporary) {
             const siswaService = require('./siswa.service');
             await siswaService.completeRegistrationFromCallback(processedData);
           } else {
@@ -334,8 +343,8 @@ class PaymentService {
         throw new NotFoundError('Payment or Xendit payment not found');
       }
 
-      if (payment.xenditPayment.xenditStatus !== 'EXPIRED' && 
-          payment.xenditPayment.xenditStatus !== 'FAILED') {
+      if (payment.xenditPayment.xenditStatus !== 'EXPIRED' &&
+        payment.xenditPayment.xenditStatus !== 'FAILED') {
         throw new BadRequestError('Payment is not in failed or expired state');
       }
 
@@ -405,7 +414,7 @@ class PaymentService {
   async getPaymentHistory(filters = {}) {
     try {
       const { page = 1, limit = 10, status, tipePembayaran, metodePembayaran } = filters;
-      
+
       const where = {};
       if (status) {
         where.statusPembayaran = status;
