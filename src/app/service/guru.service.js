@@ -187,6 +187,7 @@ class GuruService {
           pendidikanTerakhir: true,
           noRekening: true,
           namaBank: true,
+          tarifPerJam: true,
           user: {
             select: {
               email: true,
