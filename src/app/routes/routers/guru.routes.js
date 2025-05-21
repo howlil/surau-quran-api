@@ -6,6 +6,8 @@ const guruController = require('../../controller/guru.controller');
 const guruValidation = require('../../validation/guru.validation');
 
 // Admin routes for managing teachers
+
+// TODO : IMPLEMENTASI MULTER UNTUK UPLOAD GAMBAR
 router.post(
   '/v1/guru',
   authMiddleware.authenticate,
@@ -13,7 +15,7 @@ router.post(
   validationMiddleware.validateBody(guruValidation.create()),
   guruController.create
 );
-
+// TODO : IMPLEMENTASI MULTER UNTUK UPLOAD GAMBAR
 router.patch(
   '/v1/guru/:id',
   authMiddleware.authenticate,
@@ -44,19 +46,14 @@ router.get(
   guruController.getAllWithSchedules
 );
 
+// Get all class programs with enrolled students
 router.get(
-  '/v1/guru/:id/jadwal',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
-  guruController.getGuruScheduleAdmin
-);
-
-// Teacher route for viewing own schedule
-router.get(
-  '/v1/guru/jadwal/saya',
+  '/v1/guru/jadwal/siswa',
   authMiddleware.authenticate,
   authMiddleware.authorize(['GURU']),
-  guruController.getOwnSchedule
+  guruController.getKelasProgramWithStudents
 );
+
+
 
 module.exports = router;

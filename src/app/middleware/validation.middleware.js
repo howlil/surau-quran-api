@@ -16,7 +16,18 @@ class ValidationMiddleware {
   static validateQuery(validator) {
     return (req, res, next) => {
       try {
-        req.validatedQuery = validator.validate(req.query);
+        const { error, value } = validator.validate(req.query, { abortEarly: false });
+
+        if (error) {
+          const errorDetails = error.details.map(detail => ({
+            message: detail.message,
+            path: detail.path
+          }));
+
+          return next(new ValidationError('Validation error', errorDetails));
+        }
+
+        req.validatedQuery = value;
         next();
       } catch (error) {
         next(error);

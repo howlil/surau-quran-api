@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const authRoutes = require('./routers/auth.routes');
 const kelasRoutes = require('./routers/kelas.routes');
-const kelasProgramRoutes = require('./routers/kelas-program.routes');
 const programRoutes = require('./routers/program.routes');
 const jamMengajarRoutes = require('./routers/jam-mengajar.routes');
 const guruRoutes = require('./routers/guru.routes');
@@ -16,7 +15,6 @@ const sppRoutes = require('./routers/spp.routes');
 
 router.use(authRoutes);
 router.use(kelasRoutes);
-router.use(kelasProgramRoutes);
 router.use(programRoutes);
 router.use(paymentRoutes);
 router.use(jamMengajarRoutes);

@@ -105,22 +105,7 @@ class ProgramService {
     }
   }
 
-  async getById(id) {
-    try {
-      const program = await prisma.program.findUnique({
-        where: { id }
-      });
 
-      if (!program) {
-        throw new NotFoundError(`Program dengan ID ${id} tidak ditemukan`);
-      }
-
-      return program;
-    } catch (error) {
-      logger.error(`Error getting program with ID ${id}:`, error);
-      throw error;
-    }
-  }
 
   async getAll(filters = {}) {
     try {

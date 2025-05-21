@@ -92,7 +92,6 @@ class VoucherService {
     }
   }
 
-
   async getAll(filters = {}) {
     try {
       const { page = 1, limit = 10, kodeVoucher, tipe, isActive } = filters;
@@ -127,8 +126,6 @@ class VoucherService {
       throw error;
     }
   }
-
- 
 
  
 }

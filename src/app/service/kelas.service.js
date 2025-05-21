@@ -94,23 +94,6 @@ class KelasService {
         }
     }
 
-    async getById(id) {
-        try {
-            const kelas = await prisma.kelas.findUnique({
-                where: { id }
-            });
-
-            if (!kelas) {
-                throw new NotFoundError(`Kelas dengan ID ${id} tidak ditemukan`);
-            }
-
-            return kelas;
-        } catch (error) {
-            logger.error(`Error getting kelas with ID ${id}:`, error);
-            throw error;
-        }
-    }
-
     async getAll(filters = {}) {
         try {
             const { page = 1, limit = 10, namaKelas } = filters;

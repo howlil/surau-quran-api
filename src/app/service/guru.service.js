@@ -165,7 +165,6 @@ class GuruService {
     }
   }
 
-
   //admin
   async getAll(filters = {}) {
     try {
@@ -203,150 +202,90 @@ class GuruService {
     }
   }
 
-  // Get all teachers with their schedules for admin
-  async getAllGuruWithSchedules(filters = {}) {
+  async getAllGuruWithSchedules() {
     try {
-      const { page = 1, limit = 10 } = filters;
-
-      return await PrismaUtils.paginate(prisma.guru, {
-        page,
-        limit,
+      const gurus = await prisma.guru.findMany({
         select: {
           id: true,
           nama: true,
-          nip: true,
-          noWhatsapp: true,
           keahlian: true,
-          tarifPerJam: true,
-          user: {
-            select: {
-              email: true
-            }
-          },
+          fotoProfile: true,
+          pendidikanTerakhir: true,
           kelasProgram: {
             select: {
               id: true,
               hari: true,
-              tipeKelas: true,
-              kelas: {
-                select: {
-                  id: true,
-                  namaKelas: true
-                }
-              },
-              program: {
-                select: {
-                  id: true,
-                  namaProgram: true
-                }
-              },
-              jamMengajar: {
-                select: {
-                  id: true,
-                  jamMulai: true,
-                  jamSelesai: true
-                }
-              }
-            },
-            orderBy: [
-              {
-                hari: 'asc',
-              },
-              {
-                jamMengajar: {
-                  jamMulai: 'asc',
-                }
-              }
-            ]
+              jamMengajarId: true,
+              kelasId: true,
+              programId: true
+            }
           }
         },
         orderBy: { nama: 'asc' }
       });
+
+      return gurus.map(guru => ({
+        id: guru.id,
+        nama: guru.nama,
+        keahlian: guru.keahlian,
+        fotoProfile: guru.fotoProfile,
+        pendidikanTerakhir: guru.pendidikanTerakhir,
+        jadwalGuru: guru.kelasProgram.map(kp => ({
+          kelasProgramId: kp.id,
+          kelasId: kp.kelasId,
+          programId: kp.programId,
+          hari: kp.hari,
+          jamMengajarId: kp.jamMengajarId
+        }))
+      }));
     } catch (error) {
-      logger.error('Error getting all gurus with schedules:', error);
+      logger.error('Error getting simplified guru list:', error);
       throw error;
     }
   }
 
-  // Get schedule for a specific teacher
-  async getGuruSchedule(guruId) {
+  async getKelasProgramWithStudents(guruId) {
     try {
-      const guru = await prisma.guru.findUnique({
-        where: { id: guruId },
+      // Get all kelasProgram entries
+      const kelasPrograms = await prisma.kelasProgram.findMany({
+        where: { guruId: guruId },
         select: {
           id: true,
-          nama: true,
-          nip: true,
-          keahlian: true,
-          kelasProgram: {
+          kelasId: true,
+          programId: true,
+          hari: true,
+          jamMengajarId: true,
+          programSiswa: {
             select: {
-              id: true,
-              hari: true,
-              tipeKelas: true,
-              kelas: {
+              siswa: {
                 select: {
-                  id: true,
-                  namaKelas: true
-                }
-              },
-              program: {
-                select: {
-                  id: true,
-                  namaProgram: true
-                }
-              },
-              jamMengajar: {
-                select: {
-                  id: true,
-                  jamMulai: true,
-                  jamSelesai: true
+                  namaMurid: true,
+                  nis: true
                 }
               }
-            },
-            orderBy: [
-              {
-                hari: 'asc',
-              },
-              {
-                jamMengajar: {
-                  jamMulai: 'asc',
-                }
-              }
-            ]
+            }
           }
         }
       });
 
-      if (!guru) {
-        throw new NotFoundError(`Guru dengan ID ${guruId} tidak ditemukan`);
-      }
-
-      // Group schedules by day for easier frontend rendering
-      const scheduledDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      const groupedSchedule = {};
-
-      scheduledDays.forEach(day => {
-        const daySchedules = guru.kelasProgram.filter(kp => kp.hari === day);
-        if (daySchedules.length > 0) {
-          groupedSchedule[day] = daySchedules;
-        }
-      });
-
-      return {
-        guru: {
-          id: guru.id,
-          nama: guru.nama,
-          nip: guru.nip,
-          keahlian: guru.keahlian,
-        },
-        jadwal: groupedSchedule,
-        totalKelas: guru.kelasProgram.length
-      };
+      // Transform to the desired format
+      return kelasPrograms.map(kp => ({
+        kelasProgramId: kp.id,
+        kelasId: kp.kelasId,
+        programId: kp.programId,
+        hari: kp.hari,
+        jamMengajarId: kp.jamMengajarId,
+        siswa: kp.programSiswa.map(ps => ({
+          namaSiswa: ps.siswa.namaMurid,
+          NIS: ps.siswa.nis
+        }))
+      }));
     } catch (error) {
-      logger.error(`Error getting schedule for guru ${guruId}:`, error);
+      logger.error('Error getting kelas programs with students:', error);
       throw error;
     }
   }
+
 }
 
 module.exports = new GuruService();

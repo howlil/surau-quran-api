@@ -14,7 +14,7 @@ router.get(
     statisticsController.getStudentCounts
 );
 
-// Admin: Get financial statistics for graphs
+//TODO: masih error
 router.get(
     '/v1/statistics/financial',
     authMiddleware.authenticate,
@@ -23,7 +23,7 @@ router.get(
     statisticsController.getFinancialStatistics
 );
 
-// Admin: Get student distribution across classes
+// TODO : masih error
 router.get(
     '/v1/statistics/student-distribution',
     authMiddleware.authenticate,

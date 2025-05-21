@@ -241,7 +241,6 @@ class SiswaService {
     }
   }
 
-  // Helper function to get day name from date string
   getDayFromDate(dateString) {
     const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
     const date = new Date(dateString);

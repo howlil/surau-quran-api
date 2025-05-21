@@ -24,11 +24,7 @@ class ProgramController {
     return Http.Response.success(res, { id }, 'Program berhasil dihapus');
   });
 
-  getById = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const result = await programService.getById(id);
-    return Http.Response.success(res, result);
-  });
+
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'namaProgram']);

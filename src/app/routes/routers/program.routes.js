@@ -28,11 +28,6 @@ router.delete(
     ProgramController.delete
 );
 
-// TODO : deperhatikan lagi untuk detail ini di case mana
-router.get(
-    '/v1/program/:id',
-    ProgramController.getById
-);
 
 // TODO : untuk program gaperlu pagination
 router.get(

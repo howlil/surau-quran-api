@@ -166,6 +166,10 @@ class SppService {
             throw error;
         }
     }
+
+    // TODO : SISWA BAYAR SPP
+
+    // TODO : SISWA BAYAR BATCH SPP (bisa sekali bayar beberapa bulan) 
 }
 
 module.exports = new SppService();

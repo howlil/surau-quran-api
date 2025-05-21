@@ -24,11 +24,6 @@ router.delete('/v1/kelas/:id',
     kelasController.delete
 );
 
-// TODO : deperhatikan lagi untuk detail ini di case mana
-
-router.get('/v1/kelas/:id',
-    kelasController.getById
-);
 
 // TODO : untuk kelas gaperlu pagination
 

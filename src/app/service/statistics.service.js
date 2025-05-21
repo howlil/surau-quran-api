@@ -274,7 +274,6 @@ class StatisticsService {
         }
     }
 
-    // Helper method to get default start date based on groupBy
     getDefaultStartDate(groupBy) {
         const now = new Date();
         if (groupBy === 'year') {
@@ -287,7 +286,6 @@ class StatisticsService {
         }
     }
 
-    // Helper method to group financial data by period
     groupFinancialDataByPeriod(data, dateField, groupBy) {
         const result = {};
 
