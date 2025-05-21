@@ -9,7 +9,7 @@ router.post(
     '/v1/jam',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
-    validationMiddleware.validateBody(jamMengajarValidation.createSchema),
+    validationMiddleware.validateBody(jamMengajarValidation.create()),
     jamMengajarController.create
 );
 
@@ -17,7 +17,7 @@ router.patch(
     '/v1/jam/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
-    validationMiddleware.validateBody(jamMengajarValidation.updateSchema),
+    validationMiddleware.validateBody(jamMengajarValidation.update()),
     jamMengajarController.update
 );
 
@@ -28,10 +28,6 @@ router.delete(
     jamMengajarController.delete
 );
 
-router.get(
-    '/v1/jam/:id',
-    jamMengajarController.getById
-);
 
 router.get(
     '/v1/jam',

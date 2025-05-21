@@ -56,8 +56,9 @@ model Siswa {
 
   // Relations
   user         User           @relation(fields: [userId], references: [id])
-  programSiswa ProgramSiswa[]
-  pendaftaran  Pendaftaran[]
+  pendaftaran  Pendaftaran? // Siswa hanya memiliki satu pendaftaran
+  programSiswa ProgramSiswa[] // Tapi bisa memiliki banyak program
+  AbsensiSiswa AbsensiSiswa[]
 }
 
 // Admin model
@@ -86,7 +87,7 @@ model Guru {
   pendidikanTerakhir String?
   noRekening         String?
   namaBank           String?
-  tarifPerJam        Decimal  @db.Decimal(10, 2)
+  tarifPerJam        Decimal?  @db.Decimal(10, 2)
   suratKontrak       String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -95,6 +96,7 @@ model Guru {
   user         User           @relation(fields: [userId], references: [id])
   kelasProgram KelasProgram[]
   payroll      Payroll[]
+  AbsensiGuru  AbsensiGuru[]
 }
 
 model Kelas {
@@ -114,8 +116,8 @@ model Program {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  kelasProgram     KelasProgram[]
-  programSiswa     ProgramSiswa[]
+  kelasProgram KelasProgram[]
+  programSiswa ProgramSiswa[]
 }
 
 model JamMengajar {
@@ -126,59 +128,85 @@ model JamMengajar {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  kelasProgram      KelasProgram[]
-  PendaftaranJadwal PendaftaranJadwal[]
+  kelasProgram       KelasProgram[]
+  JadwalProgramSiswa JadwalProgramSiswa[]
 }
 
 model KelasProgram {
   id            String   @id @default(uuid())
   kelasId       String?
   programId     String
+  hari          HARI
   jamMengajarId String
-  hari          String
   guruId        String?
   tipeKelas     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relations
-  kelas            Kelas?             @relation(fields: [kelasId], references: [id])
-  program          Program            @relation(fields: [programId], references: [id])
-  jamMengajar      JamMengajar        @relation(fields: [jamMengajarId], references: [id])
-  guru             Guru?              @relation(fields: [guruId], references: [id])
-  jadwalSiswa      JadwalSiswa[]
-  absensiGuru      AbsensiGuru[]
-  AbsensiSiswa     AbsensiSiswa[]
+  kelas        Kelas?         @relation(fields: [kelasId], references: [id])
+  program      Program        @relation(fields: [programId], references: [id])
+  jamMengajar  JamMengajar    @relation(fields: [jamMengajarId], references: [id])
+  guru         Guru?          @relation(fields: [guruId], references: [id])
+  programSiswa ProgramSiswa[] // Relasi langsung ke ProgramSiswa
+  absensiGuru  AbsensiGuru[]
+  absensiSiswa AbsensiSiswa[]
 }
 
+// Model Pendaftaran (sekali untuk satu siswa)
+model Pendaftaran {
+  id               String           @id @default(uuid())
+  siswaId          String           @unique
+  biayaPendaftaran Decimal          @db.Decimal(10, 2)
+  tanggalDaftar    String
+  diskon           Decimal          @db.Decimal(10, 2)
+  totalBiaya       Decimal          @db.Decimal(10, 2)
+  statusVerifikasi StatusVerifikasi
+  voucher_id       String?
+  pembayaranId     String?          @unique
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  voucher          Voucher?         @relation(fields: [voucher_id], references: [id])
+  siswa      Siswa       @relation(fields: [siswaId], references: [id])
+  pembayaran Pembayaran? @relation(fields: [pembayaranId], references: [id])
+}
+
+// Model Program Siswa (hubungan siswa dengan program)
 model ProgramSiswa {
-  id        String      @id @default(uuid())
-  siswaId   String
-  programId String
-  status    StatusSiswa
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  siswaId        String
+  programId      String
+  kelasProgramId String // Relasi langsung ke KelasProgram
+  status         StatusSiswa
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   // Relations
   siswa              Siswa                @relation(fields: [siswaId], references: [id])
   program            Program              @relation(fields: [programId], references: [id])
-  jadwalSiswa        JadwalSiswa[]
-  riwayatStatusSiswa RiwayatStatusSiswa[]
-  pendaftaran        Pendaftaran[]
+  kelasProgram       KelasProgram         @relation(fields: [kelasProgramId], references: [id])
+  riwayatStatus      RiwayatStatusSiswa[]
   periodeSpp         PeriodeSpp[]
+  JadwalProgramSiswa JadwalProgramSiswa[]
 }
 
-model JadwalSiswa {
-  id             String   @id @default(uuid())
+model JadwalProgramSiswa {
+  id             String @id @default(uuid())
   programSiswaId String
-  kelasProgramId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  hari           HARI
+  jamMengajarId  String
 
-  // Relations
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations  
   programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
-  kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
+  jamMengajar  JamMengajar  @relation(fields: [jamMengajarId], references: [id])
 }
+
+// Model Jadwal Siswa (untuk menyimpan jadwal-jadwal siswa per program)
 
 model RiwayatStatusSiswa {
   id               String      @id @default(uuid())
@@ -197,12 +225,14 @@ model RiwayatStatusSiswa {
 model AbsensiSiswa {
   id              String          @id @default(uuid())
   kelasProgramId  String
+  siswaId         String
   tanggal         String
   statusKehadiran StatusKehadiran
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   // Relations
+  siswa        Siswa        @relation(fields: [siswaId], references: [id])
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
 
@@ -210,6 +240,7 @@ model AbsensiGuru {
   id              String          @id @default(uuid())
   kelasProgramId  String
   payrollId       String?
+  guruId          String
   tanggal         String
   jamMasuk        String
   jamKeluar       String
@@ -220,6 +251,7 @@ model AbsensiGuru {
   updatedAt       DateTime        @updatedAt
 
   // Relations
+  guru         Guru         @relation(fields: [guruId], references: [id])
   payroll      Payroll?     @relation(fields: [payrollId], references: [id])
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
@@ -235,43 +267,8 @@ model Voucher {
   updatedAt        DateTime    @updatedAt
 
   // Relations
-  pendaftaran      Pendaftaran[]
-  periodeSpp       PeriodeSpp[]
-}
-
-model Pendaftaran {
-  id               String           @id @default(uuid())
-  siswaId          String
-  programSiswaId   String
-  pembayaranId     String?          @unique
-  biayaPendaftaran Decimal          @db.Decimal(10, 2)
-  tanggalDaftar    String
-  voucherId        String?
-  diskon           Decimal          @db.Decimal(10, 2)
-  totalBiaya       Decimal          @db.Decimal(10, 2)
-  statusVerifikasi StatusVerifikasi
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-
-  // Relations
-  siswa             Siswa               @relation(fields: [siswaId], references: [id])
-  voucher           Voucher?            @relation(fields: [voucherId], references: [id])
-  programSiswa      ProgramSiswa        @relation(fields: [programSiswaId], references: [id])
-  pembayaran        Pembayaran?         @relation(fields: [pembayaranId], references: [id])
-  PendaftaranJadwal PendaftaranJadwal[]
-}
-
-model PendaftaranJadwal {
-  id            String   @id @default(uuid())
-  pendaftaranId String
-  hari          String
-  jamMengajarId String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  pendaftarah Pendaftaran @relation(fields: [pendaftaranId], references: [id])
-  jamMengajar JamMengajar @relation(fields: [jamMengajarId], references: [id])
+  PeriodeSpp  PeriodeSpp[]
+  Pendaftaran Pendaftaran[]
 }
 
 model PeriodeSpp {
@@ -280,19 +277,18 @@ model PeriodeSpp {
   bulan             String
   tahun             Int
   tanggalTagihan    String
-  tanggalJatuhTempo String
   jumlahTagihan     Decimal          @db.Decimal(10, 2)
-  voucherId         String?
-  diskon            Decimal          @db.Decimal(10, 2)
+  diskon            Decimal?          @db.Decimal(10, 2)
   totalTagihan      Decimal          @db.Decimal(10, 2)
   statusPembayaran  StatusPembayaran
   pembayaranId      String?          @unique
+  voucher_id        String?
+  voucher           Voucher?         @relation(fields: [voucher_id], references: [id])
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   // Relations
   programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
-  voucher      Voucher?     @relation(fields: [voucherId], references: [id])
   pembayaran   Pembayaran?  @relation(fields: [pembayaranId], references: [id])
 }
 
@@ -326,39 +322,7 @@ model XenditPayment {
   updatedAt            DateTime     @updatedAt
 
   // Relations
-  pembayaran            Pembayaran              @relation(fields: [pembayaranId], references: [id])
-  xenditCallbackInvoice XenditCallbackInvoice[]
-}
-
-
-
-// Separate callback models for different reference types
-model XenditCallbackInvoice {
-  id              String       @id @default(uuid())
-  xenditPaymentId String
-  eventType       String
-  rawResponse     Json
-  amount          Decimal      @db.Decimal(10, 2)
-  status          XenditStatus
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  // Relations
-  xenditPayment XenditPayment @relation(fields: [xenditPaymentId], references: [id])
-}
-
-model XenditCallbackDisbursement {
-  id                   String                   @id @default(uuid())
-  xenditDisbursementId String
-  eventType            String
-  rawResponse          Json
-  amount               Decimal                  @db.Decimal(10, 2)
-  status               XenditDisbursementStatus
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-
-  // Relations
-  xenditDisbursement XenditDisbursement @relation(fields: [xenditDisbursementId], references: [id])
+  pembayaran Pembayaran @relation(fields: [pembayaranId], references: [id])
 }
 
 model Payroll {
@@ -368,7 +332,7 @@ model Payroll {
   bulan     String
   tahun     Int
   gajiPokok Decimal       @db.Decimal(10, 2)
-  insentif  Decimal       @db.Decimal(10, 2)
+  insentif  Decimal?       @db.Decimal(10, 2)
   potongan  Decimal       @db.Decimal(10, 2)
   totalGaji Decimal       @db.Decimal(10, 2)
   status    StatusPayroll
@@ -408,8 +372,16 @@ model XenditDisbursement {
   updatedAt             DateTime                 @updatedAt
 
   // Relations
-  payrollDisbursement        PayrollDisbursement          @relation(fields: [payrollDisbursementId], references: [id])
-  xenditCallbackDisbursement XenditCallbackDisbursement[]
+  payrollDisbursement PayrollDisbursement @relation(fields: [payrollDisbursementId], references: [id])
+}
+
+enum HARI {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
 }
 
 enum Role {

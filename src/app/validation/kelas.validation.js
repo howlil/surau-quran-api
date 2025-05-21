@@ -22,7 +22,6 @@ class KelasValidation {
         })
     });
   }
-
   static getById() {
     return ValidatorFactory.create({
       id: Joi.string().required()
@@ -32,7 +31,6 @@ class KelasValidation {
         })
     });
   }
-
   static getAll() {
     return ValidatorFactory.create({
       page: Joi.number().integer().min(1).default(1)

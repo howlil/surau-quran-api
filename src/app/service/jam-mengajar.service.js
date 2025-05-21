@@ -102,22 +102,7 @@ class JamMengajarService {
     }
   }
 
-  async getById(id) {
-    try {
-      const jamMengajar = await prisma.jamMengajar.findUnique({
-        where: { id }
-      });
-
-      if (!jamMengajar) {
-        throw new NotFoundError(`Jam mengajar dengan ID ${id} tidak ditemukan`);
-      }
-
-      return jamMengajar;
-    } catch (error) {
-      logger.error(`Error getting jamMengajar with ID ${id}:`, error);
-      throw error;
-    }
-  }
+  
 
   async getAll(filters = {}) {
     try {

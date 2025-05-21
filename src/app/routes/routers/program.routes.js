@@ -13,7 +13,7 @@ router.post(
     ProgramController.create
 );
 
-router.patch(
+router.put(
     '/v1/program/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
@@ -27,10 +27,14 @@ router.delete(
     authMiddleware.authorize(['ADMIN']),
     ProgramController.delete
 );
+
+// TODO : deperhatikan lagi untuk detail ini di case mana
 router.get(
     '/v1/program/:id',
     ProgramController.getById
 );
+
+// TODO : untuk program gaperlu pagination
 router.get(
     '/v1/program',
     ProgramController.getAll

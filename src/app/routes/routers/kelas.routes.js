@@ -12,7 +12,7 @@ router.post('/v1/kelas',
     kelasController.create
 );
 
-router.patch('/v1/kelas/:id',
+router.put('/v1/kelas/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
     validationMiddleware.validateBody(kelasValidation.update()),
@@ -23,9 +23,15 @@ router.delete('/v1/kelas/:id',
     authMiddleware.authorize(['ADMIN']),
     kelasController.delete
 );
+
+// TODO : deperhatikan lagi untuk detail ini di case mana
+
 router.get('/v1/kelas/:id',
     kelasController.getById
 );
+
+// TODO : untuk kelas gaperlu pagination
+
 router.get('/v1/kelas',
     kelasController.getAll
 );
