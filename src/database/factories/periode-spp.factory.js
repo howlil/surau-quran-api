@@ -14,21 +14,7 @@ class PeriodeSppFactory {
         const diskon = voucherId ? Math.floor(jumlahTagihan * 0.1) : 0; // 10% discount if voucher
         const totalTagihan = jumlahTagihan - diskon;
 
-        const statuses = ['UNPAID', 'PENDING', 'PAID', 'SETTLED', 'EXPIRED'];
-        const statusWeight = [0.3, 0.1, 0.4, 0.1, 0.1]; // Weighted probabilities
-
-        let statusIndex = 0;
-        const randomVal = Math.random();
-        let cumulativeWeight = 0;
-
-        for (let i = 0; i < statusWeight.length; i++) {
-            cumulativeWeight += statusWeight[i];
-            if (randomVal <= cumulativeWeight) {
-                statusIndex = i;
-                break;
-            }
-        }
-
+ 
         return {
             programSiswaId,
             bulan,
@@ -37,7 +23,6 @@ class PeriodeSppFactory {
             jumlahTagihan,
             diskon,
             totalTagihan,
-            statusPembayaran: statuses[statusIndex],
             voucher_id: voucherId
         };
     }

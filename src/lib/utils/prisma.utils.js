@@ -19,13 +19,17 @@ class PrismaUtils {
 
   static async paginate(model, options = {}) {
     const {
-      page = 1,
-      limit = 10,
+      page: pageParam = 1,
+      limit: limitParam = 10,
       where = {},
       orderBy = {},
       select = {},
       include = {}
     } = options;
+
+    // Pastikan page dan limit adalah angka
+    const page = Number(pageParam);
+    const limit = Number(limitParam);
 
     // Exclude createdAt and updatedAt from select if they exist
     const excludedFields = ['createdAt', 'updatedAt'];
@@ -34,41 +38,47 @@ class PrismaUtils {
     );
     const skip = (page - 1) * limit;
 
-    const [total, data] = await prisma.$transaction([
-      model.count({ where }),
-      model.findMany({
-        skip,
-        take: limit,
-        where,
-        orderBy,
-        select: Object.keys(filteredSelect).length ? filteredSelect : undefined,
-        include: Object.keys(include).length ? include : undefined
-      })
-    ]);
+    try {
+      const [total, data] = await prisma.$transaction([
+        model.count({ where }),
+        model.findMany({
+          skip,
+          take: limit,
+          where,
+          orderBy,
+          select: Object.keys(filteredSelect).length ? filteredSelect : undefined,
+          include: Object.keys(include).length ? include : undefined
+        })
+      ]);
 
-    const filteredData = data.map(item => {
-      const { createdAt, updatedAt, ...rest } = item;
-      return rest;
-    });
-    
-    return {
-      data: filteredData,
-      meta: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: skip + filteredData.length < total,
-        hasPreviousPage: page > 1
-      }
-    };
+      const filteredData = data.map(item => {
+        if (item) {
+          const { createdAt, updatedAt, ...rest } = item;
+          return rest;
+        }
+        return item;
+      });
+      
+      return {
+        data: filteredData,
+        meta: {
+          total,
+          limit,
+          page,
+          totalPages: Math.ceil(total / limit),
+
+        }
+      };
+    } catch (error) {
+      logger.error('Pagination error:', error);
+      throw error;
+    }
   }
 
   static buildWhereClause(filters = {}) {
     const where = {};
 
     Object.entries(filters).forEach(([key, value]) => {
-      // Exclude createdAt and updatedAt from where clause
       if (key === 'createdAt' || key === 'updatedAt') {
         return;
       }

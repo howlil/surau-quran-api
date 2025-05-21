@@ -7,30 +7,114 @@ class AbsensiService {
     // Get student attendance for admin (filtered by date)
     async getAbsensiSiswaForAdmin(filters = {}) {
         try {
-            const { tanggal, page = 1, limit = 10 } = filters;
+            const {
+                tanggal,
+                page = 1,
+                limit = 10,
+                absensiPage = 1,
+                absensiLimit = 10
+            } = filters;
 
-            const where = {};
+            const kelasProgramQuery = {};
+
             if (tanggal) {
-                where.tanggal = tanggal;
+                kelasProgramQuery.absensiSiswa = {
+                    some: {
+                        tanggal
+                    }
+                };
             }
 
-            return await PrismaUtils.paginate(prisma.absensiSiswa, {
-                page,
-                limit,
-                where,
+            const totalKelasProgram = await prisma.kelasProgram.count({
+                where: kelasProgramQuery
+            });
+
+            // Calculate pagination for KelasProgram
+            const skip = (page - 1) * limit;
+            const take = parseInt(limit);
+            const totalPages = Math.ceil(totalKelasProgram / limit);
+
+            // Get KelasProgram with pagination
+            const kelasPrograms = await prisma.kelasProgram.findMany({
+                where: kelasProgramQuery,
                 include: {
-                    kelasProgram: {
-                        include: {
-                            kelas: true,
-                            program: true,
-                            jamMengajar: true
-                        }
-                    }
+                    kelas: true,
+                    program: true,
+                    jamMengajar: true
                 },
+                skip,
+                take,
                 orderBy: { createdAt: 'desc' }
             });
+
+            // For each KelasProgram, get the attendance data with pagination
+            const result = await Promise.all(kelasPrograms.map(async (kelasProgram) => {
+                // Get attendance records for this KelasProgram
+                const absensiWhere = {
+                    kelasProgramId: kelasProgram.id
+                };
+
+                if (tanggal) {
+                    absensiWhere.tanggal = tanggal;
+                }
+
+                // Get total count of attendance records for this KelasProgram
+                const totalAbsensi = await prisma.absensiSiswa.count({
+                    where: absensiWhere
+                });
+
+                // Calculate pagination for attendance records
+                const absensiSkip = (absensiPage - 1) * absensiLimit;
+                const absensiTake = parseInt(absensiLimit);
+                const totalAbsensiPages = Math.ceil(totalAbsensi / absensiLimit);
+
+                // Get attendance records with pagination
+                const absensiRecords = await prisma.absensiSiswa.findMany({
+                    where: absensiWhere,
+                    include: {
+                        siswa: {
+                            select: {
+                                namaMurid: true,
+                                nis: true
+                            }
+                        }
+                    },
+                    skip: absensiSkip,
+                    take: absensiTake,
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                // Format data for response
+                const absensiData = absensiRecords.map(record => ({
+                    namaSiswa: record.siswa.namaMurid,
+                    nis: record.siswa.nis,
+                    status: record.statusKehadiran
+                }));
+
+                return {
+                    kelasId: kelasProgram.kelasId,
+                    namaKelas: kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
+                    programId: kelasProgram.programId,
+                    namaProgram: kelasProgram.program.namaProgram,
+                    hari: kelasProgram.hari,
+                    jamMulai: kelasProgram.jamMengajar.jamMulai,
+                    jamSelesai: kelasProgram.jamMengajar.jamSelesai,
+                    absensi: {
+                        data: absensiData,
+                        pagination: {
+                            page: parseInt(absensiPage),
+                            limit: parseInt(absensiLimit),
+                            totalItems: totalAbsensi,
+                            totalPages: totalAbsensiPages,
+                        }
+                    }
+                };
+            }));
+
+            // Return with pagination metadata for KelasProgram
+            return result
         } catch (error) {
-            logger.error('Error getting siswa attendance:', error);
+            logger.error('Error getting siswa attendance by kelas:', error);
             throw error;
         }
     }

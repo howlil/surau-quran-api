@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class StatisticsService {
     async getStudentCounts(filters = {}) {
@@ -64,11 +63,7 @@ class StatisticsService {
                 presentStudents,
                 absentStudents,
                 totalPrograms,
-                newStudents,
-                dateRange: {
-                    startDate: parsedStartDate,
-                    endDate: parsedEndDate
-                }
+                newStudents
             };
         } catch (error) {
             logger.error('Error getting student counts:', error);
@@ -154,11 +149,7 @@ class StatisticsService {
                     total: Object.values(incomeData).reduce((sum, item) => sum + item.value, 0) -
                         Object.values(payrollData2).reduce((sum, item) => sum + item.value, 0)
                 },
-                dateRange: {
-                    startDate: parsedStartDate,
-                    endDate: parsedEndDate,
-                    groupBy
-                }
+
             };
         } catch (error) {
             logger.error('Error getting financial statistics:', error);

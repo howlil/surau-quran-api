@@ -23,11 +23,7 @@ class VoucherController {
     return Http.Response.success(res, { id }, 'Voucher berhasil dihapus');
   });
 
-  getById = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const result = await voucherService.getById(id);
-    return Http.Response.success(res, result);
-  });
+  
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
@@ -37,23 +33,10 @@ class VoucherController {
     return Http.Response.success(res, result);
   });
 
-  getByCode = ErrorHandler.asyncHandler(async (req, res) => {
-    const { kodeVoucher } = HttpRequest.getUrlParams(req);
-    const result = await voucherService.getByCode(kodeVoucher);
-    return Http.Response.success(res, result);
-  });
+ 
+ 
 
-  toggleStatus = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const result = await voucherService.toggleStatus(id);
-    return Http.Response.success(res, result, 'Status voucher berhasil diubah');
-  });
 
-  getUsageReport = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const result = await voucherService.getUsageReport(id);
-    return Http.Response.success(res, result);
-  });
 }
 
 module.exports = new VoucherController();

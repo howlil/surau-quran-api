@@ -17,7 +17,6 @@ class PendaftaranFactory {
             tanggalDaftar,
             diskon,
             totalBiaya,
-            statusVerifikasi: Math.random() > 0.3 ? 'DIVERIFIKASI' : 'MENUNGGU',
             voucher_id: voucherId
         };
     }

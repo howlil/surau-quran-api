@@ -40,6 +40,7 @@ model Siswa {
   id               String   @id @default(uuid())
   userId           String   @unique
   noWhatsapp       String?
+  nis              String?
   namaMurid        String
   namaPanggilan    String?
   tanggalLahir     String?
@@ -161,7 +162,6 @@ model Pendaftaran {
   tanggalDaftar    String
   diskon           Decimal          @db.Decimal(10, 2)
   totalBiaya       Decimal          @db.Decimal(10, 2)
-  statusVerifikasi StatusVerifikasi
   voucher_id       String?
   pembayaranId     String?          @unique
   createdAt        DateTime         @default(now())
@@ -280,7 +280,6 @@ model PeriodeSpp {
   jumlahTagihan     Decimal          @db.Decimal(10, 2)
   diskon            Decimal?          @db.Decimal(10, 2)
   totalTagihan      Decimal          @db.Decimal(10, 2)
-  statusPembayaran  StatusPembayaran
   pembayaranId      String?          @unique
   voucher_id        String?
   voucher           Voucher?         @relation(fields: [voucher_id], references: [id])

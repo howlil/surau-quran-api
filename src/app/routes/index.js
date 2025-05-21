@@ -11,6 +11,7 @@ const siswaRoutes = require('./routers/siswa.routes');
 const paymentRoutes = require('./routers/payment.routes');
 const absensiRoutes = require('./routers/absensi.routes');
 const statisticsRoutes = require('./routers/statistics.routes');
+const sppRoutes = require('./routers/spp.routes');
 
 
 router.use(authRoutes);
@@ -24,5 +25,6 @@ router.use(voucherRoutes);
 router.use(siswaRoutes);
 router.use(absensiRoutes);
 router.use(statisticsRoutes);
+router.use(sppRoutes);
 
 module.exports = router;

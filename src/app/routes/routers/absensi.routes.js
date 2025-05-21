@@ -6,10 +6,12 @@ const validationMiddleware = require('../../middleware/validation.middleware');
 const absensiValidation = require('../../validation/absensi.validation');
 
 // Admin routes
+
+// TODO: FILTER TANGGAL MASIH GAJALAN
 router.get('/v1/admin/absensi/siswa',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
-    validationMiddleware.validateQuery(absensiValidation.getAbsensiSiswa()),
+    validationMiddleware.validateQuery(absensiValidation.tanggal()),
     absensiController.getAbsensiSiswaForAdmin
 );
 
@@ -45,7 +47,6 @@ router.get('/v1/siswa/absensi/count',
 router.get('/v1/siswa/absensi/detail',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SISWA']),
-    validationMiddleware.validateQuery(absensiValidation.getAbsensiSiswa()),
     absensiController.getAbsensiDetailForSiswa
 );
 

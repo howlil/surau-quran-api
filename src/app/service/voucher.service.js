@@ -92,30 +92,6 @@ class VoucherService {
     }
   }
 
-  async getById(id) {
-    try {
-      const voucher = await prisma.voucher.findUnique({
-        where: { id },
-        include: {
-          _count: {
-            select: {
-              pendaftaran: true,
-              periodeSpp: true
-            }
-          }
-        }
-      });
-
-      if (!voucher) {
-        throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
-      }
-
-      return voucher;
-    } catch (error) {
-      logger.error(`Error getting voucher with ID ${id}:`, error);
-      throw error;
-    }
-  }
 
   async getAll(filters = {}) {
     try {
@@ -152,135 +128,9 @@ class VoucherService {
     }
   }
 
-  async getByCode(kodeVoucher) {
-    try {
-      const voucher = await prisma.voucher.findUnique({
-        where: { kodeVoucher },
-        include: {
-          _count: {
-            select: {
-              pendaftaran: true,
-              periodeSpp: true
-            }
-          }
-        }
-      });
+ 
 
-      if (!voucher) {
-        throw new NotFoundError(`Voucher dengan kode ${kodeVoucher} tidak ditemukan`);
-      }
-
-      if (!voucher.isActive) {
-        throw new ConflictError('Voucher tidak aktif');
-      }
-
-      const totalUsage = voucher._count.pendaftaran + voucher._count.periodeSpp;
-      if (totalUsage >= voucher.jumlahPenggunaan) {
-        throw new ConflictError('Voucher sudah habis digunakan');
-      }
-
-      return voucher;
-    } catch (error) {
-      logger.error(`Error getting voucher with code ${kodeVoucher}:`, error);
-      throw error;
-    }
-  }
-
-  async toggleStatus(id) {
-    try {
-      const voucher = await prisma.voucher.findUnique({
-        where: { id }
-      });
-
-      if (!voucher) {
-        throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
-      }
-
-      const updated = await prisma.voucher.update({
-        where: { id },
-        data: { isActive: !voucher.isActive }
-      });
-
-      logger.info(`Toggled voucher status with ID: ${id} to ${updated.isActive}`);
-      return updated;
-    } catch (error) {
-      logger.error(`Error toggling voucher status with ID ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async getUsageReport(id) {
-    try {
-      const voucher = await prisma.voucher.findUnique({
-        where: { id },
-        include: {
-          pendaftaran: {
-            include: {
-              siswa: {
-                select: {
-                  id: true,
-                  namaMurid: true
-                }
-              }
-            }
-          },
-          periodeSpp: {
-            include: {
-              programSiswa: {
-                include: {
-                  siswa: {
-                    select: {
-                      id: true,
-                      namaMurid: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (!voucher) {
-        throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
-      }
-
-      const usage = {
-        pendaftaran: voucher.pendaftaran.map(p => ({
-          id: p.id,
-          siswa: p.siswa.namaMurid,
-          tanggal: p.tanggalDaftar,
-          diskon: p.diskon
-        })),
-        periodeSpp: voucher.periodeSpp.map(p => ({
-          id: p.id,
-          siswa: p.programSiswa.siswa.namaMurid,
-          bulan: p.bulan,
-          tahun: p.tahun,
-          diskon: p.diskon
-        }))
-      };
-
-      const totalUsage = voucher.pendaftaran.length + voucher.periodeSpp.length;
-
-      return {
-        voucher: {
-          id: voucher.id,
-          kodeVoucher: voucher.kodeVoucher,
-          tipe: voucher.tipe,
-          nominal: voucher.nominal,
-          jumlahPenggunaan: voucher.jumlahPenggunaan,
-          totalPenggunaan: totalUsage,
-          sisaPenggunaan: voucher.jumlahPenggunaan - totalUsage,
-          isActive: voucher.isActive
-        },
-        penggunaan: usage
-      };
-    } catch (error) {
-      logger.error(`Error getting usage report for voucher ${id}:`, error);
-      throw error;
-    }
-  }
+ 
 }
 
 module.exports = new VoucherService();

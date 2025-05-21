@@ -3,6 +3,7 @@ class SiswaFactory {
         return {
             noWhatsapp: `08${Math.floor(Math.random() * 10000000000).toString().padStart(10, '0')}`,
             namaMurid: `Siswa ${Math.random().toString(36).substring(7)}`,
+            nis: `1234567890${Math.floor(Math.random() * 10000000000).toString().padStart(10, '0')}`,
             namaPanggilan: `Panggilan ${Math.random().toString(36).substring(7)}`,
             tanggalLahir: `${2000 + Math.floor(Math.random() * 20)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
             jenisKelamin: Math.random() > 0.5 ? 'LAKI_LAKI' : 'PEREMPUAN',

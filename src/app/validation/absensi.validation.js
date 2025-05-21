@@ -1,10 +1,15 @@
 const Joi = require('joi');
 
 class AbsensiValidation {
-    getAbsensiSiswa() {
+
+    tanggal() {
         return Joi.object({
-            tanggal: Joi.string().optional(),
-            bulan: Joi.string().optional(),
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .optional()
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
+                }),
         });
     }
 
