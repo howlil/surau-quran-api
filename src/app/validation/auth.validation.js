@@ -28,7 +28,7 @@ class AuthValidation {
           'string.email': 'Email harus valid',
           'any.required': 'Email wajib diisi'
         }),
-   password: Joi.string()
+      password: Joi.string()
         .min(6)
         .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
         .required()
@@ -54,6 +54,47 @@ class AuthValidation {
           'number.positive': 'Tarif per jam harus lebih dari 0',
           'any.required': 'Tarif per jam wajib diisi'
         })
+    });
+  }
+
+  static createAdmin() {
+    return ValidatorFactory.create({
+      email: Joi.string().email().required()
+        .messages({
+          'string.email': 'Email harus valid',
+          'any.required': 'Email wajib diisi'
+        }),
+      password: Joi.string()
+        .min(6)
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        .required()
+        .messages({
+          'string.min': 'Password minimal 6 karakter',
+          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+          'any.required': 'Password wajib diisi'
+        }),
+      nama: Joi.string().required()
+        .messages({
+          'any.required': 'Nama wajib diisi'
+        })
+    });
+  }
+
+  static updateAdmin() {
+    return ValidatorFactory.create({
+      email: Joi.string().email().optional()
+        .messages({
+          'string.email': 'Email harus valid'
+        }),
+      password: Joi.string()
+        .min(6)
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        .optional()
+        .messages({
+          'string.min': 'Password minimal 6 karakter',
+          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+        }),
+      nama: Joi.string().optional()
     });
   }
 }

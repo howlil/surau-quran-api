@@ -472,3 +472,29 @@ enum XenditDisbursementStatus {
   COMPLETED
   FAILED
 }
+
+model PendaftaranTemp {
+  id               String   @id @default(uuid())
+  namaMurid        String
+  namaPanggilan    String?
+  tanggalLahir     String?
+  jenisKelamin     Gender
+  alamat           String?
+  strataPendidikan SPM?
+  kelasSekolah     String?
+  email            String
+  namaSekolah      String?
+  namaOrangTua     String
+  namaPenjemput    String?
+  noWhatsapp       String?
+  programId        String
+  jadwalJson       String   @db.Text
+  kodeVoucher      String?
+  biayaPendaftaran Decimal  @db.Decimal(10, 2)
+  diskon           Decimal  @db.Decimal(10, 2)
+  totalBiaya       Decimal  @db.Decimal(10, 2)
+  pembayaranId     String   @unique
+  voucherId        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

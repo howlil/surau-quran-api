@@ -11,7 +11,6 @@ class AuthController {
   }
   );
 
-
   logout = ErrorHandler.asyncHandler(async (req, res) => {
     const token = Http.Request.getAuthToken(req);
     if (!token) {
@@ -21,6 +20,31 @@ class AuthController {
     return Http.Response.success(res, null, 'Logout berhasil');
   });
 
+  createAdmin = ErrorHandler.asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const result = await authService.createAdmin(req.body, userId);
+    return Http.Response.created(res, result, 'Admin berhasil dibuat');
+  });
+
+  getAllAdmins = ErrorHandler.asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const admins = await authService.getAllAdmins(userId);
+    return Http.Response.success(res, admins, 'Daftar admin berhasil diambil');
+  });
+
+  updateAdmin = ErrorHandler.asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const adminId = req.params.id;
+    const result = await authService.updateAdmin(adminId, req.body, userId);
+    return Http.Response.success(res, result, 'Admin berhasil diperbarui');
+  });
+
+  deleteAdmin = ErrorHandler.asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const adminId = req.params.id;
+    await authService.deleteAdmin(adminId, userId);
+    return Http.Response.success(res,  'Admin berhasil dihapus');
+  });
 }
 
 module.exports = new AuthController();

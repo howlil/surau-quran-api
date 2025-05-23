@@ -4,9 +4,7 @@ const validationMiddleware = require('../../middleware/validation.middleware');
 const authMiddleware = require('../../middleware/auth.middleware');
 const siswaController = require('../../controller/siswa.controller');
 const siswaValidation = require('../../validation/siswa.validation');
-
-
-
+const pendaftaranValidation = require('../../validation/pendaftaran.validation');
 
 router.get(
   '/v1/siswa',
@@ -22,13 +20,19 @@ router.get(
   siswaController.getProfile
 );
 
-
 router.patch(
   '/v1/siswa/:id',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
   validationMiddleware.validateBody(siswaValidation.adminUpdateSiswa()),
   siswaController.adminUpdateSiswa
+);
+
+// Public endpoint for registration
+router.post(
+  '/v1/pendaftaran',
+  validationMiddleware.validateBody(pendaftaranValidation.pendaftaranSiswa()),
+  siswaController.pendaftaranSiswa
 );
 
 module.exports = router;

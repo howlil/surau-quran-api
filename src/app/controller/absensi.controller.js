@@ -15,7 +15,6 @@ class AbsensiController {
         return Http.Response.success(res, result, 'Data absensi siswa berhasil diambil');
     });
 
-
     // Admin: Get teacher attendance grouped by date
     getAbsensiGuruByDate = ErrorHandler.asyncHandler(async (req, res) => {
         const filters = HttpRequest.getQueryParams(req, ['tanggal']);

@@ -7,16 +7,14 @@ const jamMengajarRoutes = require('./routers/jam-mengajar.routes');
 const guruRoutes = require('./routers/guru.routes');
 const voucherRoutes = require('./routers/voucher.routes');
 const siswaRoutes = require('./routers/siswa.routes');
-const paymentRoutes = require('./routers/payment.routes');
 const absensiRoutes = require('./routers/absensi.routes');
 const statisticsRoutes = require('./routers/statistics.routes');
 const sppRoutes = require('./routers/spp.routes');
-
+const paymentRoutes = require('./routers/payment.routes');
 
 router.use(authRoutes);
 router.use(kelasRoutes);
 router.use(programRoutes);
-router.use(paymentRoutes);
 router.use(jamMengajarRoutes);
 router.use(guruRoutes);
 router.use(voucherRoutes);
@@ -24,5 +22,6 @@ router.use(siswaRoutes);
 router.use(absensiRoutes);
 router.use(statisticsRoutes);
 router.use(sppRoutes);
+router.use(paymentRoutes);
 
 module.exports = router;

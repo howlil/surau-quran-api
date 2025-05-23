@@ -23,7 +23,6 @@ class VoucherController {
     return Http.Response.success(res, { id }, 'Voucher berhasil dihapus');
   });
 
-  
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
@@ -33,10 +32,5 @@ class VoucherController {
     return Http.Response.success(res, result);
   });
 
- 
- 
-
-
 }
-
 module.exports = new VoucherController();
