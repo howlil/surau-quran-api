@@ -13,6 +13,7 @@ class PaymentController {
         const callbackToken = req.headers['x-callback-token'];
         const rawBody = req.body;
 
+
         const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
         if (!isValidToken) {
             logger.warn('Invalid Xendit callback token received');

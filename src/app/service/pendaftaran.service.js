@@ -56,19 +56,7 @@ class PendaftaranService {
           throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
         }
 
-        const kelasProgram = await prisma.kelasProgram.findFirst({
-          where: {
-            programId,
-            hari: jadwalItem.hari,
-            jamMengajarId: jadwalItem.jamMengajarId
-          }
-        });
-
-        if (!kelasProgram) {
-          throw new NotFoundError(`Kelas program tidak tersedia untuk ${jadwalItem.hari} jam ${jamMengajar.jamMulai}-${jamMengajar.jamSelesai}`);
-        }
-
-        validJadwalIds.push(kelasProgram.id);
+        validJadwalIds.push(jadwalItem.id);
       }
 
       let voucherId = null;

@@ -63,66 +63,7 @@ class VoucherValidation {
     });
   }
 
-  static getById() {
-    return ValidatorFactory.create({
-      id: Joi.string().required()
-        .messages({
-          'string.empty': 'ID voucher tidak boleh kosong',
-          'any.required': 'ID voucher wajib diisi'
-        })
-    });
-  }
-
-  static getByCode() {
-    return ValidatorFactory.create({
-      kodeVoucher: Joi.string().required()
-        .messages({
-          'string.empty': 'Kode voucher tidak boleh kosong',
-          'any.required': 'Kode voucher wajib diisi'
-        })
-    });
-  }
-
-  static getAll() {
-    return ValidatorFactory.create({
-      page: Joi.number().integer().min(1).default(1)
-        .messages({
-          'number.base': 'Halaman harus berupa angka',
-          'number.integer': 'Halaman harus berupa bilangan bulat',
-          'number.min': 'Halaman minimal 1'
-        }),
-      limit: Joi.number().integer().min(1).max(100).default(10)
-        .messages({
-          'number.base': 'Batas harus berupa angka',
-          'number.integer': 'Batas harus berupa bilangan bulat',
-          'number.min': 'Batas minimal 1',
-          'number.max': 'Batas maksimal 100'
-        }),
-      kodeVoucher: Joi.string().allow('', null),
-      tipe: Joi.string().valid('PERSENTASE', 'NOMINAL').allow('', null),
-      isActive: Joi.string().valid('true', 'false').allow('', null)
-    });
-  }
-
-  static toggleStatus() {
-    return ValidatorFactory.create({
-      id: Joi.string().required()
-        .messages({
-          'string.empty': 'ID voucher tidak boleh kosong',
-          'any.required': 'ID voucher wajib diisi'
-        })
-    });
-  }
-
-  static getUsageReport() {
-    return ValidatorFactory.create({
-      id: Joi.string().required()
-        .messages({
-          'string.empty': 'ID voucher tidak boleh kosong',
-          'any.required': 'ID voucher wajib diisi'
-        })
-    });
-  }
+ 
 }
 
 module.exports = VoucherValidation;

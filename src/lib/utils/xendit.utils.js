@@ -4,6 +4,7 @@ const { logger } = require('../config/logger.config');
 class XenditUtils {
   static async createInvoice(data) {
     try {
+
       if (!xendit) {
         throw new Error('Xendit client not available or not properly initialized');
       }
@@ -74,15 +75,13 @@ class XenditUtils {
           name: item.name,
           quantity: Number(item.quantity),
           price: Number(item.price),
-          category: item.category || 'FEES'  // Add default category if not provided
+          category: item.category || 'FEES'  
         }));
       }
 
       if (paymentMethods && paymentMethods.length > 0) {
-        invoiceParams.paymentMethods = paymentMethods;  // camelCase
+        invoiceParams.paymentMethods = paymentMethods;  
       }
-
-      logger.debug('Creating Xendit invoice with params:', JSON.stringify(invoiceParams));
 
       let invoice;
 
@@ -130,7 +129,6 @@ class XenditUtils {
         }
       }
 
-      // Log the full error object for debugging
       logger.error('Full error object:', JSON.stringify(error, null, 2));
 
       throw error;
@@ -240,23 +238,7 @@ class XenditUtils {
     const random = Math.floor(Math.random() * 1000);
     return `${prefix}-${timestamp}-${random}`;
   }
-
-  static mapXenditStatus(xenditStatus) {
-    const statusMap = {
-      'PENDING': 'PENDING',
-      'PAID': 'LUNAS',
-      'SETTLED': 'LUNAS',
-      'EXPIRED': 'KADALUARSA',
-      'FAILED': 'DIBATALKAN'
-    };
-
-    return statusMap[xenditStatus] || 'PENDING';
-  }
-
-  static validateCallbackSignature(rawBody, callbackToken, xenditCallbackToken) {
-    return callbackToken === xenditCallbackToken;
-  }
-
+ 
   static processInvoiceCallback(callbackData) {
     return {
       xenditInvoiceId: callbackData.id,
@@ -267,7 +249,6 @@ class XenditUtils {
       amount: callbackData.amount
     };
   }
-
   static processDisbursementCallback(callbackData) {
     if (!callbackData) {
       throw new Error('Invalid callback data');
@@ -282,26 +263,6 @@ class XenditUtils {
       accountHolderName: callbackData.account_holder_name,
       eventType: 'disbursement.completed'
     };
-  }
-
-  // Add test method for debugging
-  static async testCreateInvoice() {
-    try {
-      const testData = {
-        externalId: `TEST-${Date.now()}`,
-        amount: 10000,
-        payerEmail: 'test@example.com',
-        description: 'Test Invoice'
-      };
-
-      logger.info('Testing Xendit invoice creation with:', testData);
-      const result = await XenditUtils.createInvoice(testData);
-      logger.info('Test invoice created successfully:', result);
-      return result;
-    } catch (error) {
-      logger.error('Test invoice creation failed:', error);
-      throw error;
-    }
   }
 }
 

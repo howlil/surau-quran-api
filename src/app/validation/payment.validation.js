@@ -55,9 +55,6 @@ class PaymentValidation {
     });
   }
 
-
-  
-
   static xenditCallback() {
     return ValidatorFactory.create({
       id: Joi.string().required()

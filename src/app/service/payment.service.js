@@ -24,7 +24,6 @@ class PaymentService {
         }]
       };
 
-
       if (!invoiceData.externalId || !invoiceData.amount || !invoiceData.payerEmail || !invoiceData.description) {
         logger.error('Missing required fields in invoiceData:', JSON.stringify(invoiceData, null, 2));
         throw new Error('Missing required fields for invoice creation');
@@ -35,7 +34,6 @@ class PaymentService {
       const pembayaran = await prisma.pembayaran.create({
         data: {
           tipePembayaran: 'PENDAFTARAN',
-          metodePembayaran: 'VIRTUAL_ACCOUNT',
           jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
           statusPembayaran: xenditInvoice.status,
           tanggalPembayaran: xenditInvoice.updated.toISOString().split('T')[0],
@@ -134,6 +132,8 @@ class PaymentService {
     try {
       const processedData = XenditUtils.processInvoiceCallback(callbackData);
 
+      logger.info('Processing Xendit callback:', JSON.stringify(callbackData, null, 2));
+
       const xenditPayment = await prisma.xenditPayment.findUnique({
         where: { xenditInvoiceId: processedData.xenditInvoiceId },
         include: {
@@ -145,12 +145,13 @@ class PaymentService {
         throw new NotFoundError(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
       }
 
-      const mappedStatus = XenditUtils.mapXenditStatus(processedData.status);
+
 
       await prisma.$transaction(async (tx) => {
         await tx.xenditPayment.update({
           where: { id: xenditPayment.id },
           data: {
+            xenditPaymentChannel: processedData.paymentMethod,
             xenditStatus: processedData.status,
             xenditPaidAt: processedData.paidAt
           }
@@ -159,7 +160,8 @@ class PaymentService {
         await tx.pembayaran.update({
           where: { id: xenditPayment.pembayaranId },
           data: {
-            statusPembayaran: mappedStatus,
+            metodePembayaran: processedData.paymentMethod,
+            statusPembayaran: processedData.status,
             tanggalPembayaran: processedData.paidAt ?
               new Date(processedData.paidAt).toISOString().split('T')[0] :
               new Date().toISOString().split('T')[0]
@@ -167,13 +169,11 @@ class PaymentService {
         });
       });
 
-      logger.info(`Updated payment status for invoice ${processedData.xenditInvoiceId} to ${mappedStatus}`);
-
       return {
         success: true,
         payment: {
           id: xenditPayment.pembayaranId,
-          statusPembayaran: mappedStatus,
+          statusPembayaran: xenditPayment.pembayaran.statusPembayaran,
           tipePembayaran: xenditPayment.pembayaran.tipePembayaran,
           xenditInvoiceId: processedData.xenditInvoiceId
         }
@@ -183,7 +183,7 @@ class PaymentService {
       throw error;
     }
   }
-  
+
 
 }
 
