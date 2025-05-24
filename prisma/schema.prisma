@@ -442,6 +442,7 @@ enum StatusPayroll {
 
 enum MetodePembayaran {
   VIRTUAL_ACCOUNT
+  TUNAI
   CARD
   OVER_THE_COUNTER
   DIRECT_DEBIT
