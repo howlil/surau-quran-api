@@ -1,4 +1,6 @@
 const HttpResponse = require('./response.http');
+require('dotenv').config();
+
 
 
 class ErrorHandler {

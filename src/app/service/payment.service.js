@@ -1,31 +1,22 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const XenditUtils = require('../../lib/utils/xendit.utils');
-const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const { NotFoundError } = require('../../lib/http/errors.http');
 
 class PaymentService {
   async createPendaftaranInvoice(data) {
     try {
-      const { email, namaMurid, totalBiaya, successRedirectUrl, failureRedirectUrl } = data;
-
-      logger.debug('Creating pendaftaran invoice with data:', JSON.stringify({
-        email,
-        namaMurid,
-        totalBiaya,
-        successRedirectUrl,
-        failureRedirectUrl
-      }, null, 2));
+      const { email, namaMurid, totalBiaya } = data;
 
       const externalId = XenditUtils.generateExternalId('DAFTAR');
-      logger.debug('Generated external ID:', externalId);
 
       const invoiceData = {
         externalId,
         amount: Number(totalBiaya),
         payerEmail: email,
         description: `Pembayaran Pendaftaran - ${namaMurid}`,
-        successRedirectUrl,
-        failureRedirectUrl,
+        successRedirectUrl: process.env.XENDIT_SUCCESS_REDIRECT_URL || 'https://example.com/success',
+        failureRedirectUrl: process.env.XENDIT_FAILURE_REDIRECT_URL || 'https://example.com/failure',
         items: [{
           name: 'Biaya Pendaftaran',
           quantity: 1,
@@ -33,72 +24,40 @@ class PaymentService {
         }]
       };
 
-      logger.debug('Constructed invoice data:', JSON.stringify(invoiceData, null, 2));
 
       if (!invoiceData.externalId || !invoiceData.amount || !invoiceData.payerEmail || !invoiceData.description) {
-        logger.error('Missing required fields in invoiceData:', invoiceData);
+        logger.error('Missing required fields in invoiceData:', JSON.stringify(invoiceData, null, 2));
         throw new Error('Missing required fields for invoice creation');
       }
 
-      logger.debug('Invoice data before sending to Xendit:', JSON.stringify(invoiceData, null, 2));
-
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
-     
       const pembayaran = await prisma.pembayaran.create({
         data: {
           tipePembayaran: 'PENDAFTARAN',
           metodePembayaran: 'VIRTUAL_ACCOUNT',
-          jumlahTagihan: Number(totalBiaya),
-          statusPembayaran: 'PENDING',
-          tanggalPembayaran: new Date().toISOString().split('T')[0]
+          jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          statusPembayaran: xenditInvoice.status,
+          tanggalPembayaran: xenditInvoice.updated.toISOString().split('T')[0],
         }
       });
 
-      // Handle different possible response formats from Xendit
-      // The invoice URL field might be named differently
-      const invoiceUrl = xenditInvoice.invoice_url ||
-        xenditInvoice.invoiceUrl ||
-        xenditInvoice.url ||
-        xenditInvoice.xendit_url ||
-        `https://checkout.xendit.co/v2/invoices/${xenditInvoice.id}`;
-
-      // The expiry date field might also be named differently
-      // Ensure it's always converted to ISO string format
-      let expiryDate = xenditInvoice.expiry_date ||
-        xenditInvoice.expiryDate ||
-        xenditInvoice.expires_at ||
-        xenditInvoice.expiresAt;
-
-      // Convert to ISO string if it's not already a string
-      if (expiryDate) {
-        expiryDate = typeof expiryDate === 'string' ? expiryDate : new Date(expiryDate).toISOString();
-      } else {
-        // Default to 24 hours from now
-        expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      }
-
-      // Log what we're using
-      logger.debug('Using invoice URL:', invoiceUrl);
-      logger.debug('Using expiry date:', expiryDate);
-
-      // Create xendit payment record with proper field mapping
       await prisma.xenditPayment.create({
         data: {
           pembayaranId: pembayaran.id,
           xenditInvoiceId: xenditInvoice.id,
-          xenditExternalId: externalId,
-          xenditPaymentUrl: invoiceUrl, // This field is required
+          xenditExternalId: xenditInvoice.externalId,
+          xenditPaymentUrl: xenditInvoice.invoiceUrl,
           xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-          xenditExpireDate: expiryDate, // Now guaranteed to be a string
-          xenditStatus: xenditInvoice.status || 'PENDING'
+          xenditExpireDate: xenditInvoice.expiryDate.toISOString().split('T')[0],
+          xenditStatus: xenditInvoice.status
         }
       });
 
       return {
         pembayaranId: pembayaran.id,
-        xenditInvoiceUrl: invoiceUrl,
-        expireDate: expiryDate,
+        xenditInvoiceUrl: xenditInvoice.invoiceUrl,
+        expireDate: xenditInvoice.expiryDate,
         amount: Number(totalBiaya),
         xenditInvoiceId: xenditInvoice.id
       };
@@ -108,7 +67,6 @@ class PaymentService {
       throw error;
     }
   }
-
 
   async createSppInvoice(data) {
     try {
@@ -225,114 +183,8 @@ class PaymentService {
       throw error;
     }
   }
+  
 
-  async getPaymentStatus(pembayaranId) {
-    try {
-      const payment = await prisma.pembayaran.findUnique({
-        where: { id: pembayaranId },
-        include: {
-          xenditPayment: true,
-          pendaftaran: {
-            include: {
-              siswa: {
-                select: {
-                  namaMurid: true
-                }
-              }
-            }
-          },
-          periodeSpp: {
-            include: {
-              programSiswa: {
-                include: {
-                  siswa: {
-                    select: {
-                      namaMurid: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (!payment) {
-        throw new NotFoundError(`Payment dengan ID ${pembayaranId} tidak ditemukan`);
-      }
-
-      let customerName = 'Unknown';
-      if (payment.pendaftaran?.siswa?.namaMurid) {
-        customerName = payment.pendaftaran.siswa.namaMurid;
-      } else if (payment.periodeSpp?.programSiswa?.siswa?.namaMurid) {
-        customerName = payment.periodeSpp.programSiswa.siswa.namaMurid;
-      }
-
-      return {
-        id: payment.id,
-        tipePembayaran: payment.tipePembayaran,
-        metodePembayaran: payment.metodePembayaran,
-        jumlahTagihan: payment.jumlahTagihan,
-        statusPembayaran: payment.statusPembayaran,
-        tanggalPembayaran: payment.tanggalPembayaran,
-        customerName,
-        xenditInfo: payment.xenditPayment ? {
-          invoiceUrl: payment.xenditPayment.xenditPaymentUrl,
-          expireDate: payment.xenditPayment.xenditExpireDate,
-          paidAt: payment.xenditPayment.xenditPaidAt,
-          status: payment.xenditPayment.xenditStatus
-        } : null
-      };
-    } catch (error) {
-      logger.error(`Error getting payment status for ID ${pembayaranId}:`, error);
-      throw error;
-    }
-  }
-
-  async expirePayment(pembayaranId) {
-    try {
-      const payment = await prisma.pembayaran.findUnique({
-        where: { id: pembayaranId },
-        include: {
-          xenditPayment: true
-        }
-      });
-
-      if (!payment) {
-        throw new NotFoundError(`Payment dengan ID ${pembayaranId} tidak ditemukan`);
-      }
-
-      if (payment.statusPembayaran === 'PAID') {
-        throw new BadRequestError('Cannot expire a paid payment');
-      }
-
-      await prisma.$transaction(async (tx) => {
-        if (payment.xenditPayment) {
-          try {
-            await XenditUtils.expireInvoice(payment.xenditPayment.xenditInvoiceId);
-          } catch (error) {
-            logger.warn(`Failed to expire Xendit invoice: ${error.message}`);
-          }
-
-          await tx.xenditPayment.update({
-            where: { id: payment.xenditPayment.id },
-            data: { xenditStatus: 'EXPIRED' }
-          });
-        }
-
-        await tx.pembayaran.update({
-          where: { id: pembayaranId },
-          data: { statusPembayaran: 'EXPIRED' }
-        });
-      });
-
-      logger.info(`Expired payment with ID: ${pembayaranId}`);
-      return { success: true };
-    } catch (error) {
-      logger.error(`Error expiring payment with ID ${pembayaranId}:`, error);
-      throw error;
-    }
-  }
 }
 
 module.exports = new PaymentService();

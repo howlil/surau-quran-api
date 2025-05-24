@@ -3,7 +3,6 @@ const paymentService = require('../service/payment.service');
 const pendaftaranService = require('../service/pendaftaran.service');
 const voucherService = require('../service/voucher.service');
 const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { xenditConfig } = require('../../lib/config/xendit.config');
 const { prisma } = require('../../lib/config/prisma.config');
@@ -22,7 +21,7 @@ class PaymentController {
 
         const result = await paymentService.handleXenditCallback(rawBody);
 
-        if (result.payment.statusPembayaran === 'LUNAS' && result.payment.tipePembayaran === 'PENDAFTARAN') {
+        if (result.payment.statusPembayaran === 'PAID' && result.payment.tipePembayaran === 'PENDAFTARAN') {
             try {
                 await pendaftaranService.processPaidPendaftaran(result.payment.id);
                 logger.info(`Successfully processed pendaftaran payment for ID: ${result.payment.id}`);
@@ -36,23 +35,6 @@ class PaymentController {
             message: 'Callback received and processed successfully'
         });
 
-    expirePayment = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = req.params;
-        const result = await paymentService.expirePayment(id);
-        return Http.Response.success(res, result, 'Payment berhasil diexpired');
-    });
-    });
-
-    getPaymentStatus = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = req.params;
-        const payment = await paymentService.getPaymentStatus(id);
-        return Http.Response.success(res, payment);
-    });
-
-    expirePayment = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = req.params;
-        const result = await paymentService.expirePayment(id);
-        return Http.Response.success(res, result, 'Payment berhasil diexpired');
     });
 
     createSppPayment = ErrorHandler.asyncHandler(async (req, res) => {
@@ -101,7 +83,7 @@ class PaymentController {
             const voucher = await voucherService.getVoucherByKode(kodeVoucher);
             if (voucher && voucher.isActive && voucher.jumlahPenggunaan > 0) {
                 voucherId = voucher.id;
-                
+
                 let diskon = 0;
                 if (voucher.tipe === 'NOMINAL') {
                     diskon = Number(voucher.nominal);
@@ -183,7 +165,7 @@ class PaymentController {
             const voucher = await voucherService.getVoucherByKode(kodeVoucher);
             if (voucher && voucher.isActive && voucher.jumlahPenggunaan > 0) {
                 voucherId = voucher.id;
-                
+
                 let diskon = 0;
                 if (voucher.tipe === 'NOMINAL') {
                     diskon = Number(voucher.nominal);
@@ -227,47 +209,6 @@ class PaymentController {
         }, 'Invoice SPP batch berhasil dibuat');
     });
 
-    validateVoucher = ErrorHandler.asyncHandler(async (req, res) => {
-        const { kodeVoucher, totalBiaya } = req.body;
-
-        const voucher = await voucherService.getVoucherByKode(kodeVoucher);
-        
-        if (!voucher) {
-            throw new NotFoundError('Voucher tidak ditemukan');
-        }
-
-        if (!voucher.isActive) {
-            throw new BadRequestError('Voucher tidak aktif');
-        }
-
-        if (voucher.jumlahPenggunaan <= 0) {
-            throw new BadRequestError('Voucher sudah habis digunakan');
-        }
-
-        let diskon = 0;
-        if (voucher.tipe === 'NOMINAL') {
-            diskon = Number(voucher.nominal);
-        } else if (voucher.tipe === 'PERSENTASE') {
-            diskon = Number(totalBiaya) * (Number(voucher.nominal) / 100);
-        }
-
-        const finalAmount = Math.max(0, Number(totalBiaya) - diskon);
-
-        return Http.Response.success(res, {
-            valid: true,
-            voucher: {
-                id: voucher.id,
-                kodeVoucher: voucher.kodeVoucher,
-                tipe: voucher.tipe,
-                nominal: voucher.nominal
-            },
-            calculation: {
-                originalAmount: Number(totalBiaya),
-                discount: diskon,
-                finalAmount
-            }
-        }, 'Voucher valid');
-    });
 }
 
 module.exports = new PaymentController();

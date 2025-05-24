@@ -4,7 +4,6 @@ const validationMiddleware = require('../../middleware/validation.middleware');
 const authMiddleware = require('../../middleware/auth.middleware');
 const siswaController = require('../../controller/siswa.controller');
 const siswaValidation = require('../../validation/siswa.validation');
-const pendaftaranValidation = require('../../validation/pendaftaran.validation');
 
 router.get(
   '/v1/siswa',
@@ -30,18 +29,10 @@ router.patch(
 
 router.post(
   '/v1/pendaftaran',
-  validationMiddleware.validateBody(pendaftaranValidation.pendaftaranSiswa()),
+  validationMiddleware.validateBody(siswaValidation.pendaftaranSiswa()),
   siswaController.pendaftaranSiswa
 );
 
-// router.get(
-//   '/v1/pendaftaran/:id/status',
-//   siswaController.getPendaftaranStatus
-// );
 
-// router.delete(
-//   '/v1/pendaftaran/:id/cancel',
-//   siswaController.cancelPendaftaran
-// );
 
 module.exports = router;

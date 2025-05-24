@@ -55,25 +55,8 @@ class PaymentValidation {
     });
   }
 
-  static getPaymentStatus() {
-    return ValidatorFactory.create({
-      id: Joi.string().guid({ version: 'uuidv4' }).required()
-        .messages({
-          'string.guid': 'Payment ID harus berupa UUID yang valid',
-          'any.required': 'Payment ID wajib diisi'
-        })
-    });
-  }
 
-  static expirePayment() {
-    return ValidatorFactory.create({
-      id: Joi.string().guid({ version: 'uuidv4' }).required()
-        .messages({
-          'string.guid': 'Payment ID harus berupa UUID yang valid',
-          'any.required': 'Payment ID wajib diisi'
-        })
-    });
-  }
+  
 
   static xenditCallback() {
     return ValidatorFactory.create({
@@ -101,21 +84,7 @@ class PaymentValidation {
     });
   }
 
-  static validateVoucher() {
-    return ValidatorFactory.create({
-      kodeVoucher: Joi.string().uppercase().min(3).max(50).required()
-        .messages({
-          'string.min': 'Kode voucher minimal 3 karakter',
-          'string.max': 'Kode voucher maksimal 50 karakter',
-          'any.required': 'Kode voucher wajib diisi'
-        }),
-      totalBiaya: Joi.number().positive().required()
-        .messages({
-          'number.positive': 'Total biaya harus lebih dari 0',
-          'any.required': 'Total biaya wajib diisi'
-        })
-    });
-  }
+  
 }
 
 module.exports = PaymentValidation;

@@ -3,6 +3,8 @@ const cors = require('cors');
 const { rateLimit } = require('express-rate-limit');
 const { logger } = require('../../lib/config/logger.config');
 const CONSTANT = require('../../lib/constants');
+require('dotenv').config();
+
 
 class SecurityMiddleware {
   static get helmet() {

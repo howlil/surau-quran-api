@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/prisma.config');
 const { UnauthorizedError } = require('../http/errors.http');
+require('dotenv').config();
+
 
 class TokenUtils {
   static #jwtSecret = process.env.JWT_SECRET;

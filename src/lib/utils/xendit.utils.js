@@ -8,14 +8,12 @@ class XenditUtils {
         throw new Error('Xendit client not available or not properly initialized');
       }
 
-      // Get the Invoice API instance
       const Invoice = xendit.Invoice;
 
       if (!Invoice) {
         throw new Error('Xendit Invoice API not available');
       }
 
-      // Validate required parameters
       if (!data) {
         throw new Error('Invoice data is required');
       }
@@ -35,7 +33,6 @@ class XenditUtils {
         ],
       } = data;
 
-      // Validate each required parameter individually
       if (!externalId) {
         throw new Error('externalId is required for invoice creation');
       }
@@ -52,20 +49,18 @@ class XenditUtils {
         throw new Error('description is required for invoice creation');
       }
 
-      // Format data according to Xendit's API requirements
-      // For SDK v6+, use camelCase properties
+
       const invoiceParams = {
-        externalId: externalId,  // camelCase
+        externalId: externalId,
         amount: Number(amount),
-        payerEmail: payerEmail,  // camelCase
+        payerEmail: payerEmail,
         description: description,
-        invoiceDuration: 86400,  // camelCase (24 hours in seconds)
+        invoiceDuration: 7200,
         currency: 'IDR',
-        reminderTime: 1,  // camelCase
-        shouldSendEmail: true  // camelCase
+        reminderTime: 1,
+        shouldSendEmail: true
       };
 
-      // Only add optional parameters if they are present
       if (successRedirectUrl) {
         invoiceParams.successRedirectUrl = successRedirectUrl;  // camelCase
       }
@@ -74,7 +69,6 @@ class XenditUtils {
         invoiceParams.failureRedirectUrl = failureRedirectUrl;  // camelCase
       }
 
-      // Format items properly if provided
       if (items && items.length > 0) {
         invoiceParams.items = items.map(item => ({
           name: item.name,
@@ -84,46 +78,37 @@ class XenditUtils {
         }));
       }
 
-      // Format payment methods
       if (paymentMethods && paymentMethods.length > 0) {
         invoiceParams.paymentMethods = paymentMethods;  // camelCase
       }
 
-      // Log the exact parameters being sent
-      logger.debug('Creating Xendit invoice with params:', JSON.stringify(invoiceParams, null, 2));
+      logger.debug('Creating Xendit invoice with params:', JSON.stringify(invoiceParams));
 
-      // Create invoice - SDK v6+ expects direct parameters, not wrapped in 'data'
-      // Try different approaches based on SDK version
       let invoice;
 
       try {
-        // Method 1: Direct parameters (most common for SDK v6+)
         invoice = await Invoice.createInvoice(invoiceParams);
       } catch (error1) {
         logger.debug('Method 1 failed, trying method 2 with data wrapper');
 
         try {
-          // Method 2: Wrapped in data object
           invoice = await Invoice.createInvoice({ data: invoiceParams });
         } catch (error2) {
           logger.debug('Method 2 failed, trying method 3 with request object');
 
-          // Method 3: Using request object format
           invoice = await Invoice.createInvoice({
             request: invoiceParams
           });
         }
       }
 
-      // Log the response for debugging
-      logger.debug('Xendit invoice response:', JSON.stringify(invoice, null, 2));
+      logger.debug('Xendit invoice response:', JSON.stringify(invoice));
       logger.info(`Created Xendit invoice: ${invoice.id}`);
 
       return invoice;
     } catch (error) {
-      logger.error('Error creating Xendit invoice:', error.message);
+      logger.error(`Error creating Xendit invoice: ${error.message}`);
 
-      // Enhanced error logging
       if (error.response) {
         logger.error('Xendit API Response:', {
           status: error.status,

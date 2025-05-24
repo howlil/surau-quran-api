@@ -29,9 +29,8 @@ class SiswaController {
   });
 
   pendaftaranSiswa = ErrorHandler.asyncHandler(async (req, res) => {
-    const pendaftaranData = HttpRequest.getBodyParams(req);
-    const result = await pendaftaranService.createPendaftaran(pendaftaranData);
-
+    const data = HttpRequest.getBodyParams(req);
+    const result = await pendaftaranService.createPendaftaran(data);
     return Http.Response.success(res, {
       message: 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran',
       data: {

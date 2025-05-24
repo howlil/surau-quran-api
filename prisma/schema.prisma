@@ -294,7 +294,7 @@ model PeriodeSpp {
 model Pembayaran {
   id                String           @id @default(uuid())
   tipePembayaran    TipePembayaran
-  metodePembayaran  MetodePembayaran
+  metodePembayaran  MetodePembayaran?
   jumlahTagihan     Decimal          @db.Decimal(10, 2)
   statusPembayaran  StatusPembayaran
   tanggalPembayaran String

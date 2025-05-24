@@ -1,7 +1,6 @@
 const morgan = require('morgan');
 const { stream } = require('../../lib/config/logger.config');
-
-
+require('dotenv').config();
 class HttpLoggerMiddleware {
 
   static getFormat() {

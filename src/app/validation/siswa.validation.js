@@ -2,87 +2,75 @@ const Joi = require('joi');
 const ValidatorFactory = require('./factory.validation');
 
 class SiswaValidation {
-  static RegisterSiswa() {
+  static pendaftaranSiswa() {
     return ValidatorFactory.create({
-      // User account data
+      namaMurid: Joi.string().min(3).max(191).required()
+        .messages({
+          'string.min': 'Nama murid minimal 3 karakter',
+          'string.max': 'Nama murid maksimal 191 karakter',
+          'any.required': 'Nama murid wajib diisi'
+        }),
+      namaPanggilan: Joi.string().min(2).max(50).optional()
+        .messages({
+          'string.min': 'Nama panggilan minimal 2 karakter',
+          'string.max': 'Nama panggilan maksimal 50 karakter'
+        }),
+      tanggalLahir: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
+        .messages({
+          'string.pattern.base': 'Format tanggal lahir harus DD-MM-YYYY'
+        }),
+      jenisKelamin: Joi.string().valid('LAKI_LAKI', 'PEREMPUAN').required()
+        .messages({
+          'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN',
+          'any.required': 'Jenis kelamin wajib diisi'
+        }),
+      alamat: Joi.string().min(5).max(500).optional()
+        .messages({
+          'string.min': 'Alamat minimal 5 karakter',
+          'string.max': 'Alamat maksimal 500 karakter'
+        }),
+      strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
+        .messages({
+          'any.only': 'Strata pendidikan harus salah satu dari: PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
+        }),
+      kelasSekolah: Joi.string().min(1).max(191).optional()
+        .messages({
+          'string.min': 'Kelas sekolah minimal 1 karakter',
+          'string.max': 'Kelas sekolah maksimal 191 karakter'
+        }),
       email: Joi.string().email().max(191).required()
         .messages({
           'string.email': 'Format email tidak valid',
           'string.max': 'Email maksimal 191 karakter',
           'any.required': 'Email wajib diisi'
         }),
-
-      // Siswa data
-      siswaData: Joi.object({
-        namaMurid: Joi.string().min(3).max(191).required()
-          .messages({
-            'string.min': 'Nama murid minimal 3 karakter',
-            'string.max': 'Nama murid maksimal 191 karakter',
-            'any.required': 'Nama murid wajib diisi'
-          }),
-        namaPanggilan: Joi.string().min(2).max(50).optional()
-          .messages({
-            'string.min': 'Nama panggilan minimal 2 karakter',
-            'string.max': 'Nama panggilan maksimal 50 karakter'
-          }),
-        tanggalLahir: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional()
-          .messages({
-            'string.pattern.base': 'Format tanggal lahir harus YYYY-MM-DD'
-          }),
-        jenisKelamin: Joi.string().valid('LAKI_LAKI', 'PEREMPUAN').required()
-          .messages({
-            'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN',
-            'any.required': 'Jenis kelamin wajib diisi'
-          }),
-        noWhatsapp: Joi.string().min(10).max(15).optional()
-          .messages({
-            'string.min': 'Nomor WhatsApp minimal 10 karakter',
-            'string.max': 'Nomor WhatsApp maksimal 15 karakter'
-          }),
-        alamat: Joi.string().min(5).max(500).optional()
-          .messages({
-            'string.min': 'Alamat minimal 5 karakter',
-            'string.max': 'Alamat maksimal 500 karakter'
-          }),
-        strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
-          .messages({
-            'any.only': 'Strata pendidikan harus salah satu dari: PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
-          }),
-        kelasSekolah: Joi.string().min(1).max(191).optional()
-          .messages({
-            'string.min': 'Kelas sekolah minimal 1 karakter',
-            'string.max': 'Kelas sekolah maksimal 191 karakter'
-          }),
-        namaSekolah: Joi.string().min(3).max(191).optional()
-          .messages({
-            'string.min': 'Nama sekolah minimal 3 karakter',
-            'string.max': 'Nama sekolah maksimal 191 karakter'
-          }),
-        namaOrangTua: Joi.string().min(2).max(191).required()
-          .messages({
-            'string.min': 'Nama orang tua minimal 2 karakter',
-            'string.max': 'Nama orang tua maksimal 191 karakter',
-            'any.required': 'Nama orang tua wajib diisi'
-          }),
-        namaPenjemput: Joi.string().min(2).max(191).optional()
-          .messages({
-            'string.min': 'Nama penjemput minimal 2 karakter',
-            'string.max': 'Nama penjemput maksimal 191 karakter'
-          })
-      }).required()
+      namaSekolah: Joi.string().min(3).max(191).optional()
         .messages({
-          'any.required': 'Data siswa wajib diisi'
+          'string.min': 'Nama sekolah minimal 3 karakter',
+          'string.max': 'Nama sekolah maksimal 191 karakter'
         }),
-
-      // Program registration
+      namaOrangTua: Joi.string().min(2).max(191).required()
+        .messages({
+          'string.min': 'Nama orang tua minimal 2 karakter',
+          'string.max': 'Nama orang tua maksimal 191 karakter',
+          'any.required': 'Nama orang tua wajib diisi'
+        }),
+      namaPenjemput: Joi.string().min(2).max(191).optional()
+        .messages({
+          'string.min': 'Nama penjemput minimal 2 karakter',
+          'string.max': 'Nama penjemput maksimal 191 karakter'
+        }),
+      noWhatsapp: Joi.string().min(10).max(15).optional()
+        .messages({
+          'string.min': 'Nomor WhatsApp minimal 10 karakter',
+          'string.max': 'Nomor WhatsApp maksimal 15 karakter'
+        }),
       programId: Joi.string().guid({ version: 'uuidv4' }).required()
         .messages({
           'string.guid': 'Program ID harus berupa UUID yang valid',
           'any.required': 'Program ID wajib diisi'
         }),
-
-      // Schedule preferences (at least 2 preferred schedules)
-      jadwalPreferences: Joi.array().items(
+      jadwal: Joi.array().items(
         Joi.object({
           hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').required()
             .messages({
@@ -95,44 +83,30 @@ class SiswaValidation {
               'any.required': 'Jam Mengajar ID wajib diisi'
             })
         })
-      ).min(2).max(2).required()
+      ).min(1).required()
         .messages({
-          'array.min': 'Jadwal preferences harus memilih 2 pilihan',
-          'array.max': 'Jadwal preferences maksimal 2 pilihan',
-          'any.required': 'Jadwal preferences wajib diisi'
+          'array.min': 'Jadwal harus memilih minimal 1 pilihan',
+          'any.required': 'Jadwal wajib diisi'
         }),
-
-      // Payment data
-      biayaPendaftaran: Joi.number().precision(2).positive().min(10000).max(100000000).required()
-        .messages({
-          'number.base': 'Biaya pendaftaran harus berupa angka',
-          'number.positive': 'Biaya pendaftaran harus lebih dari 0',
-          'number.min': 'Biaya pendaftaran minimal Rp 10.000',
-          'number.max': 'Biaya pendaftaran maksimal Rp 100.000.000',
-          'any.required': 'Biaya pendaftaran wajib diisi'
-        }),
-
-      // Optional voucher
       kodeVoucher: Joi.string().uppercase().min(3).max(50).optional()
         .messages({
           'string.min': 'Kode voucher minimal 3 karakter',
           'string.max': 'Kode voucher maksimal 50 karakter'
         }),
-
-      // Payment URLs (optional)
-      successRedirectUrl: Joi.string().uri().max(500).optional()
+      jumlahPembayaran: Joi.number().precision(2).positive().required()
         .messages({
-          'string.uri': 'Success redirect URL harus berupa URL yang valid',
-          'string.max': 'Success redirect URL maksimal 500 karakter'
+          'number.base': 'Jumlah pembayaran harus berupa angka',
+          'number.positive': 'Jumlah pembayaran harus lebih dari 0',
+          'any.required': 'Jumlah pembayaran wajib diisi'
         }),
-      failureRedirectUrl: Joi.string().uri().max(500).optional()
+      totalBiaya: Joi.number().precision(2).positive().required()
         .messages({
-          'string.uri': 'Failure redirect URL harus berupa URL yang valid',
-          'string.max': 'Failure redirect URL maksimal 500 karakter'
-        })
+          'number.base': 'Total biaya harus berupa angka',
+          'number.positive': 'Total biaya harus lebih dari 0',
+          'any.required': 'Total biaya wajib diisi'
+        }),
     });
   }
-
 
   static adminUpdateSiswa() {
     return ValidatorFactory.create({
@@ -210,7 +184,7 @@ class SiswaValidation {
       // Schedule array for the program - with identification for updates
       jadwal: Joi.array().items(
         Joi.object({
-         
+
           hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').optional()
             .messages({
               'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU'

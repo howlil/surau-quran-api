@@ -1,5 +1,7 @@
 const { Xendit } = require('xendit-node');
 const { logger } = require('./logger.config');
+require('dotenv').config();
+
 
 let xenditClient;
 

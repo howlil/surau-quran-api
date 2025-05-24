@@ -28,8 +28,6 @@ class PendaftaranService {
         kodeVoucher,
         jumlahPembayaran,
         totalBiaya,
-        successRedirectUrl,
-        failureRedirectUrl
       } = pendaftaranData;
 
       const existingUser = await prisma.user.findUnique({
@@ -78,7 +76,7 @@ class PendaftaranService {
 
       if (kodeVoucher) {
         const voucher = await prisma.voucher.findUnique({
-          where: { 
+          where: {
             kodeVoucher: kodeVoucher.toUpperCase(),
             isActive: true
           }
@@ -114,8 +112,6 @@ class PendaftaranService {
         email,
         namaMurid,
         totalBiaya,
-        successRedirectUrl,
-        failureRedirectUrl
       });
 
       const pendaftaranTemp = await prisma.pendaftaranTemp.create({
@@ -189,7 +185,7 @@ class PendaftaranService {
         const existingNISNumbers = await tx.siswa.findMany({
           select: { nis: true }
         });
-        
+
         const nisNumber = DataGeneratorUtils.generateNIS(
           existingNISNumbers.map(s => s.nis).filter(Boolean)
         );
@@ -328,81 +324,7 @@ class PendaftaranService {
     }
   }
 
-  async getPendaftaranStatus(pendaftaranId) {
-    try {
-      const pendaftaranTemp = await prisma.pendaftaranTemp.findUnique({
-        where: { id: pendaftaranId },
-        include: {
-          pembayaran: {
-            include: {
-              xenditPayment: true
-            }
-          }
-        }
-      });
 
-      if (!pendaftaranTemp) {
-        throw new NotFoundError(`Pendaftaran dengan ID ${pendaftaranId} tidak ditemukan`);
-      }
-
-      return {
-        id: pendaftaranTemp.id,
-        namaMurid: pendaftaranTemp.namaMurid,
-        email: pendaftaranTemp.email,
-        totalBiaya: pendaftaranTemp.totalBiaya,
-        statusPembayaran: pendaftaranTemp.pembayaran?.statusPembayaran || 'PENDING',
-        paymentInfo: pendaftaranTemp.pembayaran?.xenditPayment ? {
-          invoiceUrl: pendaftaranTemp.pembayaran.xenditPayment.xenditPaymentUrl,
-          expireDate: pendaftaranTemp.pembayaran.xenditPayment.xenditExpireDate,
-          status: pendaftaranTemp.pembayaran.xenditPayment.xenditStatus
-        } : null,
-        createdAt: pendaftaranTemp.createdAt,
-        isCompleted: false
-      };
-    } catch (error) {
-      logger.error(`Error getting pendaftaran status for ID ${pendaftaranId}:`, error);
-      throw error;
-    }
-  }
-
-  async cancelPendaftaran(pendaftaranId) {
-    try {
-      const pendaftaranTemp = await prisma.pendaftaranTemp.findUnique({
-        where: { id: pendaftaranId },
-        include: {
-          pembayaran: {
-            include: {
-              xenditPayment: true
-            }
-          }
-        }
-      });
-
-      if (!pendaftaranTemp) {
-        throw new NotFoundError(`Pendaftaran dengan ID ${pendaftaranId} tidak ditemukan`);
-      }
-
-      if (pendaftaranTemp.pembayaran?.statusPembayaran === 'PAID') {
-        throw new BadRequestError('Tidak dapat membatalkan pendaftaran yang sudah dibayar');
-      }
-
-      await PrismaUtils.transaction(async (tx) => {
-        if (pendaftaranTemp.pembayaran?.id) {
-          await paymentService.expirePayment(pendaftaranTemp.pembayaran.id);
-        }
-
-        await tx.pendaftaranTemp.delete({
-          where: { id: pendaftaranId }
-        });
-      });
-
-      logger.info(`Cancelled pendaftaran with ID: ${pendaftaranId}`);
-      return { success: true, message: 'Pendaftaran berhasil dibatalkan' };
-    } catch (error) {
-      logger.error(`Error cancelling pendaftaran with ID ${pendaftaranId}:`, error);
-      throw error;
-    }
-  }
 }
 
 module.exports = new PendaftaranService();

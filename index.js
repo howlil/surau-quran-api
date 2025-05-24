@@ -1,11 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const { logger } = require('./src/lib/config/logger.config');
-const EnvironmentConfig = require('./src/lib/config/env.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
 const SecurityMiddleware = require('./src/app/middleware/security.middleware');
-
 const { prismaConfig } = require('./src/lib/config/prisma.config');
 const routes = require('./src/app/routes');
 
@@ -51,19 +49,10 @@ class Application {
     }
   }
 
-  validateEnvironment() {
-    try {
-      EnvironmentConfig.validateEnv();
-    } catch (error) {
-      logger.error('Environment validation failed:', error);
-      throw error;
-    }
-  }
 
   async start() {
     try {
       // Validate environment variables first
-      this.validateEnvironment();
 
       // Then connect to database
       await this.connectDatabase();
