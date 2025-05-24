@@ -17,6 +17,7 @@ class Application {
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
+    this.app.set('trust proxy', 1);
   }
 
   setupMiddleware() {

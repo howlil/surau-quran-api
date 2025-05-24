@@ -5,14 +5,11 @@ class EnvironmentConfig {
         logger.info('Validating environment variables...');
 
         const requiredVars = [
-            // Database
             'DATABASE_URL',
 
-            // Auth
             'JWT_SECRET',
             'JWT_EXPIRES_IN',
 
-            // Xendit API
             'XENDIT_SECRET_KEY',
             'XENDIT_CALLBACK_TOKEN',
         ];

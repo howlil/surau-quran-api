@@ -28,11 +28,20 @@ router.patch(
   siswaController.adminUpdateSiswa
 );
 
-// Public endpoint for registration
 router.post(
   '/v1/pendaftaran',
   validationMiddleware.validateBody(pendaftaranValidation.pendaftaranSiswa()),
   siswaController.pendaftaranSiswa
 );
+
+// router.get(
+//   '/v1/pendaftaran/:id/status',
+//   siswaController.getPendaftaranStatus
+// );
+
+// router.delete(
+//   '/v1/pendaftaran/:id/cancel',
+//   siswaController.cancelPendaftaran
+// );
 
 module.exports = router;

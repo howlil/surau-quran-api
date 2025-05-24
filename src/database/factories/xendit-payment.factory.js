@@ -30,7 +30,7 @@ class XenditPaymentFactory {
                 xenditStatus = 'PENDING';
                 break;
             default:
-                xenditStatus = 'PENDING';
+            xenditStatus = 'PENDING';
         }
 
         return {
