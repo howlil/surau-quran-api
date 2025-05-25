@@ -1,12 +1,10 @@
+// src/app/service/spp.service.js
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError } = require('../../lib/http/errors.http');
+const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class SppService {
-
-
-    // TODO: FILTER MASIH GAJALAN
     async getSppForAdmin(filters = {}) {
         try {
             const {
@@ -19,19 +17,16 @@ class SppService {
 
             const where = {};
 
-            // Filter by status
             if (status) {
                 where.pembayaran = {
                     statusPembayaran: status
                 };
             }
 
-            // Filter by month
             if (bulan) {
                 where.bulan = bulan;
             }
 
-            // Filter by student name
             if (namaSiswa) {
                 where.programSiswa = {
                     siswa: {
@@ -43,7 +38,6 @@ class SppService {
                 };
             }
 
-            // Get data with pagination
             const result = await PrismaUtils.paginate(prisma.periodeSpp, {
                 page,
                 limit,
@@ -75,19 +69,23 @@ class SppService {
                 orderBy: { updatedAt: 'desc' }
             });
 
-            // Format response data
             const formattedData = result.data.map(spp => ({
                 id: spp.id,
                 namaSiswa: spp.programSiswa.siswa.namaMurid,
                 nis: spp.programSiswa.siswa.nis,
                 program: spp.programSiswa.program.namaProgram,
+                bulan: spp.bulan,
+                tahun: spp.tahun,
                 tanggalTagihan: spp.tanggalTagihan,
                 tanggalPembayaran: spp.pembayaran?.tanggalPembayaran || null,
                 jumlahBayar: spp.pembayaran?.jumlahTagihan || null,
                 statusPembayaran: spp.pembayaran?.statusPembayaran || 'UNPAID'
             }));
 
-            return formattedData;
+            return {
+                data: formattedData,
+                meta: result.meta
+            };
         } catch (error) {
             logger.error('Error getting SPP data for admin:', error);
             throw error;
@@ -96,9 +94,8 @@ class SppService {
 
     async getSppForSiswa(userId, filters = {}) {
         try {
-            const {  page = 1, limit = 10 } = filters;
+            const { page = 1, limit = 10 } = filters;
 
-            // Find the siswa based on userId
             const siswa = await prisma.siswa.findUnique({
                 where: { userId }
             });
@@ -107,23 +104,28 @@ class SppService {
                 throw new NotFoundError('Data siswa tidak ditemukan');
             }
 
-            // Find all program-siswa relationships
             const programSiswaIds = await prisma.programSiswa.findMany({
                 where: { siswaId: siswa.id },
                 select: { id: true }
             });
 
             if (programSiswaIds.length === 0) {
-                return [];
+                return {
+                    data: [],
+                    meta: {
+                        total: 0,
+                        limit,
+                        page,
+                        totalPages: 0
+                    }
+                };
             }
 
-            // Build where clause
             const where = {
                 programSiswaId: {
                     in: programSiswaIds.map(ps => ps.id)
                 }
             };
-
 
             const result = await PrismaUtils.paginate(prisma.periodeSpp, {
                 page,
@@ -147,29 +149,141 @@ class SppService {
                         }
                     }
                 },
-                orderBy: { updatedAt: 'desc' }
+                orderBy: [
+                    { tahun: 'desc' },
+                    { tanggalTagihan: 'desc' }
+                ]
             });
 
             const formattedData = result.data.map(spp => ({
                 id: spp.id,
                 program: spp.programSiswa.program.namaProgram,
                 bulan: spp.bulan,
+                tahun: spp.tahun,
                 tanggalTagihan: spp.tanggalTagihan,
                 tanggalPembayaran: spp.pembayaran?.tanggalPembayaran || null,
-                jumlahBayar: spp.pembayaran?.jumlahTagihan || null,
-                statusPembayaran: spp.pembayaran?.statusPembayaran || 'UNPAID'
+                jumlahTagihan: Number(spp.jumlahTagihan),
+                diskon: Number(spp.diskon),
+                totalTagihan: Number(spp.totalTagihan),
+                statusPembayaran: spp.pembayaran?.statusPembayaran || 'UNPAID',
+                isPaid: !!spp.pembayaran?.statusPembayaran && ['PAID', 'SETTLED'].includes(spp.pembayaran.statusPembayaran)
             }));
 
-            return formattedData;
+            return {
+                data: formattedData,
+                meta: result.meta
+            };
         } catch (error) {
             logger.error('Error getting SPP data for student:', error);
             throw error;
         }
     }
 
-    // TODO : SISWA BAYAR SPP
+    async createSppPayment(userId, data) {
+        try {
+            const { periodeSppIds, kodeVoucher } = data;
 
-    // TODO : SISWA BAYAR BATCH SPP (bisa sekali bayar beberapa bulan) 
+            const siswa = await prisma.siswa.findUnique({
+                where: { userId },
+                include: {
+                    user: true
+                }
+            });
+
+            if (!siswa) {
+                throw new NotFoundError('Data siswa tidak ditemukan');
+            }
+
+            const periodeSppList = await prisma.periodeSpp.findMany({
+                where: {
+                    id: { in: periodeSppIds },
+                    programSiswa: {
+                        siswaId: siswa.id
+                    }
+                },
+                include: {
+                    programSiswa: {
+                        include: {
+                            program: true
+                        }
+                    },
+                    pembayaran: true
+                }
+            });
+
+            if (periodeSppList.length !== periodeSppIds.length) {
+                throw new BadRequestError('Beberapa periode SPP tidak valid atau tidak ditemukan');
+            }
+
+            const paidSpp = periodeSppList.filter(spp => spp.pembayaran);
+            if (paidSpp.length > 0) {
+                throw new BadRequestError(`${paidSpp.length} periode SPP sudah dibayar`);
+            }
+
+            let totalAmount = periodeSppList.reduce((sum, spp) => sum + Number(spp.totalTagihan), 0);
+            let discountAmount = 0;
+            let voucherId = null;
+
+            if (kodeVoucher) {
+                const voucher = await prisma.voucher.findUnique({
+                    where: {
+                        kodeVoucher: kodeVoucher.toUpperCase(),
+                        isActive: true
+                    }
+                });
+
+                if (!voucher) {
+                    throw new NotFoundError('Voucher tidak valid atau tidak aktif');
+                }
+
+                if (voucher.jumlahPenggunaan <= 0) {
+                    throw new BadRequestError('Voucher sudah habis digunakan');
+                }
+
+                voucherId = voucher.id;
+
+                if (voucher.tipe === 'NOMINAL') {
+                    discountAmount = Math.min(Number(voucher.nominal), totalAmount);
+                } else if (voucher.tipe === 'PERSENTASE') {
+                    discountAmount = totalAmount * (Number(voucher.nominal) / 100);
+                }
+            }
+
+            const finalAmount = totalAmount - discountAmount;
+
+            const periods = periodeSppList.map(spp => ({
+                bulan: spp.bulan,
+                tahun: spp.tahun,
+                program: spp.programSiswa.program.namaProgram
+            }));
+
+            const monthYears = [...new Set(periods.map(p => `${p.bulan} ${p.tahun}`))].join(', ');
+            const programs = [...new Set(periods.map(p => p.program))].join(', ');
+
+            return {
+                siswa: {
+                    id: siswa.id,
+                    nama: siswa.namaMurid,
+                    email: siswa.user.email
+                },
+                payment: {
+                    periodeSppIds,
+                    periods: monthYears,
+                    programs,
+                    originalAmount: totalAmount,
+                    discountAmount,
+                    finalAmount,
+                    voucherId,
+                    kodeVoucher
+                }
+            };
+        } catch (error) {
+            logger.error('Error creating SPP payment:', error);
+            throw error;
+        }
+    }
+
+   
 }
 
 module.exports = new SppService();

@@ -1,56 +1,25 @@
+// src/app/validation/payment.validation.js
 const Joi = require('joi');
 const ValidatorFactory = require('./factory.validation');
 
 class PaymentValidation {
   static createSppPayment() {
     return ValidatorFactory.create({
-      periodeSppId: Joi.string().guid({ version: 'uuidv4' }).required()
-        .messages({
-          'string.guid': 'Periode SPP ID harus berupa UUID yang valid',
-          'any.required': 'Periode SPP ID wajib diisi'
-        }),
-      kodeVoucher: Joi.string().uppercase().min(3).max(50).optional()
-        .messages({
-          'string.min': 'Kode voucher minimal 3 karakter',
-          'string.max': 'Kode voucher maksimal 50 karakter'
-        }),
-      successRedirectUrl: Joi.string().uri().max(500).optional()
-        .messages({
-          'string.uri': 'Success redirect URL harus berupa URL yang valid',
-          'string.max': 'Success redirect URL maksimal 500 karakter'
-        }),
-      failureRedirectUrl: Joi.string().uri().max(500).optional()
-        .messages({
-          'string.uri': 'Failure redirect URL harus berupa URL yang valid',
-          'string.max': 'Failure redirect URL maksimal 500 karakter'
-        })
-    });
-  }
-
-  static createBatchSppPayment() {
-    return ValidatorFactory.create({
       periodeSppIds: Joi.array().items(
         Joi.string().guid({ version: 'uuidv4' }).required()
+          .messages({
+            'string.guid': 'ID periode SPP harus berupa UUID yang valid'
+          })
       ).min(1).max(12).required()
         .messages({
           'array.min': 'Minimal harus memilih 1 periode SPP',
-          'array.max': 'Maksimal dapat memilih 12 periode SPP',
-          'any.required': 'Periode SPP IDs wajib diisi'
+          'array.max': 'Maksimal dapat memilih 12 periode SPP sekaligus',
+          'any.required': 'Periode SPP wajib dipilih'
         }),
       kodeVoucher: Joi.string().uppercase().min(3).max(50).optional()
         .messages({
           'string.min': 'Kode voucher minimal 3 karakter',
           'string.max': 'Kode voucher maksimal 50 karakter'
-        }),
-      successRedirectUrl: Joi.string().uri().max(500).optional()
-        .messages({
-          'string.uri': 'Success redirect URL harus berupa URL yang valid',
-          'string.max': 'Success redirect URL maksimal 500 karakter'
-        }),
-      failureRedirectUrl: Joi.string().uri().max(500).optional()
-        .messages({
-          'string.uri': 'Failure redirect URL harus berupa URL yang valid',
-          'string.max': 'Failure redirect URL maksimal 500 karakter'
         })
     });
   }
@@ -80,8 +49,6 @@ class PaymentValidation {
       payment_channel: Joi.string().optional()
     });
   }
-
-  
 }
 
 module.exports = PaymentValidation;

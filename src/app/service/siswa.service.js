@@ -101,7 +101,7 @@ class SiswaService {
         email,
         namaMurid,
         totalBiaya,
-        noWhatsapp, 
+        noWhatsapp,
         alamat
       });
 
@@ -277,6 +277,32 @@ class SiswaService {
           }
         });
 
+        const sppAmount = await this.#getSppAmount(pendaftaranTemp.programId);
+        const sppPeriods = [];
+
+        for (let i = 1; i <= 3; i++) {
+          const sppDate = new Date(bulanDaftar);
+          sppDate.setMonth(sppDate.getMonth() + i);
+
+          const bulan = sppDate.toLocaleString('id-ID', { month: 'long' });
+          const tahun = sppDate.getFullYear();
+          const tanggalTagihan = `${tahun}-${String(sppDate.getMonth() + 1).padStart(2, '0')}-25`;
+
+          const periodeSpp = await tx.periodeSpp.create({
+            data: {
+              programSiswaId: programSiswa.id,
+              bulan,
+              tahun,
+              tanggalTagihan,
+              jumlahTagihan: sppAmount,
+              diskon: 0,
+              totalTagihan: sppAmount,
+              voucher_id: null
+            }
+          });
+
+          sppPeriods.push(periodeSpp);
+        }
 
         // TODO : SEND EMAIL 
         // 14. Kirim welcome email (di luar transaksi supaya tidak rollback kalau email gagal)
@@ -316,7 +342,19 @@ class SiswaService {
     }
   }
 
-  //TODO :  data siswa nya ga keambil
+  async #getSppAmount(programId) {
+    const program = await prisma.program.findUnique({
+      where: { id: programId },
+      include: {
+        kelasProgram: true
+      }
+    });
+
+    const defaultSppAmount = 300000;
+
+    return defaultSppAmount;
+  }
+
   async getPendaftaranInvoice(invoices, filters = {}) {
     const { status, tanggal, page = 1, limit = 10 } = filters;
 

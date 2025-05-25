@@ -10,21 +10,15 @@ router.post(
     paymentController.handleXenditCallback
 );
 
-router.post(
-    '/v1/payment/spp/create',
+router.patch(
+    '/v1/payment/spp',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SISWA']),
     validationMiddleware.validateBody(paymentValidation.createSppPayment()),
     paymentController.createSppPayment
 );
 
-router.post(
-    '/v1/payment/spp/batch',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['SISWA']),
-    validationMiddleware.validateBody(paymentValidation.createBatchSppPayment()),
-    paymentController.createBatchSppPayment
-);
+
 
 
 module.exports = router;

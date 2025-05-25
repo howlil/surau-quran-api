@@ -1,7 +1,9 @@
+// src/app/service/payment.service.js
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const { NotFoundError } = require('../../lib/http/errors.http');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class PaymentService {
 
@@ -16,8 +18,8 @@ class PaymentService {
         amount: Number(totalBiaya),
         payerEmail: email,
         description: `Pembayaran Pendaftaran - ${namaMurid}`,
-        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL ,
-        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL ,
+        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
+        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
         items: [{
           name: 'Biaya Pendaftaran',
           quantity: 1,
@@ -27,14 +29,9 @@ class PaymentService {
           givenNames: namaMurid,
           email: email,
           phoneNumber: noWhatsapp,
-          address : alamat
+          address: alamat
         }
       };
-
-      if (!invoiceData.externalId || !invoiceData.amount || !invoiceData.payerEmail || !invoiceData.description) {
-        logger.error('Missing required fields in invoiceData:', JSON.stringify(invoiceData, null, 2));
-        throw new Error('Missing required fields for invoice creation');
-      }
 
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
@@ -68,69 +65,95 @@ class PaymentService {
       };
     } catch (error) {
       logger.error('Error creating pendaftaran invoice:', error);
-      logger.error('Error stack:', error.stack);
       throw error;
     }
   }
 
-  async createSppInvoice(data) {
+  async createBatchSppInvoice(data) {
     try {
-      const { email, namaSiswa, totalBiaya, periodeSppId, successRedirectUrl, failureRedirectUrl } = data;
+      const { periodeSppIds, siswa, payment, voucherId } = data;
 
       const externalId = XenditUtils.generateExternalId('SPP');
 
       const invoiceData = {
         externalId,
-        amount: Number(totalBiaya),
-        payerEmail: email,
-        description: `Pembayaran SPP - ${namaSiswa}`,
-        successRedirectUrl,
-        failureRedirectUrl,
+        amount: Number(payment.finalAmount),
+        payerEmail: siswa.email,
+        description: `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`,
+        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
+        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
         items: [{
-          name: 'SPP Bulanan',
+          name: `SPP ${payment.periods}`,
           quantity: 1,
-          price: Number(totalBiaya)
+          price: Number(payment.originalAmount)
         }]
       };
 
+      if (payment.discountAmount > 0) {
+        invoiceData.items.push({
+          name: `Diskon Voucher ${payment.kodeVoucher}`,
+          quantity: 1,
+          price: -Number(payment.discountAmount)
+        });
+      }
+
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
-      const pembayaran = await prisma.pembayaran.create({
-        data: {
-          tipePembayaran: 'SPP',
-          metodePembayaran: 'VIRTUAL_ACCOUNT',
-          jumlahTagihan: Number(totalBiaya),
-          statusPembayaran: 'PENDING',
-          tanggalPembayaran: new Date().toISOString().split('T')[0]
-        }
-      });
+      return await PrismaUtils.transaction(async (tx) => {
+        const pembayaran = await tx.pembayaran.create({
+          data: {
+            tipePembayaran: 'SPP',
+            metodePembayaran: 'VIRTUAL_ACCOUNT',
+            jumlahTagihan: Number(payment.finalAmount),
+            statusPembayaran: 'PENDING',
+            tanggalPembayaran: new Date().toISOString().split('T')[0]
+          }
+        });
 
-      await prisma.xenditPayment.create({
-        data: {
+        await tx.xenditPayment.create({
+          data: {
+            pembayaranId: pembayaran.id,
+            xenditInvoiceId: xenditInvoice.id,
+            xenditExternalId: xenditInvoice.externalId,
+            xenditPaymentUrl: xenditInvoice.invoiceUrl,
+            xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
+            xenditExpireDate: xenditInvoice.expiryDate.toISOString().split('T')[0],
+            xenditStatus: xenditInvoice.status
+          }
+        });
+
+        for (const periodeSppId of periodeSppIds) {
+          await tx.periodeSpp.update({
+            where: { id: periodeSppId },
+            data: { 
+              pembayaranId: pembayaran.id,
+              ...(voucherId && { 
+                voucher_id: voucherId,
+                diskon: payment.discountAmount / periodeSppIds.length
+              })
+            }
+          });
+        }
+
+        if (voucherId) {
+          await tx.voucher.update({
+            where: { id: voucherId },
+            data: {
+              jumlahPenggunaan: { decrement: 1 }
+            }
+          });
+        }
+
+        return {
           pembayaranId: pembayaran.id,
-          xenditInvoiceId: xenditInvoice.id,
-          xenditExternalId: externalId,
-          xenditPaymentUrl: xenditInvoice.invoice_url,
-          xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-          xenditExpireDate: xenditInvoice.expiry_date,
-          xenditStatus: 'PENDING'
-        }
+          xenditInvoiceUrl: xenditInvoice.invoiceUrl,
+          expireDate: xenditInvoice.expiryDate,
+          amount: Number(payment.finalAmount),
+          xenditInvoiceId: xenditInvoice.id
+        };
       });
-
-      await prisma.periodeSpp.update({
-        where: { id: periodeSppId },
-        data: { pembayaranId: pembayaran.id }
-      });
-
-      return {
-        pembayaranId: pembayaran.id,
-        xenditInvoiceUrl: xenditInvoice.invoice_url,
-        expireDate: xenditInvoice.expiry_date,
-        amount: Number(totalBiaya),
-        xenditInvoiceId: xenditInvoice.id
-      };
     } catch (error) {
-      logger.error('Error creating SPP invoice:', error);
+      logger.error('Error creating batch SPP invoice:', error);
       throw error;
     }
   }
@@ -176,7 +199,7 @@ class PaymentService {
         success: true,
         payment: {
           id: xenditPayment.pembayaranId,
-          statusPembayaran: xenditPayment.pembayaran.statusPembayaran,
+          statusPembayaran: processedData.status,
           tipePembayaran: xenditPayment.pembayaran.tipePembayaran,
           xenditInvoiceId: processedData.xenditInvoiceId
         }
@@ -186,8 +209,38 @@ class PaymentService {
       throw error;
     }
   }
-  
-  
+
+  async processPaidSpp(pembayaranId) {
+    try {
+      const periodeSppList = await prisma.periodeSpp.findMany({
+        where: { pembayaranId },
+        include: {
+          programSiswa: {
+            include: {
+              siswa: true
+            }
+          }
+        }
+      });
+
+      if (periodeSppList.length === 0) {
+        throw new NotFoundError('Tidak ada periode SPP yang terkait dengan pembayaran ini');
+      }
+
+      const monthsPaid = periodeSppList.map(spp => `${spp.bulan} ${spp.tahun}`).join(', ');
+      logger.info(`SPP payment processed for: ${periodeSppList[0].programSiswa.siswa.namaMurid} - ${monthsPaid}`);
+
+      return {
+        success: true,
+        siswaId: periodeSppList[0].programSiswa.siswaId,
+        monthsPaid,
+        totalPeriods: periodeSppList.length
+      };
+    } catch (error) {
+      logger.error('Error processing paid SPP:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new PaymentService();

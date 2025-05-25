@@ -125,57 +125,6 @@ class XenditUtils {
     }
   }
 
-  static async createDisbursement(data) {
-    try {
-      if (!xendit || !xendit.Disbursement) {
-        throw new Error('Xendit client not available or not properly initialized');
-      }
-
-      const {
-        externalId,
-        amount,
-        bankCode,
-        accountHolderName,
-        accountNumber,
-        description
-      } = data;
-
-      const disbursementData = {
-        externalId,
-        amount,
-        bankCode,
-        accountHolderName,
-        accountNumber,
-        description
-      };
-
-      const disbursement = await xendit.Disbursement.create(disbursementData);
-
-      logger.info(`Created Xendit disbursement: ${disbursement.id}`);
-      return disbursement;
-    } catch (error) {
-      logger.error('Error creating Xendit disbursement:', error);
-      throw error;
-    }
-  }
-
-  static async getDisbursement(disbursementId) {
-    try {
-      if (!xendit || !xendit.Disbursement) {
-        throw new Error('Xendit client not available or not properly initialized');
-      }
-
-      const disbursement = await xendit.Disbursement.getById({
-        disbursementId
-      });
-
-      return disbursement;
-    } catch (error) {
-      logger.error(`Error getting Xendit disbursement ${disbursementId}:`, error);
-      throw error;
-    }
-  }
-
   static generateExternalId(prefix = 'TXN') {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
@@ -192,21 +141,7 @@ class XenditUtils {
       amount: callbackData.amount
     };
   }
-  static processDisbursementCallback(callbackData) {
-    if (!callbackData) {
-      throw new Error('Invalid callback data');
-    }
 
-    return {
-      disbursementId: callbackData.id,
-      externalId: callbackData.external_id,
-      status: callbackData.status,
-      amount: callbackData.amount,
-      bankCode: callbackData.bank_code,
-      accountHolderName: callbackData.account_holder_name,
-      eventType: 'disbursement.completed'
-    };
-  }
 }
 
 module.exports = XenditUtils;
