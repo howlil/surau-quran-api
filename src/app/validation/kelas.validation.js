@@ -22,7 +22,20 @@ class KelasValidation {
         })
     });
   }
- 
+
+  static patchInitialStudentIntoClass() {
+    return ValidatorFactory.create({
+      programId: Joi.string().optional(),
+      hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').optional(),
+      jamMengajarId: Joi.string().optional(),
+      guruId: Joi.string().optional(),
+      tambahSiswaIds: Joi.array().items(Joi.string()).optional()
+        .messages({
+          'array.base': 'Daftar siswa harus berupa array',
+        })
+    });
+  }
+
 }
 
 module.exports = KelasValidation;

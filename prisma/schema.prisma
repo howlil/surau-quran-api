@@ -88,7 +88,7 @@ model Guru {
   pendidikanTerakhir String?
   noRekening         String?
   namaBank           String?
-  tarifPerJam        Decimal?  @db.Decimal(10, 2)
+  tarifPerJam        Decimal? @db.Decimal(10, 2)
   suratKontrak       String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -156,19 +156,19 @@ model KelasProgram {
 
 // Model Pendaftaran (sekali untuk satu siswa)
 model Pendaftaran {
-  id               String           @id @default(uuid())
-  siswaId          String           @unique
-  biayaPendaftaran Decimal          @db.Decimal(10, 2)
+  id               String   @id @default(uuid())
+  siswaId          String   @unique
+  biayaPendaftaran Decimal  @db.Decimal(10, 2)
   tanggalDaftar    String
-  diskon           Decimal          @db.Decimal(10, 2)
-  totalBiaya       Decimal          @db.Decimal(10, 2)
+  diskon           Decimal  @db.Decimal(10, 2)
+  totalBiaya       Decimal  @db.Decimal(10, 2)
   voucher_id       String?
-  pembayaranId     String?          @unique
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  pembayaranId     String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
-  voucher          Voucher?         @relation(fields: [voucher_id], references: [id])
+  voucher    Voucher?    @relation(fields: [voucher_id], references: [id])
   siswa      Siswa       @relation(fields: [siswaId], references: [id])
   pembayaran Pembayaran? @relation(fields: [pembayaranId], references: [id])
 }
@@ -178,15 +178,16 @@ model ProgramSiswa {
   id             String      @id @default(uuid())
   siswaId        String
   programId      String
-  kelasProgramId String // Relasi langsung ke KelasProgram
+  kelasProgramId String?
   status         StatusSiswa
+  isVerified     Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   // Relations
   siswa              Siswa                @relation(fields: [siswaId], references: [id])
   program            Program              @relation(fields: [programId], references: [id])
-  kelasProgram       KelasProgram         @relation(fields: [kelasProgramId], references: [id])
+  kelasProgram       KelasProgram?        @relation(fields: [kelasProgramId], references: [id])
   riwayatStatus      RiwayatStatusSiswa[]
   periodeSpp         PeriodeSpp[]
   JadwalProgramSiswa JadwalProgramSiswa[]
@@ -272,19 +273,19 @@ model Voucher {
 }
 
 model PeriodeSpp {
-  id                String           @id @default(uuid())
-  programSiswaId    String
-  bulan             String
-  tahun             Int
-  tanggalTagihan    String
-  jumlahTagihan     Decimal          @db.Decimal(10, 2)
-  diskon            Decimal?          @db.Decimal(10, 2)
-  totalTagihan      Decimal          @db.Decimal(10, 2)
-  pembayaranId      String?          @unique
-  voucher_id        String?
-  voucher           Voucher?         @relation(fields: [voucher_id], references: [id])
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id             String   @id @default(uuid())
+  programSiswaId String
+  bulan          String
+  tahun          Int
+  tanggalTagihan String
+  jumlahTagihan  Decimal  @db.Decimal(10, 2)
+  diskon         Decimal? @db.Decimal(10, 2)
+  totalTagihan   Decimal  @db.Decimal(10, 2)
+  pembayaranId   String?  @unique
+  voucher_id     String?
+  voucher        Voucher? @relation(fields: [voucher_id], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
@@ -292,14 +293,14 @@ model PeriodeSpp {
 }
 
 model Pembayaran {
-  id                String           @id @default(uuid())
+  id                String            @id @default(uuid())
   tipePembayaran    TipePembayaran
   metodePembayaran  MetodePembayaran?
-  jumlahTagihan     Decimal          @db.Decimal(10, 2)
+  jumlahTagihan     Decimal           @db.Decimal(10, 2)
   statusPembayaran  StatusPembayaran
   tanggalPembayaran String
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   // Relations
   periodeSpp    PeriodeSpp?
@@ -331,7 +332,7 @@ model Payroll {
   bulan     String
   tahun     Int
   gajiPokok Decimal       @db.Decimal(10, 2)
-  insentif  Decimal?       @db.Decimal(10, 2)
+  insentif  Decimal?      @db.Decimal(10, 2)
   potongan  Decimal       @db.Decimal(10, 2)
   totalGaji Decimal       @db.Decimal(10, 2)
   status    StatusPayroll

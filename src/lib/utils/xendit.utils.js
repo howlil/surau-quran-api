@@ -5,16 +5,6 @@ class XenditUtils {
   static async createInvoice(data) {
     try {
 
-      if (!xendit) {
-        throw new Error('Xendit client not available or not properly initialized');
-      }
-
-      const Invoice = xendit.Invoice;
-
-      if (!Invoice) {
-        throw new Error('Xendit Invoice API not available');
-      }
-
       if (!data) {
         throw new Error('Invoice data is required');
       }
@@ -75,36 +65,27 @@ class XenditUtils {
           name: item.name,
           quantity: Number(item.quantity),
           price: Number(item.price),
-          category: item.category || 'FEES'  
+          category: item.category || 'FEES'
         }));
       }
 
       if (paymentMethods && paymentMethods.length > 0) {
-        invoiceParams.paymentMethods = paymentMethods;  
+        invoiceParams.paymentMethods = paymentMethods;
       }
 
       let invoice;
 
       try {
-        invoice = await Invoice.createInvoice(invoiceParams);
-      } catch (error1) {
-        logger.debug('Method 1 failed, trying method 2 with data wrapper');
-
-        try {
-          invoice = await Invoice.createInvoice({ data: invoiceParams });
-        } catch (error2) {
-          logger.debug('Method 2 failed, trying method 3 with request object');
-
-          invoice = await Invoice.createInvoice({
-            request: invoiceParams
-          });
-        }
+        invoice = await xendit.Invoice.createInvoice({ data: invoiceParams });
+      } catch (err) {
+        logger.error('Error creating Xendit invoice:', err);
+        throw new Error(`Failed to create Xendit invoice: ${err.message}`);
       }
 
-      logger.debug('Xendit invoice response:', JSON.stringify(invoice));
       logger.info(`Created Xendit invoice: ${invoice.id}`);
 
       return invoice;
+
     } catch (error) {
       logger.error(`Error creating Xendit invoice: ${error.message}`);
 
@@ -129,55 +110,17 @@ class XenditUtils {
         }
       }
 
-      logger.error('Full error object:', JSON.stringify(error, null, 2));
-
       throw error;
     }
   }
 
-  static async getInvoice(invoiceId) {
+  static async getAllInvoice() {
     try {
-      if (!xendit) {
-        throw new Error('Xendit client not available or not properly initialized');
-      }
-
-      const Invoice = xendit.Invoice;
-
-      if (!Invoice) {
-        throw new Error('Xendit Invoice API not available');
-      }
-
-      const invoice = await Invoice.getInvoice({
-        invoiceID: invoiceId
-      });
+      const invoice = await xendit.Invoice.getInvoices();
 
       return invoice;
     } catch (error) {
-      logger.error(`Error getting Xendit invoice ${invoiceId}:`, error);
-      throw error;
-    }
-  }
-
-  static async expireInvoice(invoiceId) {
-    try {
-      if (!xendit) {
-        throw new Error('Xendit client not available or not properly initialized');
-      }
-
-      const Invoice = xendit.Invoice;
-
-      if (!Invoice) {
-        throw new Error('Xendit Invoice API not available');
-      }
-
-      const invoice = await Invoice.expireInvoice({
-        invoiceID: invoiceId
-      });
-
-      logger.info(`Expired Xendit invoice: ${invoiceId}`);
-      return invoice;
-    } catch (error) {
-      logger.error(`Error expiring Xendit invoice ${invoiceId}:`, error);
+      logger.error(`Error getting Xendit invoice `, error);
       throw error;
     }
   }
@@ -238,7 +181,7 @@ class XenditUtils {
     const random = Math.floor(Math.random() * 1000);
     return `${prefix}-${timestamp}-${random}`;
   }
- 
+
   static processInvoiceCallback(callbackData) {
     return {
       xenditInvoiceId: callbackData.id,

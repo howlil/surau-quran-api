@@ -1,7 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ForbiddenError } = require('../../lib/http/errors.http');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
+const { NotFoundError } = require('../../lib/http/errors.http');
 
 class AbsensiService {
     // Get student attendance for admin (filtered by date) - redesigned API
@@ -62,6 +61,7 @@ class AbsensiService {
 
                 // Format attendance data for this program
                 const absensiData = kelasProgram.absensiSiswa.map(record => ({
+                    siswaId: record.siswaId,
                     namaSiswa: record.siswa.namaMurid,
                     nis: record.siswa.nis,
                     status: record.statusKehadiran
@@ -162,7 +162,6 @@ class AbsensiService {
             throw error;
         }
     }
-
     // Helper to get description for attendance status
     getKehadiranDescription(status) {
         switch (status) {
@@ -245,6 +244,54 @@ class AbsensiService {
             return formattedResponse;
         } catch (error) {
             logger.error(`Error updating guru attendance with ID ${id}:`, error);
+            throw error;
+        }
+    }
+
+    // TODO : absensi harus ngecek guru id 
+    async updateAbsensiSiswa(siswaId, data) {
+        try {
+            const absensi = await prisma.absensiSiswa.findFirst({
+                where: {
+                    siswaId,
+                }
+            });
+
+            if (!absensi) {
+                throw new NotFoundError(`Absensi siswa tidak ditemukan`);
+            }
+
+            logger.info(`Updating attendance for siswa ID: ${siswaId} ${data.value.statusKehadiran}`);
+            // Format data
+            const updated = await prisma.absensiSiswa.update({
+                where: { id: absensi.id },
+                data: {
+                    statusKehadiran: data.value.statusKehadiran,
+                },
+                include: {
+                    siswa: {
+                        select: {
+                            id: true,
+                            namaMurid: true,
+                            nis: true
+                        }
+                    },
+
+                }
+            });
+
+
+            const formattedResponse = {
+                id: updated.id,
+                tanggal: updated.tanggal,
+                namaSiswa: updated.siswa.namaMurid,
+                nisSiswa: updated.siswa.nis,
+                statusKehadiran: updated.statusKehadiran,
+            };
+
+            return formattedResponse;
+        } catch (error) {
+            logger.error(`Error updating siswa attendance with ID ${id}:`, error);
             throw error;
         }
     }

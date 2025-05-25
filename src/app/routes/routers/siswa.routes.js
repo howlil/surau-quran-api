@@ -33,6 +33,12 @@ router.post(
   siswaController.pendaftaranSiswa
 );
 
+router.get(
+  '/v1/pendaftaran/invoice',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  siswaController.getPendaftaranInvoice
+)
 
 
 module.exports = router;

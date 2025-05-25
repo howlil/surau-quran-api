@@ -41,7 +41,7 @@ class ProgramService {
       // Check if name is being changed and if it already exists
       if (data.namaProgram && data.namaProgram !== program.namaProgram) {
         const existing = await prisma.program.findFirst({
-          where: { 
+          where: {
             namaProgram: data.namaProgram,
             id: { not: id }
           }
@@ -105,12 +105,10 @@ class ProgramService {
     }
   }
 
-
-
   async getAll(filters = {}) {
     try {
       const { page = 1, limit = 10, namaProgram } = filters;
-      
+
       const where = {};
       if (namaProgram) {
         where.namaProgram = { contains: namaProgram, mode: 'insensitive' };
@@ -127,6 +125,57 @@ class ProgramService {
       throw error;
     }
   }
+
+  async getProgramStudents(kelasProgramId) {
+    try {
+      // 1. Ambil data KelasProgram dulu
+      const kelasProgram = await prisma.kelasProgram.findUnique({
+        where: { id: kelasProgramId },
+        include: {
+          program: true,
+          jamMengajar: true
+        }
+      });
+
+      if (!kelasProgram) {
+        throw new Error('KelasProgram tidak ditemukan');
+      }
+
+      // 2. Cari semua ProgramSiswa yg eligible
+      const programSiswaList = await prisma.programSiswa.findMany({
+        where: {
+          kelasProgramId: null,
+          status: 'AKTIF',
+          programId: kelasProgram.programId,
+          isVerified: false,
+          JadwalProgramSiswa: {
+            some: {
+              hari: kelasProgram.hari,
+              jamMengajarId: kelasProgram.jamMengajarId
+            }
+          }
+        },
+        include: {
+          siswa: true
+        }
+      });
+
+      // 3. Mapping ke response
+      const result = programSiswaList.map(ps => ({
+        programSiswaId: ps.id,
+        siswaId: ps.siswa.id,
+        namaSiswa: ps.siswa.namaMurid,
+        NIS: ps.siswa.nis
+      }));
+
+      return result;
+
+    } catch (error) {
+      logger.error('Error getting program students:', error);
+      throw error;
+    }
+  }
+
 }
 
 module.exports = new ProgramService();

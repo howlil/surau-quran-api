@@ -1,8 +1,8 @@
 const siswaService = require('../service/siswa.service');
-const pendaftaranService = require('../service/pendaftaran.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const XenditUtils = require('../../lib/utils/xendit.utils');
 
 class SiswaController {
 
@@ -30,7 +30,7 @@ class SiswaController {
 
   pendaftaranSiswa = ErrorHandler.asyncHandler(async (req, res) => {
     const data = HttpRequest.getBodyParams(req);
-    const result = await pendaftaranService.createPendaftaran(data);
+    const result = await siswaService.createPendaftaran(data);
     return Http.Response.success(res, {
       message: 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran',
       data: {
@@ -39,6 +39,18 @@ class SiswaController {
         expiryDate: result.paymentInfo.expireDate,
         amount: result.paymentInfo.amount
       }
+    });
+  });
+
+  getPendaftaranInvoice = ErrorHandler.asyncHandler(async (req, res) => {
+    const filters = HttpRequest.getQueryParams(req, ['tanggal', 'status', 'page', 'limit']);
+
+    const invoices = await XenditUtils.getAllInvoice()
+
+    const result = await siswaService.getPendaftaranInvoice(invoices, filters);
+    return Http.Response.success(res, {
+      message: 'Invoice pendaftaran berhasil ditemukan',
+      data: result
     });
   });
 }

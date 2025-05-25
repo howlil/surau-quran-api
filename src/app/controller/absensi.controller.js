@@ -30,6 +30,13 @@ class AbsensiController {
         await absensiService.updateAbsensiGuru(id, data);
         return Http.Response.success(res, 'Data absensi guru berhasil diperbarui');
     });
+
+    updateAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+        const { siswaId } = HttpRequest.getUrlParams(req);
+        const data = HttpRequest.getBodyParams(req);
+        await absensiService.updateAbsensiSiswa(siswaId, data);
+        return Http.Response.success(res, 'Data absensi siswa berhasil diperbarui');
+    });
 }
 
-module.exports = new AbsensiController();    
+module.exports = new AbsensiController();

@@ -29,6 +29,13 @@ class ProgramController {
     const result = await programService.getAll(filters);
     return Http.Response.success(res, result);
   });
+
+  getProgramStudents = ErrorHandler.asyncHandler(async (req, res) => {
+    const { kelasProgramId } = HttpRequest.getUrlParams(req);
+    const result = await programService.getProgramStudents(kelasProgramId);
+    return Http.Response.success(res, result);
+  });
+
 }
 
 module.exports = new ProgramController();

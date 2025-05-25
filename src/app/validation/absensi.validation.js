@@ -60,7 +60,16 @@ class AbsensiValidation {
         });
     }
 
-   
+    updateAbsensiSiswa() {
+        return Joi.object({
+            statusKehadiran: Joi.string().valid('HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT').required()
+                .messages({
+                    'any.required': 'Status kehadiran wajib diisi',
+                    'any.only': 'Status kehadiran tidak valid'
+                }),
+        });
+    }
+
 }
 
 module.exports = new AbsensiValidation(); 

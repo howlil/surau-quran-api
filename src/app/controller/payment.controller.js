@@ -1,6 +1,6 @@
 const { logger } = require('../../lib/config/logger.config');
 const paymentService = require('../service/payment.service');
-const pendaftaranService = require('../service/pendaftaran.service');
+const siswaService = require('../service/siswa.service');
 const voucherService = require('../service/voucher.service');
 const Http = require('../../lib/http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
@@ -9,6 +9,7 @@ const { prisma } = require('../../lib/config/prisma.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 
 class PaymentController {
+    
     handleXenditCallback = ErrorHandler.asyncHandler(async (req, res) => {
         const callbackToken = req.headers['x-callback-token'];
         const rawBody = req.body;
@@ -24,7 +25,7 @@ class PaymentController {
 
         if (result.payment.statusPembayaran === 'PAID' && result.payment.tipePembayaran === 'PENDAFTARAN') {
             try {
-                await pendaftaranService.processPaidPendaftaran(result.payment.id);
+                await siswaService.processPaidPendaftaran(result.payment.id);
                 logger.info(`Successfully processed pendaftaran payment for ID: ${result.payment.id}`);
             } catch (error) {
                 logger.error(`Failed to process pendaftaran for payment ID: ${result.payment.id}`, error);

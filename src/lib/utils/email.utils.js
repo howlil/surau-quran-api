@@ -247,20 +247,7 @@ Tim Surau Quran
     `.trim();
   }
 
-  static formatCurrency(amount) {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(amount);
-  }
-
-  static formatDate(date) {
-    return new Date(date).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  }
+ 
 }
 
 module.exports = EmailUtils;

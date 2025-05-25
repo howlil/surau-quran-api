@@ -31,4 +31,19 @@ router.get('/v1/kelas',
     kelasController.getAll
 );
 
+
+router.get('/v1/kelas/initial-student',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['ADMIN']),
+    kelasController.getInitialStudentIntoClass
+);
+
+router.patch(
+    '/v1/kelas-program/:kelasProgramId/initial-student',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['ADMIN']),
+    validationMiddleware.validateBody(kelasValidation.patchInitialStudentIntoClass()),
+    kelasController.patchInitialStudentIntoClass
+);
+
 module.exports = router;

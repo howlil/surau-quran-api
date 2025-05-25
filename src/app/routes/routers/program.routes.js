@@ -34,4 +34,12 @@ router.get(
     '/v1/program',
     ProgramController.getAll
 );
+
+router.get(
+    '/v1/program/:kelasProgramId/siswa',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['ADMIN']),
+    ProgramController.getProgramStudents
+);
+
 module.exports = router;

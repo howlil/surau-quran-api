@@ -30,4 +30,11 @@ router.put('/v1/absensi/guru/:id',
     absensiController.updateAbsensiGuru
 );
 
+router.patch('/v1/absensi/siswa/:siswaId',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateBody(absensiValidation.updateAbsensiSiswa()),
+    absensiController.updateAbsensiSiswa
+);
+
 module.exports = router; 

@@ -114,6 +114,148 @@ class KelasService {
             throw error;
         }
     }
+
+    async getInitialStudentIntoClass() {
+        try {
+            const kelasList = await prisma.kelas.findMany({
+                include: {
+                    kelasProgram: {
+                        include: {
+                            program: true,
+                            jamMengajar: true,
+                            guru: true,
+                            programSiswa: {
+                                include: {
+                                    siswa: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+
+            const result = kelasList.map(kelas => ({
+                kelasId: kelas.id,
+                namaKelas: kelas.namaKelas,
+                program: kelas.kelasProgram.map(kp => ({
+                    kelasProgramId: kp.id,
+                    programId: kp.programId,
+                    namaProgram: kp.program?.namaProgram || null,
+                    hari: kp.hari,
+                    jadwal: kp.jamMengajar
+                        ? {
+                            jamMengajarId: kp.jamMengajar.id,
+                            jamMulai: kp.jamMengajar.jamMulai,
+                            jamSelesai: kp.jamMengajar.jamSelesai
+                        }
+                        : null,
+                    guru: kp.guru
+                        ? {
+                            guruId: kp.guru.id,
+                            namaGuru: kp.guru.nama,
+                            NIP: kp.guru.nip || null
+                        }
+                        : null,
+                    siswa: kp.programSiswa
+                        .filter(ps => ps.status === 'AKTIF' && ps.isVerified === true)
+                        .map(ps => ({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            NIS: ps.siswa.nis
+                        }))
+                }))
+            }));
+
+            return result;
+        } catch (err) {
+            logger.error('Error getting initial student into class:', err);
+            throw err;
+        }
+    }
+
+    async patchInitialStudentIntoClass(kelasProgramId, data) {
+        try {
+            const {
+                programId,
+                hari,
+                jamMengajarId,
+                guruId,
+                tambahSiswaIds = []
+            } = data;
+
+            const updateData = {};
+            if (programId) updateData.programId = programId;
+            if (hari) updateData.hari = hari;
+            if (jamMengajarId) updateData.jamMengajarId = jamMengajarId;
+            if (guruId) updateData.guruId = guruId;
+
+            let kelasProgram = null;
+            await prisma.$transaction(async (tx) => {
+                if (Object.keys(updateData).length > 0) {
+                    kelasProgram = await tx.kelasProgram.update({
+                        where: { id: kelasProgramId },
+                        data: updateData
+                    });
+                } else {
+                    kelasProgram = await tx.kelasProgram.findUnique({
+                        where: { id: kelasProgramId }
+                    });
+                }
+
+                // Proses penambahan siswa
+                let siswaDitambah = [];
+                if (tambahSiswaIds.length > 0) {
+                    // Ambil programSiswa yang eligible
+                    const programSiswaList = await tx.programSiswa.findMany({
+                        where: {
+                            siswaId: { in: tambahSiswaIds },
+                            status: 'AKTIF',
+                            programId: kelasProgram.programId,
+                            kelasProgramId: null,
+                            isVerified: false,
+                            JadwalProgramSiswa: {
+                                some: {
+                                    hari: kelasProgram.hari,
+                                    jamMengajarId: kelasProgram.jamMengajarId
+                                }
+                            }
+                        },
+                        include: { siswa: true }
+                    });
+
+                    for (const ps of programSiswaList) {
+                        await tx.programSiswa.update({
+                            where: { id: ps.id },
+                            data: { kelasProgramId: kelasProgramId, isVerified: true }
+                        });
+                        siswaDitambah.push({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            NIS: ps.siswa.nis
+                        });
+                    }
+                }
+
+                // Return response di luar $transaction agar keluar dari scope
+                kelasProgram = {
+                    ...kelasProgram,
+                    siswaDitambah
+                };
+            });
+
+            return {
+                kelasProgramId,
+                updateData,
+                siswaDitambah: kelasProgram.siswaDitambah || []
+            };
+
+        } catch (err) {
+            logger.error('Error in initialStudentIntoClass:', err);
+            throw err;
+        }
+    }
+
 }
 
 module.exports = new KelasService();

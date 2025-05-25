@@ -4,9 +4,10 @@ const XenditUtils = require('../../lib/utils/xendit.utils');
 const { NotFoundError } = require('../../lib/http/errors.http');
 
 class PaymentService {
+
   async createPendaftaranInvoice(data) {
     try {
-      const { email, namaMurid, totalBiaya } = data;
+      const { email, namaMurid, totalBiaya, noWhatsapp, alamat } = data;
 
       const externalId = XenditUtils.generateExternalId('DAFTAR');
 
@@ -15,13 +16,19 @@ class PaymentService {
         amount: Number(totalBiaya),
         payerEmail: email,
         description: `Pembayaran Pendaftaran - ${namaMurid}`,
-        successRedirectUrl: process.env.XENDIT_SUCCESS_REDIRECT_URL || 'https://example.com/success',
-        failureRedirectUrl: process.env.XENDIT_FAILURE_REDIRECT_URL || 'https://example.com/failure',
+        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL ,
+        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL ,
         items: [{
           name: 'Biaya Pendaftaran',
           quantity: 1,
           price: Number(totalBiaya)
-        }]
+        }],
+        customer: {
+          givenNames: namaMurid,
+          email: email,
+          phoneNumber: noWhatsapp,
+          address : alamat
+        }
       };
 
       if (!invoiceData.externalId || !invoiceData.amount || !invoiceData.payerEmail || !invoiceData.description) {
@@ -132,8 +139,6 @@ class PaymentService {
     try {
       const processedData = XenditUtils.processInvoiceCallback(callbackData);
 
-      logger.info('Processing Xendit callback:', JSON.stringify(callbackData, null, 2));
-
       const xenditPayment = await prisma.xenditPayment.findUnique({
         where: { xenditInvoiceId: processedData.xenditInvoiceId },
         include: {
@@ -144,8 +149,6 @@ class PaymentService {
       if (!xenditPayment) {
         throw new NotFoundError(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
       }
-
-
 
       await prisma.$transaction(async (tx) => {
         await tx.xenditPayment.update({
@@ -183,8 +186,8 @@ class PaymentService {
       throw error;
     }
   }
-
-
+  
+  
 }
 
 module.exports = new PaymentService();
