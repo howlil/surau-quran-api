@@ -21,33 +21,35 @@ router.patch(
   payrollController.updatePayroll
 );
 
-router.delete(
-  '/v1/payroll/:id',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
-  payrollController.deletePayroll
-);
-
 router.get(
   '/v1/payroll',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
   validationMiddleware.validateQuery(payrollValidation.getAll()),
-  payrollController.getAllPayrolls
+  payrollController.getAllPayrollsForAdmin
 );
 
 router.get(
-  '/v1/payroll/:id',
+  '/v1/payroll/:id/detail',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
-  payrollController.getPayrollById
+  payrollController.getPayrollDetailForEdit
 );
 
-router.post(
-  '/v1/payroll/:id/process',
+router.patch(
+  '/v1/payroll/:id/detail',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
-  payrollController.processPayroll
+  validationMiddleware.validateBody(payrollValidation.updateDetail()),
+  payrollController.updatePayrollDetail
+);
+
+router.get(
+  '/v1/guru/payroll',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['GURU']),
+  validationMiddleware.validateQuery(payrollValidation.getForGuru()),
+  payrollController.getPayrollForGuru
 );
 
 router.post(
@@ -58,20 +60,20 @@ router.post(
   payrollController.generateMonthlyPayroll
 );
 
+router.post(
+  '/v1/payroll/generate-manual',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateBody(payrollValidation.generateMonthly()),
+  payrollController.generateManualPayroll
+);
+
 router.get(
   '/v1/payroll/summary/overview',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
   validationMiddleware.validateQuery(payrollValidation.getSummary()),
   payrollController.getPayrollSummary
-);
-
-router.post(
-  '/v1/payroll/disburse-batch',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
-  validationMiddleware.validateBody(payrollValidation.disburseBatch()),
-  payrollController.disburseBatch
 );
 
 module.exports = router;

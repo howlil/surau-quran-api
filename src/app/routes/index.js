@@ -11,6 +11,7 @@ const absensiRoutes = require('./routers/absensi.routes');
 const statisticsRoutes = require('./routers/statistics.routes');
 const sppRoutes = require('./routers/spp.routes');
 const paymentRoutes = require('./routers/payment.routes');
+const payrollRoutes = require('./routers/payroll.routes');
 
 router.use(authRoutes);
 router.use(kelasRoutes);
@@ -23,5 +24,6 @@ router.use(absensiRoutes);
 router.use(statisticsRoutes);
 router.use(sppRoutes);
 router.use(paymentRoutes);
+router.use(payrollRoutes);
 
 module.exports = router;

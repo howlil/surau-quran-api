@@ -2,7 +2,6 @@ const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
-const XenditUtils = require('../../lib/utils/xendit.utils');
 
 class PayrollService {
   async createPayroll(data) {
@@ -137,12 +136,115 @@ class PayrollService {
     }
   }
 
-  async deletePayroll(id) {
+
+  async getAllPayrollsForAdmin(filters = {}) {
+    try {
+      const { page = 1, limit = 10, bulan, tahun, guruId } = filters;
+
+      const where = {};
+
+      if (bulan) {
+        where.bulan = bulan;
+      }
+
+      if (tahun) {
+        where.tahun = Number(tahun);
+      }
+
+      if (guruId) {
+        where.guruId = guruId;
+      }
+
+      const result = await PrismaUtils.paginate(prisma.payroll, {
+        page,
+        limit,
+        where,
+        include: {
+          guru: {
+            select: {
+              id: true,
+              nama: true,
+              nip: true,
+              tarifPerJam: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const formattedData = await Promise.all(result.data.map(async (payroll) => {
+        const absensiData = await this.getAbsensiDataForPayroll(payroll.guruId, payroll.bulan, payroll.tahun);
+        
+        return {
+          guruId: payroll.guruId,
+          namaGuru: payroll.guru.nama,
+          NIP: payroll.guru.nip,
+          bulan: payroll.bulan,
+          totalGaji: Number(payroll.totalGaji),
+          detail: {
+            gajiGuruId: payroll.id,
+            gajiPokok: Number(payroll.gajiPokok),
+            insentif: Number(payroll.insentif),
+            absensi: absensiData,
+            totalPotongan: Number(payroll.potongan),
+            status: payroll.status
+          }
+        };
+      }));
+
+      return {
+        data: formattedData,
+        meta: result.meta
+      };
+    } catch (error) {
+      logger.error('Error getting all payrolls for admin:', error);
+      throw error;
+    }
+  }
+
+  async getAbsensiDataForPayroll(guruId, bulan, tahun) {
+    const monthNumber = this.getMonthNumber(bulan);
+    const absensiRecords = await prisma.absensiGuru.findMany({
+      where: {
+        guruId,
+        tanggal: {
+          contains: `${tahun}-${String(monthNumber).padStart(2, '0')}`
+        }
+      }
+    });
+
+    const telat = absensiRecords.filter(record => {
+      if (record.statusKehadiran !== 'HADIR') return false;
+      const jamMasuk = record.jamMasuk;
+      const [hour, minute] = jamMasuk.split(':').map(Number);
+      return hour > 8 || (hour === 8 && minute > 0);
+    }).length;
+
+    const izin = absensiRecords.filter(record => record.statusKehadiran === 'IZIN').length;
+    const sakit = absensiRecords.filter(record => record.statusKehadiran === 'SAKIT').length;
+    const absen = absensiRecords.filter(record => record.statusKehadiran === 'TIDAK_HADIR').length;
+
+    return {
+      telat,
+      izin,
+      sakit,
+      absen
+    };
+  }
+
+  async getPayrollDetailForEdit(id) {
     try {
       const payroll = await prisma.payroll.findUnique({
         where: { id },
         include: {
-          payrollDisbursement: true
+          guru: {
+            select: {
+              id: true,
+              nama: true,
+              nip: true,
+              tarifPerJam: true
+            }
+          }
         }
       });
 
@@ -150,45 +252,106 @@ class PayrollService {
         throw new NotFoundError(`Payroll dengan ID ${id} tidak ditemukan`);
       }
 
-      if (payroll.status === 'SELESAI') {
-        throw new BadRequestError('Payroll yang sudah selesai tidak dapat dihapus');
-      }
+      const absensiData = await this.getAbsensiDataForPayroll(payroll.guruId, payroll.bulan, payroll.tahun);
 
-      if (payroll.payrollDisbursement) {
-        throw new ConflictError('Payroll yang sudah memiliki disbursement tidak dapat dihapus');
-      }
-
-      await prisma.payroll.delete({
-        where: { id }
-      });
-
-      logger.info(`Deleted payroll with ID: ${id}`);
-      return { id };
+      return {
+        id: payroll.id,
+        guruId: payroll.guruId,
+        namaGuru: payroll.guru.nama,
+        NIP: payroll.guru.nip,
+        bulan: payroll.bulan,
+        tahun: payroll.tahun,
+        periode: payroll.periode,
+        gajiPokok: Number(payroll.gajiPokok),
+        insentif: Number(payroll.insentif),
+        potongan: Number(payroll.potongan),
+        totalGaji: Number(payroll.totalGaji),
+        status: payroll.status,
+        absensi: absensiData,
+        tarifPerJam: Number(payroll.guru.tarifPerJam || 0)
+      };
     } catch (error) {
-      logger.error(`Error deleting payroll with ID ${id}:`, error);
+      logger.error(`Error getting payroll detail for edit with ID ${id}:`, error);
       throw error;
     }
   }
 
-  async getAllPayrolls(filters = {}) {
+  async updatePayrollDetail(id, data) {
     try {
-      const { page = 1, limit = 10, periode, status, guruId } = filters;
+      const payroll = await prisma.payroll.findUnique({
+        where: { id }
+      });
 
-      const where = {};
-
-      if (periode) {
-        where.periode = { contains: periode, mode: 'insensitive' };
+      if (!payroll) {
+        throw new NotFoundError(`Payroll dengan ID ${id} tidak ditemukan`);
       }
 
-      if (status) {
-        where.status = status;
+      if (payroll.status === 'SELESAI') {
+        throw new BadRequestError('Payroll yang sudah selesai tidak dapat diubah');
       }
 
-      if (guruId) {
-        where.guruId = guruId;
+      const { gajiPokok, insentif, potongan } = data;
+
+      const updateData = {};
+
+      if (gajiPokok !== undefined) {
+        updateData.gajiPokok = Number(gajiPokok);
       }
 
-      return await PrismaUtils.paginate(prisma.payroll, {
+      if (insentif !== undefined) {
+        updateData.insentif = Number(insentif);
+      }
+
+      if (potongan !== undefined) {
+        updateData.potongan = Number(potongan);
+      }
+
+      const currentGajiPokok = updateData.gajiPokok ?? payroll.gajiPokok;
+      const currentInsentif = updateData.insentif ?? payroll.insentif;
+      const currentPotongan = updateData.potongan ?? payroll.potongan;
+
+      updateData.totalGaji = Number(currentGajiPokok) + Number(currentInsentif) - Number(currentPotongan);
+
+      if (updateData.totalGaji < 0) {
+        throw new BadRequestError('Total gaji tidak boleh negatif');
+      }
+
+      const updated = await prisma.payroll.update({
+        where: { id },
+        data: updateData,
+        include: {
+          guru: {
+            select: {
+              nama: true,
+              nip: true
+            }
+          }
+        }
+      });
+
+      logger.info(`Updated payroll detail with ID: ${id}`);
+      return updated;
+    } catch (error) {
+      logger.error(`Error updating payroll detail with ID ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async getPayrollForGuru(guruId, filters = {}) {
+    try {
+      const { page = 1, limit = 10, bulan, tahun } = filters;
+
+      const where = { guruId };
+
+      if (bulan) {
+        where.bulan = bulan;
+      }
+
+      if (tahun) {
+        where.tahun = Number(tahun);
+      }
+
+      const result = await PrismaUtils.paginate(prisma.payroll, {
         page,
         limit,
         where,
@@ -197,159 +360,47 @@ class PayrollService {
             select: {
               nama: true,
               nip: true,
-              noRekening: true,
-              namaBank: true
-            }
-          },
-          payrollDisbursement: {
-            select: {
-              id: true,
-              tanggalProses: true,
-              xenditDisbursement: {
-                select: {
-                  xenditStatus: true
-                }
-              }
+              tarifPerJam: true
             }
           }
         },
         orderBy: { createdAt: 'desc' }
       });
+
+      const formattedData = await Promise.all(result.data.map(async (payroll) => {
+        const absensiData = await this.getAbsensiDataForPayroll(payroll.guruId, payroll.bulan, payroll.tahun);
+        
+        return {
+          gajiGuruId: payroll.id,
+          bulan: payroll.bulan,
+          tahun: payroll.tahun,
+          tanggal: payroll.createdAt,
+          totalGaji: Number(payroll.totalGaji),
+          gajiPokok: Number(payroll.gajiPokok),
+          insentif: Number(payroll.insentif),
+          absensi: absensiData,
+          totalPotongan: Number(payroll.potongan),
+          status: payroll.status
+        };
+      }));
+
+      return {
+        data: formattedData,
+        pagination: result.meta
+      };
     } catch (error) {
-      logger.error('Error getting all payrolls:', error);
+      logger.error(`Error getting payroll for guru ${guruId}:`, error);
       throw error;
     }
   }
 
-  async getPayrollById(id) {
-    try {
-      const payroll = await prisma.payroll.findUnique({
-        where: { id },
-        include: {
-          guru: {
-            select: {
-              nama: true,
-              nip: true,
-              noRekening: true,
-              namaBank: true,
-              tarifPerJam: true
-            }
-          },
-          payrollDisbursement: {
-            include: {
-              xenditDisbursement: true
-            }
-          },
-          absensiGuru: {
-            select: {
-              tanggal: true,
-              jamMasuk: true,
-              jamKeluar: true,
-              sks: true,
-              statusKehadiran: true
-            },
-            orderBy: { tanggal: 'asc' }
-          }
-        }
-      });
-
-      if (!payroll) {
-        throw new NotFoundError(`Payroll dengan ID ${id} tidak ditemukan`);
-      }
-
-      return payroll;
-    } catch (error) {
-      logger.error(`Error getting payroll with ID ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async processPayroll(id) {
-    try {
-      const payroll = await prisma.payroll.findUnique({
-        where: { id },
-        include: {
-          guru: true,
-          payrollDisbursement: true
-        }
-      });
-
-      if (!payroll) {
-        throw new NotFoundError(`Payroll dengan ID ${id} tidak ditemukan`);
-      }
-
-      if (payroll.status !== 'DIPROSES') {
-        throw new BadRequestError('Hanya payroll dengan status DIPROSES yang dapat diproses');
-      }
-
-      if (payroll.payrollDisbursement) {
-        throw new ConflictError('Payroll sudah memiliki disbursement');
-      }
-
-      if (!payroll.guru.noRekening || !payroll.guru.namaBank) {
-        throw new BadRequestError('Data rekening guru belum lengkap');
-      }
-
-      return await PrismaUtils.transaction(async (tx) => {
-        const disbursement = await tx.payrollDisbursement.create({
-          data: {
-            payrollId: id,
-            amount: payroll.totalGaji,
-            tanggalProses: new Date().toISOString().split('T')[0]
-          }
-        });
-
-        try {
-          const xenditDisbursement = await XenditUtils.createDisbursement({
-            externalId: XenditUtils.generateExternalId('PAYROLL'),
-            amount: Number(payroll.totalGaji),
-            bankCode: this.#getBankCode(payroll.guru.namaBank),
-            accountHolderName: payroll.guru.nama,
-            accountNumber: payroll.guru.noRekening,
-            description: `Gaji ${payroll.periode} - ${payroll.guru.nama}`
-          });
-
-          await tx.xenditDisbursement.create({
-            data: {
-              payrollDisbursementId: disbursement.id,
-              xenditDisbursementId: xenditDisbursement.id,
-              xenditExternalId: xenditDisbursement.external_id,
-              xenditAmount: Number(xenditDisbursement.amount),
-              xenditStatus: 'PENDING',
-              xenditCreatedAt: xenditDisbursement.created_at,
-              rawResponse: xenditDisbursement
-            }
-          });
-
-          await tx.payroll.update({
-            where: { id },
-            data: { status: 'SELESAI' }
-          });
-
-          logger.info(`Successfully processed payroll disbursement for ID: ${id}`);
-
-          return {
-            payrollId: id,
-            disbursementId: disbursement.id,
-            xenditDisbursementId: xenditDisbursement.id,
-            amount: payroll.totalGaji,
-            status: 'SELESAI'
-          };
-        } catch (xenditError) {
-          logger.error('Failed to create Xendit disbursement:', xenditError);
-          
-          await tx.payroll.update({
-            where: { id },
-            data: { status: 'GAGAL' }
-          });
-
-          throw new BadRequestError(`Gagal memproses disbursement: ${xenditError.message}`);
-        }
-      });
-    } catch (error) {
-      logger.error(`Error processing payroll with ID ${id}:`, error);
-      throw error;
-    }
+  getMonthNumber(bulanName) {
+    const months = {
+      'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4,
+      'Mei': 5, 'Juni': 6, 'Juli': 7, 'Agustus': 8,
+      'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+    };
+    return months[bulanName] || 1;
   }
 
   async generateMonthlyPayroll(data) {
@@ -368,7 +419,7 @@ class PayrollService {
             payroll: {
               where: {
                 periode,
-                tahun
+                tahun: Number(tahun)
               }
             }
           }
@@ -379,7 +430,7 @@ class PayrollService {
             payroll: {
               where: {
                 periode,
-                tahun
+                tahun: Number(tahun)
               }
             }
           }
@@ -400,11 +451,12 @@ class PayrollService {
             continue;
           }
 
+          const monthNumber = this.getMonthNumber(bulan);
           const absensiData = await prisma.absensiGuru.findMany({
             where: {
               guruId: guru.id,
               tanggal: {
-                contains: `${tahun}-${bulan.toString().padStart(2, '0')}`
+                contains: `${tahun}-${String(monthNumber).padStart(2, '0')}`
               },
               statusKehadiran: 'HADIR'
             }
@@ -417,7 +469,7 @@ class PayrollService {
             guruId: guru.id,
             periode,
             bulan,
-            tahun,
+            tahun: Number(tahun),
             gajiPokok,
             insentif: 0,
             potongan: 0
@@ -503,75 +555,6 @@ class PayrollService {
       logger.error('Error getting payroll summary:', error);
       throw error;
     }
-  }
-
-  async disburseBatch(data) {
-    try {
-      const { payrollIds } = data;
-
-      const payrolls = await prisma.payroll.findMany({
-        where: {
-          id: { in: payrollIds },
-          status: 'DIPROSES'
-        },
-        include: {
-          guru: true,
-          payrollDisbursement: true
-        }
-      });
-
-      if (payrolls.length === 0) {
-        throw new BadRequestError('Tidak ada payroll yang dapat diproses');
-      }
-
-      const results = [];
-      const errors = [];
-
-      for (const payroll of payrolls) {
-        try {
-          const result = await this.processPayroll(payroll.id);
-          results.push(result);
-        } catch (error) {
-          errors.push({
-            payrollId: payroll.id,
-            guru: payroll.guru.nama,
-            error: error.message
-          });
-        }
-      }
-
-      logger.info(`Batch processed ${results.length} payrolls`);
-
-      return {
-        success: results,
-        errors,
-        summary: {
-          totalProcessed: results.length,
-          totalErrors: errors.length,
-          totalAmount: results.reduce((sum, r) => sum + Number(r.amount), 0)
-        }
-      };
-    } catch (error) {
-      logger.error('Error processing batch disbursement:', error);
-      throw error;
-    }
-  }
-
-  #getBankCode(namaBank) {
-    const bankCodes = {
-      'BCA': 'BCA',
-      'MANDIRI': 'MANDIRI',
-      'BNI': 'BNI',
-      'BRI': 'BRI',
-      'CIMB': 'CIMB',
-      'DANAMON': 'DANAMON',
-      'PERMATA': 'PERMATA',
-      'BSI': 'BSI',
-      'BTN': 'BTN'
-    };
-
-    const bankName = namaBank?.toUpperCase();
-    return bankCodes[bankName] || 'BCA';
   }
 }
 

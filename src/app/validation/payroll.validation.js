@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./base.validation');
+const ValidatorFactory = require('./factory.validation');
 
 class PayrollValidation {
   static create() {
@@ -87,10 +87,16 @@ class PayrollValidation {
           'number.min': 'Batas minimal 1',
           'number.max': 'Batas maksimal 100'
         }),
-      periode: Joi.string().optional(),
-      status: Joi.string().valid('DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL').optional()
+      bulan: Joi.string().valid('Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember').optional()
         .messages({
-          'any.only': 'Status harus salah satu dari: DRAFT, DIPROSES, SELESAI, GAGAL'
+          'any.only': 'Bulan harus salah satu dari: Januari, Februari, Maret, April, Mei, Juni, Juli, Agustus, September, Oktober, November, Desember'
+        }),
+      tahun: Joi.number().integer().min(2020).max(2050).optional()
+        .messages({
+          'number.base': 'Tahun harus berupa angka',
+          'number.integer': 'Tahun harus berupa bilangan bulat',
+          'number.min': 'Tahun minimal 2020',
+          'number.max': 'Tahun maksimal 2050'
         }),
       guruId: Joi.string().guid({ version: 'uuidv4' }).optional()
         .messages({
@@ -99,12 +105,31 @@ class PayrollValidation {
     });
   }
 
+  static updateDetail() {
+    return ValidatorFactory.create({
+      gajiPokok: Joi.number().precision(2).min(0).optional()
+        .messages({
+          'number.base': 'Gaji pokok harus berupa angka',
+          'number.min': 'Gaji pokok tidak boleh negatif'
+        }),
+      insentif: Joi.number().precision(2).min(0).optional()
+        .messages({
+          'number.base': 'Insentif harus berupa angka',
+          'number.min': 'Insentif tidak boleh negatif'
+        }),
+      potongan: Joi.number().precision(2).min(0).optional()
+        .messages({
+          'number.base': 'Potongan harus berupa angka',
+          'number.min': 'Potongan tidak boleh negatif'
+        })
+    });
+  }
+
   static generateMonthly() {
     return ValidatorFactory.create({
-      bulan: Joi.string().min(3).max(20).required()
+      bulan: Joi.string().valid('Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember').required()
         .messages({
-          'string.min': 'Bulan minimal 3 karakter',
-          'string.max': 'Bulan maksimal 20 karakter',
+          'any.only': 'Bulan harus salah satu dari: Januari, Februari, Maret, April, Mei, Juni, Juli, Agustus, September, Oktober, November, Desember',
           'any.required': 'Bulan wajib diisi'
         }),
       tahun: Joi.number().integer().min(2020).max(2050).required()
@@ -137,16 +162,31 @@ class PayrollValidation {
     });
   }
 
-  static disburseBatch() {
+  static getForGuru() {
     return ValidatorFactory.create({
-      payrollIds: Joi.array().items(
-        Joi.string().guid({ version: 'uuidv4' }).required()
-      ).min(1).max(50).required()
+      page: Joi.number().integer().min(1).default(1)
         .messages({
-          'array.min': 'Minimal harus memilih 1 payroll',
-          'array.max': 'Maksimal dapat memproses 50 payroll sekaligus',
-          'any.required': 'Payroll IDs wajib diisi',
-          'string.guid': 'Setiap Payroll ID harus berupa UUID yang valid'
+          'number.base': 'Halaman harus berupa angka',
+          'number.integer': 'Halaman harus berupa bilangan bulat',
+          'number.min': 'Halaman minimal 1'
+        }),
+      limit: Joi.number().integer().min(1).max(100).default(10)
+        .messages({
+          'number.base': 'Batas harus berupa angka',
+          'number.integer': 'Batas harus berupa bilangan bulat',
+          'number.min': 'Batas minimal 1',
+          'number.max': 'Batas maksimal 100'
+        }),
+      bulan: Joi.string().valid('Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember').optional()
+        .messages({
+          'any.only': 'Bulan harus salah satu dari: Januari, Februari, Maret, April, Mei, Juni, Juli, Agustus, September, Oktober, November, Desember'
+        }),
+      tahun: Joi.number().integer().min(2020).max(2050).optional()
+        .messages({
+          'number.base': 'Tahun harus berupa angka',
+          'number.integer': 'Tahun harus berupa bilangan bulat',
+          'number.min': 'Tahun minimal 2020',
+          'number.max': 'Tahun maksimal 2050'
         })
     });
   }

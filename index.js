@@ -6,6 +6,7 @@ const loggerMiddleware = require('./src/app/middleware/logger.middleware');
 const SecurityMiddleware = require('./src/app/middleware/security.middleware');
 const { prismaConfig } = require('./src/lib/config/prisma.config');
 const routes = require('./src/app/routes');
+const CronJobs = require('./src/lib/config/cronjob.config');
 
 
 class Application {
@@ -49,12 +50,18 @@ class Application {
     }
   }
 
+  setupCronJobs() {
+    try {
+      CronJobs.init();
+      logger.info('Cron jobs initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize cron jobs:', error);
+    }
+  }
 
   async start() {
     try {
-      // Validate environment variables first
 
-      // Then connect to database
       await this.connectDatabase();
 
       this.server = this.app.listen(this.port, () => {
