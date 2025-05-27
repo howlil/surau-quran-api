@@ -35,8 +35,9 @@ class MainSeeder {
             });
 
             if (!adminUser) {
+                const adminData = await UserFactory.createAdmin();
                 adminUser = await prisma.user.create({
-                    data: await UserFactory.createAdmin()
+                    data: adminData
                 });
 
                 await prisma.admin.create({
@@ -53,8 +54,9 @@ class MainSeeder {
             });
 
             if (!guruUser) {
+                const guruData = await UserFactory.createGuru();
                 guruUser = await prisma.user.create({
-                    data: await UserFactory.createGuru()
+                    data: guruData
                 });
 
                 await prisma.guru.create({
@@ -71,8 +73,9 @@ class MainSeeder {
             });
 
             if (!siswaUser) {
+                const siswaData = await UserFactory.createSiswa();
                 siswaUser = await prisma.user.create({
-                    data: await UserFactory.createSiswa()
+                    data: siswaData
                 });
 
                 await prisma.siswa.create({
@@ -103,12 +106,9 @@ class MainSeeder {
                     continue;
                 }
 
+                const userData = await UserFactory.createRandomUser('ADMIN');
                 const randomUser = await prisma.user.create({
-                    data: {
-                        email: randomEmail,
-                        password: await UserFactory.createRandomUser('ADMIN').then(data => data.password),
-                        role: 'ADMIN'
-                    }
+                    data: userData
                 });
 
                 await prisma.admin.create({
@@ -136,12 +136,9 @@ class MainSeeder {
                     continue;
                 }
 
+                const userData = await UserFactory.createRandomUser('GURU');
                 const randomUser = await prisma.user.create({
-                    data: {
-                        email: randomEmail,
-                        password: await UserFactory.createRandomUser('GURU').then(data => data.password),
-                        role: 'GURU'
-                    }
+                    data: userData
                 });
 
                 const guru = await prisma.guru.create({
@@ -169,12 +166,9 @@ class MainSeeder {
                     continue;
                 }
 
+                const userData = await UserFactory.createRandomUser('SISWA');
                 const randomUser = await prisma.user.create({
-                    data: {
-                        email: randomEmail,
-                        password: await UserFactory.createRandomUser('SISWA').then(data => data.password),
-                        role: 'SISWA'
-                    }
+                    data: userData
                 });
 
                 const siswa = await prisma.siswa.create({
