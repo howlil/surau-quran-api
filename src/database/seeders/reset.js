@@ -1,51 +1,54 @@
-const { prisma } = require('../../lib/config/prisma.config');
-const MainSeeder = require('./main.seeder');
-const { getTablesInOrder } = require('./utils');
+const {prisma} = require('../../lib/config/prisma.config');
 
 async function resetDatabase() {
-    console.log('🗑️  Starting database reset...');
-
     try {
-        // Get table names in the correct order for deletion
-        const tableNames = getTablesInOrder('delete');
+        console.log('🗑️  Cleaning database...');
 
-        console.log(`Found ${tableNames.length} tables to reset in the correct order`);
+        
+        const tables = [
+            'xenditDisbursement',
+            'payrollDisbursement',
+            'xenditPayment',
+            'pembayaran',
+            'periodeSpp',
+            'pendaftaran',
+            'pendaftaranTemp',
+            'absensiGuru',
+            'absensiSiswa',
+            'payroll',
+            'riwayatStatusSiswa',
+            'jadwalProgramSiswa',
+            'programSiswa',
+            'kelasProgram',
+            'jamMengajar',
+            'program',
+            'kelas',
+            'voucher',
+            'token',
+            'siswa',
+            'guru',
+            'admin',
+            'user'
+        ];
 
-        // Delete data from all tables in order to handle foreign key constraints
-        await prisma.$transaction(async (tx) => {
-            // Disable foreign key checks while deleting
-            await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
-
-            for (const tableName of tableNames) {
-                try {
-                    console.log(`Clearing table: ${tableName}`);
-                    await tx[tableName].deleteMany({});
-                } catch (error) {
-                    console.error(`Error clearing table ${tableName}:`, error);
-                }
+        for (const table of tables) {
+            try {
+                await prisma[table].deleteMany();
+                console.log(`✅ Cleaned ${table} table`);
+            } catch (error) {
+                console.error(`❌ Error cleaning ${table} table:`, error.message);
+                throw error;
             }
+        }
 
-            // Re-enable foreign key checks
-            await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
-        });
-
-        console.log('✅ All tables cleared successfully.');
-
-        // Run seed after clearing tables
-        console.log('🌱 Starting database seeding...');
-        await MainSeeder.seed();
-        console.log('✅ Database seeded successfully.');
-
-        // Close Prisma connection
-        await prisma.$disconnect();
-        console.log('🎉 Database reset complete!');
-        process.exit(0);
+        console.log('✅ Database cleaned successfully!');
     } catch (error) {
-        console.error('❌ Failed to reset database:', error);
+        console.error('❌ Error cleaning database:', error.message);
+        console.error('Stack trace:', error.stack);
+        throw error;
+    } finally {
         await prisma.$disconnect();
-        process.exit(1);
     }
 }
 
-// Run the reset function
-resetDatabase(); 
+module.exports = resetDatabase; 
