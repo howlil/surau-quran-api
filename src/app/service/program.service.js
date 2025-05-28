@@ -105,25 +105,22 @@ class ProgramService {
     }
   }
 
-  async getAll(filters = {}) {
+  async getAll() {
     try {
-      const { page = 1, limit = 10, namaProgram } = filters;
-
-      const where = {};
-      if (namaProgram) {
-        where.namaProgram = { contains: namaProgram, mode: 'insensitive' };
-      }
-
-      return await PrismaUtils.paginate(prisma.program, {
-        page,
-        limit,
-        where,
+      const programList = await prisma.program.findMany({
+        select: {
+          id: true,
+          namaProgram: true
+        },
         orderBy: { namaProgram: 'asc' }
       });
+
+      return programList;
     } catch (error) {
       logger.error('Error getting all programs:', error);
       throw error;
     }
+
   }
 
   async getProgramStudents(kelasProgramId) {

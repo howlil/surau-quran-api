@@ -9,15 +9,7 @@ class GuruValidation {
           'string.email': 'Email harus valid',
           'any.required': 'Email wajib diisi'
         }),
-      password: Joi.string()
-        .min(6)
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
-        .required()
-        .messages({
-          'string.min': 'Password minimal 6 karakter',
-          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
-          'any.required': 'Password wajib diisi'
-        }),
+      
       nama: Joi.string().required()
         .messages({
           'any.required': 'Nama wajib diisi'
@@ -31,10 +23,7 @@ class GuruValidation {
         .messages({
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN'
         }),
-      fotoProfile: Joi.string().uri().optional()
-        .messages({
-          'string.uri': 'Foto profile harus berupa URL yang valid'
-        }),
+      fotoProfile: Joi.any().optional(),
       keahlian: Joi.string().optional(),
       pendidikanTerakhir: Joi.string().optional(),
       noRekening: Joi.string().pattern(/^[0-9]+$/).optional()
@@ -48,10 +37,7 @@ class GuruValidation {
           'number.positive': 'Tarif per jam harus lebih dari 0',
           'any.required': 'Tarif per jam wajib diisi'
         }),
-      suratKontrak: Joi.string().uri().optional()
-        .messages({
-          'string.uri': 'Surat kontrak harus berupa URL yang valid'
-        })
+      suratKontrak: Joi.any().optional()
     });
   }
 
@@ -61,14 +47,7 @@ class GuruValidation {
         .messages({
           'string.email': 'Email harus valid'
         }),
-      password: Joi.string()
-        .min(6)
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
-        .optional()
-        .messages({
-          'string.min': 'Password minimal 6 karakter',
-          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus'
-        }),
+      
       nama: Joi.string().optional(),
       noWhatsapp: Joi.string().pattern(/^(\+62|62|0)[0-9]{9,12}$/).optional()
         .messages({
@@ -79,10 +58,7 @@ class GuruValidation {
         .messages({
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN'
         }),
-      fotoProfile: Joi.string().uri().optional()
-        .messages({
-          'string.uri': 'Foto profile harus berupa URL yang valid'
-        }),
+      fotoProfile: Joi.any().optional(),
       keahlian: Joi.string().optional(),
       pendidikanTerakhir: Joi.string().optional(),
       noRekening: Joi.string().pattern(/^[0-9]+$/).optional()
@@ -95,7 +71,8 @@ class GuruValidation {
           'number.base': 'Tarif per jam harus berupa angka',
           'number.positive': 'Tarif per jam harus lebih dari 0'
         }),
-
+      suratKontrak: Joi.any().optional()
+       
     });
   }
 

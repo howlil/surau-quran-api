@@ -61,7 +61,7 @@ class PrismaUtils {
       
       return {
         data: filteredData,
-        meta: {
+        pagination: {
           total,
           limit,
           page,

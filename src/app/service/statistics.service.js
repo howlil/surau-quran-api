@@ -111,45 +111,81 @@ class StatisticsService {
             });
 
             // Get payroll data
+            const startYear = new Date(parsedStartDate).getFullYear();
+            const startMonth = new Date(parsedStartDate).getMonth() + 1;
+            const endYear = new Date(parsedEndDate).getFullYear();
+            const endMonth = new Date(parsedEndDate).getMonth() + 1;
+
             const payrollData = await prisma.payroll.findMany({
                 where: {
                     status: 'SELESAI',
-                    periodeMulai: {
-                        gte: parsedStartDate
-                    },
-                    periodeSelesai: {
-                        lte: parsedEndDate
-                    }
+                    OR: [
+                        {
+                            // Same year
+                            AND: [
+                                { tahun: startYear },
+                                { tahun: endYear },
+                                {
+                                    bulan: {
+                                        gte: startMonth.toString().padStart(2, '0'),
+                                        lte: endMonth.toString().padStart(2, '0')
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            // Different years
+                            OR: [
+                                {
+                                    AND: [
+                                        { tahun: startYear },
+                                        { bulan: { gte: startMonth.toString().padStart(2, '0') } }
+                                    ]
+                                },
+                                {
+                                    AND: [
+                                        { tahun: endYear },
+                                        { bulan: { lte: endMonth.toString().padStart(2, '0') } }
+                                    ]
+                                },
+                                {
+                                    AND: [
+                                        { tahun: { gt: startYear } },
+                                        { tahun: { lt: endYear } }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
                 },
                 select: {
                     totalGaji: true,
-                    periodeMulai: true,
-                    periodeSelesai: true
+                    bulan: true,
+                    tahun: true
                 }
             });
 
             // Group and format the data by the specified grouping (month or year)
             const incomeData = this.groupFinancialDataByPeriod([...pendaftaranPayments, ...sppPayments], 'tanggalPembayaran', groupBy);
-            const payrollData2 = this.groupFinancialDataByPeriod(payrollData, 'periodeMulai', groupBy);
+            const payrollData2 = this.groupPayrollDataByPeriod(payrollData, groupBy);
 
             return {
                 income: {
                     data: incomeData,
-                    total: Object.values(incomeData).reduce((sum, item) => sum + item.value, 0)
+                    total: Object.values(incomeData).reduce((sum, item) => sum + Number(item.value), 0)
                 },
                 payroll: {
                     data: payrollData2,
-                    total: Object.values(payrollData2).reduce((sum, item) => sum + item.value, 0)
+                    total: Object.values(payrollData2).reduce((sum, item) => sum + Number(item.value), 0)
                 },
                 profit: {
                     data: Object.keys(incomeData).map(period => ({
                         period,
-                        value: (incomeData[period]?.value || 0) - (payrollData2[period]?.value || 0)
+                        value: (Number(incomeData[period]?.value) || 0) - (Number(payrollData2[period]?.value) || 0)
                     })),
-                    total: Object.values(incomeData).reduce((sum, item) => sum + item.value, 0) -
-                        Object.values(payrollData2).reduce((sum, item) => sum + item.value, 0)
-                },
-
+                    total: Object.values(incomeData).reduce((sum, item) => sum + Number(item.value), 0) -
+                        Object.values(payrollData2).reduce((sum, item) => sum + Number(item.value), 0)
+                }
             };
         } catch (error) {
             logger.error('Error getting financial statistics:', error);
@@ -168,7 +204,7 @@ class StatisticsService {
                         select: {
                             _count: {
                                 select: {
-                                    jadwalSiswa: true
+                                    programSiswa: true
                                 }
                             }
                         }
@@ -179,7 +215,7 @@ class StatisticsService {
             // Transform kelas data for visualization
             const kelasCounts = kelasDistribution.map(kelas => {
                 const studentCount = kelas.kelasProgram.reduce(
-                    (sum, kelasProgram) => sum + kelasProgram._count.jadwalSiswa, 0
+                    (sum, kelasProgram) => sum + kelasProgram._count.programSiswa, 0
                 );
 
                 return {
@@ -235,7 +271,7 @@ class StatisticsService {
                     },
                     _count: {
                         select: {
-                            jadwalSiswa: true
+                            programSiswa: true
                         }
                     }
                 },
@@ -252,8 +288,19 @@ class StatisticsService {
                 class: item.kelas?.namaKelas || 'Tidak ada kelas',
                 program: item.program.namaProgram,
                 time: `${item.jamMengajar.jamMulai} - ${item.jamMengajar.jamSelesai}`,
-                studentCount: item._count.jadwalSiswa
+                studentCount: item._count.programSiswa
             }));
+
+            // Calculate most popular based on actual counts
+            const mostPopularClass = kelasCounts.length > 0
+                ? kelasCounts.reduce((prev, current) =>
+                    (prev.studentCount > current.studentCount) ? prev : current)
+                : { name: 'Tidak ada kelas', studentCount: 0 };
+
+            const mostPopularProgram = programCounts.length > 0
+                ? programCounts.reduce((prev, current) =>
+                    (prev.studentCount > current.studentCount) ? prev : current)
+                : { name: 'Tidak ada program', studentCount: 0 };
 
             return {
                 byClass: kelasCounts,
@@ -262,10 +309,8 @@ class StatisticsService {
                 summary: {
                     totalClasses: kelasCounts.length,
                     totalPrograms: programCounts.length,
-                    mostPopularClass: kelasCounts.reduce((prev, current) =>
-                        (prev.studentCount > current.studentCount) ? prev : current, { studentCount: 0 }),
-                    mostPopularProgram: programCounts.reduce((prev, current) =>
-                        (prev.studentCount > current.studentCount) ? prev : current, { studentCount: 0 })
+                    mostPopularClass,
+                    mostPopularProgram
                 }
             };
         } catch (error) {
@@ -310,6 +355,23 @@ class StatisticsService {
 
             result[period].value += Number(item.jumlahTagihan || item.totalGaji || 0);
             result[period].count += 1;
+        });
+
+        return result;
+    }
+
+    groupPayrollDataByPeriod(data, groupBy) {
+        const result = {};
+
+        data.forEach(item => {
+            const period = groupBy === 'month'
+                ? `${item.tahun}-${item.bulan.padStart(2, '0')}`
+                : item.tahun.toString();
+
+            if (!result[period]) {
+                result[period] = { period, value: 0 };
+            }
+            result[period].value += Number(item.totalGaji);
         });
 
         return result;

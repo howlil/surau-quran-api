@@ -40,4 +40,14 @@ router.delete('/v1/admins/:id',
   authController.deleteAdmin
 );
 
+router.post('/v1/forgot-password',
+  validationMiddleware.validateBody(authValidation.forgotPassword()),
+  authController.forgotPassword
+);
+
+router.post('/v1/reset-password',
+  validationMiddleware.validateBody(authValidation.resetPassword()),
+  authController.resetPassword
+);
+
 module.exports = router;

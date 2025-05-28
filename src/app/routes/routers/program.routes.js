@@ -29,7 +29,6 @@ router.delete(
 );
 
 
-// TODO : untuk program gaperlu pagination
 router.get(
     '/v1/program',
     ProgramController.getAll

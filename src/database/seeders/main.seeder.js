@@ -26,86 +26,104 @@ class MainSeeder {
         try {
             console.log('🌱 Starting database seeding...');
 
-            // Create or find predefined users
-            console.log('Creating users and profiles...');
-
-            // Find or create admin user
-            let adminUser = await prisma.user.findUnique({
-                where: { email: 'example@admin.com' }
-            });
-
-            if (!adminUser) {
-                const adminData = await UserFactory.createAdmin();
-                adminUser = await prisma.user.create({
-                    data: adminData
-                });
-
-                await prisma.admin.create({
-                    data: {
-                        ...AdminFactory.create(),
-                        userId: adminUser.id
+            // Create default users
+            console.log('Creating default users...');
+            const defaultUsers = [
+                {
+                    email: 'example@admin.com',
+                    role: 'ADMIN',
+                    profile: {
+                        nama: 'Super Admin'
                     }
-                });
-            }
-
-            // Find or create guru user
-            let guruUser = await prisma.user.findUnique({
-                where: { email: 'example@guru.com' }
-            });
-
-            if (!guruUser) {
-                const guruData = await UserFactory.createGuru();
-                guruUser = await prisma.user.create({
-                    data: guruData
-                });
-
-                await prisma.guru.create({
-                    data: {
-                        ...GuruFactory.create(),
-                        userId: guruUser.id
+                },
+                {
+                    email: 'example@guru.com',
+                    role: 'GURU',
+                    profile: {
+                        nama: 'Ustadz Example',
+                        noWhatsapp: '081234567890',
+                        alamat: 'Jl. Contoh No. 1',
+                        jenisKelamin: 'LAKI_LAKI',
+                        keahlian: 'Tahfidz',
+                        pendidikanTerakhir: 'S1',
+                        noRekening: '1234567890',
+                        namaBank: 'BSI',
+                        tarifPerJam: 100000,
+                        nip: '000001'
                     }
-                });
-            }
-
-            // Find or create siswa user
-            let siswaUser = await prisma.user.findUnique({
-                where: { email: 'example@siswa.com' }
-            });
-
-            if (!siswaUser) {
-                const siswaData = await UserFactory.createSiswa();
-                siswaUser = await prisma.user.create({
-                    data: siswaData
-                });
-
-                await prisma.siswa.create({
-                    data: {
-                        ...SiswaFactory.create(),
-                        userId: siswaUser.id
+                },
+                {
+                    email: 'example@siswa.com',
+                    role: 'SISWA',
+                    profile: {
+                        nis: '000001',
+                        namaMurid: 'Siswa Example',
+                        namaPanggilan: 'Example',
+                        tanggalLahir: '2000-01-01',
+                        jenisKelamin: 'LAKI_LAKI',
+                        alamat: 'Jl. Contoh No. 2',
+                        strataPendidikan: 'SMA',
+                        kelasSekolah: '12',
+                        namaSekolah: 'SMA Example',
+                        namaOrangTua: 'Orang Tua Example',
+                        namaPenjemput: 'Penjemput Example',
+                        noWhatsapp: '081234567891',
+                        isRegistered: true
                     }
-                });
-            }
-
-            // Create additional random users and their profiles
-            const adminUsers = [adminUser.id];
-            const guruUsers = [guruUser.id];
-            const siswaUsers = [siswaUser.id];
-
-            // Create additional admins
-            console.log('Creating additional admin users...');
-            for (let i = 0; i < 9; i++) {
-                const randomEmail = `admin_${Math.random().toString(36).substring(7)}@example.com`;
-
-                // Skip if email already exists
-                const existingUser = await prisma.user.findUnique({
-                    where: { email: randomEmail }
-                });
-
-                if (existingUser) {
-                    adminUsers.push(existingUser.id);
-                    continue;
                 }
+            ];
 
+            const adminUsers = [];
+            const guruUsers = [];
+            const siswaUsers = [];
+
+            for (const defaultUser of defaultUsers) {
+                const existingUser = await prisma.user.findUnique({
+                    where: { email: defaultUser.email }
+                });
+
+                if (!existingUser) {
+                    const userData = await UserFactory.createRandomUser(defaultUser.role);
+                    userData.email = defaultUser.email;
+
+                    const user = await prisma.user.create({
+                        data: userData
+                    });
+
+                    if (defaultUser.role === 'ADMIN') {
+                        await prisma.admin.create({
+                            data: {
+                                ...defaultUser.profile,
+                                userId: user.id
+                            }
+                        });
+                        adminUsers.push(user.id);
+                    } else if (defaultUser.role === 'GURU') {
+                        await prisma.guru.create({
+                            data: {
+                                ...defaultUser.profile,
+                                userId: user.id
+                            }
+                        });
+                        guruUsers.push(user.id);
+                    } else if (defaultUser.role === 'SISWA') {
+                        await prisma.siswa.create({
+                            data: {
+                                ...defaultUser.profile,
+                                userId: user.id
+                            }
+                        });
+                        siswaUsers.push(user.id);
+                    }
+                } else {
+                    if (defaultUser.role === 'ADMIN') adminUsers.push(existingUser.id);
+                    if (defaultUser.role === 'GURU') guruUsers.push(existingUser.id);
+                    if (defaultUser.role === 'SISWA') siswaUsers.push(existingUser.id);
+                }
+            }
+
+       
+            for (let i = 0; i < 20; i++) {
                 const userData = await UserFactory.createRandomUser('ADMIN');
                 const randomUser = await prisma.user.create({
                     data: userData
@@ -113,7 +131,7 @@ class MainSeeder {
 
                 await prisma.admin.create({
                     data: {
-                        ...AdminFactory.create(),
+                        nama: `Admin ${i + 1}`,
                         userId: randomUser.id
                     }
                 });
@@ -121,29 +139,25 @@ class MainSeeder {
                 adminUsers.push(randomUser.id);
             }
 
-            // Create additional guru users
-            console.log('Creating additional guru users...');
-            for (let i = 0; i < 9; i++) {
-                const randomEmail = `guru_${Math.random().toString(36).substring(7)}@example.com`;
-
-                // Skip if email already exists
-                const existingUser = await prisma.user.findUnique({
-                    where: { email: randomEmail }
-                });
-
-                if (existingUser) {
-                    guruUsers.push(existingUser.id);
-                    continue;
-                }
-
+            // Create 20 additional guru users
+            for (let i = 0; i < 20; i++) {
                 const userData = await UserFactory.createRandomUser('GURU');
                 const randomUser = await prisma.user.create({
                     data: userData
                 });
 
-                const guru = await prisma.guru.create({
+                await prisma.guru.create({
                     data: {
-                        ...GuruFactory.create(),
+                        nip: `${(i + 2).toString().padStart(6, '0')}`,
+                        nama: `Ustadz/ah ${i + 1}`,
+                        noWhatsapp: `08${Math.floor(Math.random() * 10000000000).toString().padStart(10, '0')}`,
+                        alamat: `Jl. Guru No. ${i + 1}`,
+                        jenisKelamin: i % 2 === 0 ? 'LAKI_LAKI' : 'PEREMPUAN',
+                        keahlian: ['Tahfidz', 'Tajwid', 'Qiraat'][i % 3],
+                        pendidikanTerakhir: ['S1', 'S2', 'S3'][i % 3],
+                        noRekening: Math.floor(Math.random() * 1000000000000).toString(),
+                        namaBank: ['BCA', 'Mandiri', 'BNI', 'BSI'][i % 4],
+                        tarifPerJam: 50000 + (i * 5000),
                         userId: randomUser.id
                     }
                 });
@@ -151,29 +165,29 @@ class MainSeeder {
                 guruUsers.push(randomUser.id);
             }
 
-            // Create additional siswa users
+            // Create 20 additional siswa users
             console.log('Creating additional siswa users...');
-            for (let i = 0; i < 9; i++) {
-                const randomEmail = `siswa_${Math.random().toString(36).substring(7)}@example.com`;
-
-                // Skip if email already exists
-                const existingUser = await prisma.user.findUnique({
-                    where: { email: randomEmail }
-                });
-
-                if (existingUser) {
-                    siswaUsers.push(existingUser.id);
-                    continue;
-                }
-
+            for (let i = 0; i < 20; i++) {
                 const userData = await UserFactory.createRandomUser('SISWA');
                 const randomUser = await prisma.user.create({
                     data: userData
                 });
 
-                const siswa = await prisma.siswa.create({
+                await prisma.siswa.create({
                     data: {
-                        ...SiswaFactory.create(),
+                        nis: `${(i + 2).toString().padStart(6, '0')}`,
+                        namaMurid: `Siswa ${i + 1}`,
+                        namaPanggilan: `S${i + 1}`,
+                        tanggalLahir: `${2005 + (i % 10)}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
+                        jenisKelamin: i % 2 === 0 ? 'LAKI_LAKI' : 'PEREMPUAN',
+                        alamat: `Jl. Siswa No. ${i + 1}`,
+                        strataPendidikan: ['SD', 'SMP', 'SMA'][i % 3],
+                        kelasSekolah: `${(i % 6) + 1}`,
+                        namaSekolah: `Sekolah ${i + 1}`,
+                        namaOrangTua: `Orang Tua Siswa ${i + 1}`,
+                        namaPenjemput: `Penjemput Siswa ${i + 1}`,
+                        noWhatsapp: `08${Math.floor(Math.random() * 10000000000).toString().padStart(10, '0')}`,
+                        isRegistered: true,
                         userId: randomUser.id
                     }
                 });
@@ -181,7 +195,15 @@ class MainSeeder {
                 siswaUsers.push(randomUser.id);
             }
 
+            // Continue with other seeding operations
+            console.log(`✅ User seeding completed! Created users:
+            - ${adminUsers.length} admins (including default admin@example.com)
+            - ${guruUsers.length} gurus (including default guru@example.com)
+            - ${siswaUsers.length} siswas (including default siswa@example.com)`);
+
+            // Create kelas, program, and jam mengajar
             console.log('Creating kelas, program, and jam mengajar...');
+
             // Create 10 Kelas
             const kelasIds = [];
             for (let i = 0; i < 10; i++) {

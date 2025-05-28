@@ -4,10 +4,11 @@ const absensiController = require('../../controller/absensi.controller');
 const authMiddleware = require('../../middleware/auth.middleware');
 const validationMiddleware = require('../../middleware/validation.middleware');
 const absensiValidation = require('../../validation/absensi.validation');
+const {
+    uploadSuratIzinMiddleware,
+} = require('../../middleware/upload.middleware');
 
-// Admin routes
 
-// TODO: FILTER TANGGAL MASIH GAJALAN
 router.get('/v1/absensi/siswa',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
@@ -15,7 +16,6 @@ router.get('/v1/absensi/siswa',
     absensiController.getAbsensiSiswaForAdmin
 );
 
-// Redesigned API for teacher attendance grouped by date
 router.get('/v1/absensi/guru',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
@@ -26,6 +26,7 @@ router.get('/v1/absensi/guru',
 router.put('/v1/absensi/guru/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
+    uploadSuratIzinMiddleware,
     validationMiddleware.validateBody(absensiValidation.updateAbsensiGuru()),
     absensiController.updateAbsensiGuru
 );
@@ -35,6 +36,13 @@ router.patch('/v1/absensi/siswa/:siswaId',
     authMiddleware.authorize(['GURU']),
     validationMiddleware.validateBody(absensiValidation.updateAbsensiSiswa()),
     absensiController.updateAbsensiSiswa
+);
+
+router.get('/v1/guru/absensi/siswa',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateQuery(absensiValidation.tanggal()),
+    absensiController.getAbsensiSiswaForGuru
 );
 
 module.exports = router; 

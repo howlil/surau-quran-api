@@ -4,7 +4,7 @@ class EmailUtils {
   static async sendWelcomeEmail(userData) {
     try {
       const { email, namaMurid, password, nis } = userData;
-      
+
       const emailContent = this.generateWelcomeEmailContent({
         namaMurid,
         email,
@@ -30,7 +30,7 @@ class EmailUtils {
   static async sendPaymentReminderEmail(paymentData) {
     try {
       const { email, namaMurid, invoiceUrl, expireDate, amount } = paymentData;
-      
+
       const emailContent = this.generatePaymentReminderContent({
         namaMurid,
         invoiceUrl,
@@ -56,7 +56,7 @@ class EmailUtils {
   static async sendPaymentSuccessEmail(paymentData) {
     try {
       const { email, namaMurid, amount, paidAt } = paymentData;
-      
+
       const emailContent = this.generatePaymentSuccessContent({
         namaMurid,
         amount,
@@ -191,7 +191,7 @@ Tim Surau Quran
   static async sendSppReminderEmail(sppData) {
     try {
       const { email, namaMurid, periode, amount, dueDate } = sppData;
-      
+
       const emailContent = this.generateSppReminderContent({
         namaMurid,
         periode,
@@ -247,7 +247,54 @@ Tim Surau Quran
     `.trim();
   }
 
- 
+  static async sendPasswordResetEmail(resetData) {
+    try {
+      const { email, resetLink } = resetData;
+
+      const emailContent = this.generatePasswordResetContent({
+        email,
+        resetLink
+      });
+
+      logger.info(`Password reset email content generated for ${email}:`);
+      logger.info(emailContent);
+
+      return {
+        success: true,
+        recipient: email,
+        subject: 'Reset Password - Surau Quran',
+        content: emailContent
+      };
+    } catch (error) {
+      logger.error('Error sending password reset email:', error);
+      throw error;
+    }
+  }
+
+  static generatePasswordResetContent({ email, resetLink }) {
+    return `
+=== RESET PASSWORD - SURAU QURAN ===
+
+Assalamu'alaikum,
+
+Kami menerima permintaan untuk mereset password akun Anda.
+
+Untuk mereset password Anda, silakan klik link berikut:
+${resetLink}
+
+PENTING:
+- Link ini hanya berlaku selama 30 menit
+- Jika Anda tidak meminta reset password, abaikan email ini
+- Jangan bagikan link ini kepada siapapun
+
+Jika ada pertanyaan, silakan hubungi admin kami.
+
+Barakallahu fiikum,
+Tim Surau Quran
+
+=== SURAU QURAN MANAGEMENT SYSTEM ===
+    `.trim();
+  }
 }
 
 module.exports = EmailUtils;

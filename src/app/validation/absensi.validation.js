@@ -35,28 +35,54 @@ class AbsensiValidation {
                 }),
             jamMasuk: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .required()
+                .when('statusKehadiran', {
+                    is: 'HADIR',
+                    then: Joi.required(),
+                    otherwise: Joi.optional()
+                })
                 .messages({
-                    'string.empty': 'Jam mulai tidak boleh kosong',
-                    'any.required': 'Jam mulai wajib diisi',
-                    'string.pattern.base': 'Format jam mulai harus HH:MM (24 jam)'
+                    'string.empty': 'Jam masuk tidak boleh kosong',
+                    'any.required': 'Jam masuk wajib diisi untuk status HADIR',
+                    'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
                 }),
             jamKeluar: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .required()
+                .when('statusKehadiran', {
+                    is: 'HADIR',
+                    then: Joi.required(),
+                    otherwise: Joi.optional()
+                })
                 .messages({
-                    'string.empty': 'Jam mulai tidak boleh kosong',
-                    'any.required': 'Jam mulai wajib diisi',
-                    'string.pattern.base': 'Format jam mulai harus HH:MM (24 jam)'
+                    'string.empty': 'Jam keluar tidak boleh kosong',
+                    'any.required': 'Jam keluar wajib diisi untuk status HADIR',
+                    'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
                 }),
             keterangan: Joi.string().optional()
                 .messages({
                     'string.base': 'Keterangan harus berupa teks'
                 }),
-            suratIzin: Joi.string().optional()
+            suratIzin: Joi.when('statusKehadiran', {
+                is: Joi.valid('IZIN', 'SAKIT'),
+                then: Joi.string().required(),
+                otherwise: Joi.forbidden()
+                    .messages({
+                        'any.unknown': 'Surat izin tidak diperlukan untuk status HADIR atau TIDAK_HADIR'
+                    })
+            })
                 .messages({
-                    'string.base': 'Surat izin harus berupa teks (URL)'
+                    'any.required': 'Surat izin wajib diisi untuk status IZIN atau SAKIT'
                 }),
+            sks: Joi.number().integer().min(1).when('statusKehadiran', {
+                is: 'HADIR',
+                then: Joi.required(),
+                otherwise: Joi.optional()
+            })
+                .messages({
+                    'number.base': 'SKS harus berupa angka',
+                    'number.integer': 'SKS harus berupa bilangan bulat',
+                    'number.min': 'SKS minimal 1',
+                    'any.required': 'SKS wajib diisi untuk status HADIR'
+                })
         });
     }
 

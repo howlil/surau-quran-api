@@ -1,14 +1,137 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { UnauthorizedError, ConflictError, NotFoundError, ForbiddenError } = require('../../lib/http/errors.http');
+const { UnauthorizedError, ConflictError, NotFoundError, ForbiddenError, BadRequestError, handlePrismaError } = require('../../lib/http/error.handler.http');
 const { logger } = require('../../lib/config/logger.config');
 const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
+const EmailUtils = require('../../lib/utils/email.utils');
+const crypto = require('crypto');
 
 class AuthService {
-    async login(email, password) {
+    async #generateResetToken(userId) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+        try {
+            await prisma.$transaction([
+                prisma.passwordResetToken.deleteMany({
+                    where: { userId }
+                }),
+                prisma.passwordResetToken.create({
+                    data: {
+                        userId,
+                        token,
+                        expiresAt
+                    }
+                })
+            ]);
+
+            return token;
+        } catch (error) {
+            logger.error('Error generating reset token:', error);
+            throw handlePrismaError(error);
+        }
+    }
+
+    async #sendPasswordResetEmail(email, token) {
+        try {
+            const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+            await EmailUtils.sendPasswordResetEmail({ email, resetLink });
+        } catch (error) {
+            logger.error('Error sending reset email:', error);
+            throw new Error('Gagal mengirim email reset password');
+        }
+    }
+
+    async requestPasswordReset(email) {
+        if (!email || typeof email !== 'string') {
+            throw new BadRequestError('Email harus diisi');
+        }
+
+        const cleanEmail = email.toLowerCase().trim();
+        if (!cleanEmail) {
+            throw new BadRequestError('Email tidak boleh kosong');
+        }
+
         try {
             const user = await prisma.user.findUnique({
-                where: { email }
+                where: { email: cleanEmail },
+                select: { id: true, email: true }
+            });
+
+            if (!user) {
+                return {
+                    success: true,
+                    message: 'Jika email terdaftar, instruksi reset password akan dikirim ke email Anda'
+                };
+            }
+
+            const resetToken = await this.#generateResetToken(user.id);
+            await this.#sendPasswordResetEmail(user.email, resetToken);
+
+            return {
+                success: true,
+                message: 'Jika email terdaftar, instruksi reset password akan dikirim ke email Anda'
+            };
+        } catch (error) {
+            throw handlePrismaError(error);
+        }
+    }
+
+    async resetPassword(token, newPassword) {
+        if (!token || !newPassword) {
+            throw new BadRequestError('Token dan password baru harus diisi');
+        }
+
+        try {
+            const now = new Date();
+
+            const resetToken = await prisma.passwordResetToken.findFirst({
+                where: {
+                    token,
+                    expiresAt: { gt: now }
+                },
+                select: {
+                    id: true,
+                    userId: true
+                }
+            });
+
+            if (!resetToken) {
+                throw new UnauthorizedError('Token reset password tidak valid atau sudah kadaluarsa');
+            }
+
+            const hashedPassword = await PasswordUtils.hash(newPassword);
+
+            await prisma.$transaction([
+                prisma.user.update({
+                    where: { id: resetToken.userId },
+                    data: { password: hashedPassword }
+                }),
+                prisma.passwordResetToken.deleteMany({
+                    where: { userId: resetToken.userId }
+                }),
+                prisma.token.deleteMany({
+                    where: { userId: resetToken.userId }
+                })
+            ]);
+
+            return {
+                success: true,
+                message: 'Password berhasil direset'
+            };
+        } catch (error) {
+            throw handlePrismaError(error);
+        }
+    }
+
+    async login(email, password) {
+        if (!email || !password) {
+            throw new BadRequestError('Email dan password harus diisi');
+        }
+
+        try {
+            const user = await prisma.user.findUnique({
+                where: { email: email.toLowerCase().trim() }
             });
 
             if (!user) {
@@ -23,10 +146,17 @@ class AuthService {
 
             const token = await TokenUtils.generateToken(user.id);
 
-            return { token, user: { id: user.id, email: user.email, role: user.role } };
+            return {
+                success: true,
+                token,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role
+                }
+            };
         } catch (error) {
-            logger.error('Login error:', error);
-            throw error;
+            throw handlePrismaError(error);
         }
     }
 
@@ -86,7 +216,7 @@ class AuthService {
             };
         } catch (error) {
             logger.error('Create admin error:', error);
-            throw error;
+            throw handlePrismaError(error);
         }
     }
 
@@ -116,15 +246,12 @@ class AuthService {
                 id: admin.id,
                 nama: admin.nama,
                 email: admin.user.email,
-
             }));
         } catch (error) {
             logger.error('Get admins error:', error);
-            throw error;
+            throw handlePrismaError(error);
         }
     }
-
- 
 
     async updateAdmin(adminId, updateData, requestUserId) {
         try {
@@ -200,7 +327,7 @@ class AuthService {
             };
         } catch (error) {
             logger.error('Update admin error:', error);
-            throw error;
+            throw handlePrismaError(error);
         }
     }
 
@@ -238,11 +365,9 @@ class AuthService {
             return true;
         } catch (error) {
             logger.error('Delete admin error:', error);
-            throw error;
+            throw handlePrismaError(error);
         }
     }
-
-    // TODO : lupa password send ke email link passwordnya nanti redirect ke frontend
 }
 
 module.exports = new AuthService();

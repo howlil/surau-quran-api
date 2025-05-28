@@ -1,47 +1,60 @@
-const { ValidationError } = require('../../lib/http/errors.http');
+const { BadRequestError } = require('../../lib/http/errors.http');
 
 class ValidationMiddleware {
 
-  static validateBody(validator) {
+  static validateBody(schema) {
     return (req, res, next) => {
       try {
-        req.body = validator.validate(req.body);
+        const { error, value } = schema.validate(req.body);
+        if (error) {
+          const errors = error.details.map(detail => ({
+            field: detail.path[0],
+            message: detail.message
+          }));
+          throw new BadRequestError('Validation failed', errors);
+        }
+        req.validatedBody = value;
         next();
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        next(err);
       }
     };
   }
 
-  static validateQuery(validator) {
+  static validateQuery(schema) {
     return (req, res, next) => {
       try {
-        const { error, value } = validator.validate(req.query, { abortEarly: false });
-
+        const { error, value } = schema.validate(req.query);
         if (error) {
-          const errorDetails = error.details.map(detail => ({
-            message: detail.message,
-            path: detail.path
+          const errors = error.details.map(detail => ({
+            field: detail.path[0],
+            message: detail.message
           }));
-
-          return next(new ValidationError('Validation error', errorDetails));
+          throw new BadRequestError('Validation failed', errors);
         }
-
         req.validatedQuery = value;
         next();
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        next(err);
       }
     };
   }
 
-  static validateParams(validator) {
+  static validateParams(schema) {
     return (req, res, next) => {
       try {
-        req.params = validator.validate(req.params);
+        const { error, value } = schema.validate(req.params);
+        if (error) {
+          const errors = error.details.map(detail => ({
+            field: detail.path[0],
+            message: detail.message
+          }));
+          throw new BadRequestError('Validation failed', errors);
+        }
+        req.validatedParams = value;
         next();
-      } catch (error) {
-        next(error);
+      } catch (err) {
+        next(err);
       }
     };
   }
@@ -49,16 +62,46 @@ class ValidationMiddleware {
   static validate(validators = {}) {
     return (req, res, next) => {
       try {
+        const errors = [];
+
         if (validators.body) {
-          req.body = validators.body.validate(req.body);
+          const { error, value } = validators.body.validate(req.body);
+          if (error) {
+            errors.push(...error.details.map(detail => ({
+              field: detail.path[0],
+              message: detail.message
+            })));
+          } else {
+            req.validatedBody = value;
+          }
         }
 
         if (validators.query) {
-          req.validatedQuery = validators.query.validate(req.query);
+          const { error, value } = validators.query.validate(req.query);
+          if (error) {
+            errors.push(...error.details.map(detail => ({
+              field: detail.path[0],
+              message: detail.message
+            })));
+          } else {
+            req.validatedQuery = value;
+          }
         }
 
         if (validators.params) {
-          req.params = validators.params.validate(req.params);
+          const { error, value } = validators.params.validate(req.params);
+          if (error) {
+            errors.push(...error.details.map(detail => ({
+              field: detail.path[0],
+              message: detail.message
+            })));
+          } else {
+            req.validatedParams = value;
+          }
+        }
+
+        if (errors.length > 0) {
+          throw new BadRequestError('Validation failed', errors);
         }
 
         next();

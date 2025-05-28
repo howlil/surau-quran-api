@@ -25,8 +25,7 @@ class ProgramController {
   });
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
-    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'namaProgram']);
-    const result = await programService.getAll(filters);
+    const result = await programService.getAll();
     return Http.Response.success(res, result);
   });
 

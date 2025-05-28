@@ -1,16 +1,13 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError } = require('../../lib/http/errors.http');
+const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 
 class AbsensiService {
-    // Get student attendance for admin (filtered by date) - redesigned API
 
-    // TODO : masih ada bug tanggal dan logicnya lihat lagi
     async getAbsensiSiswaForAdmin(filters = {}) {
         try {
             const { tanggal } = filters;
 
-            // Get all kelasProgram entries that have attendance records for the given date
             const kelasPrograms = await prisma.kelasProgram.findMany({
                 where: {
                     absensiSiswa: {
@@ -87,7 +84,6 @@ class AbsensiService {
         }
     }
 
-    // TODO : samakana aha formatany dengan yg siswa 
     async getAbsensiGuruByDate(filters = {}) {
         try {
             const { tanggal } = filters;
@@ -97,7 +93,6 @@ class AbsensiService {
                 where.tanggal = tanggal;
             }
 
-            // Get all teacher attendance records filtered by date if provided
             const absensiRecords = await prisma.absensiGuru.findMany({
                 where,
                 include: {
@@ -119,10 +114,8 @@ class AbsensiService {
 
             absensiRecords.forEach(record => {
                 if (!groupedByDate[record.tanggal]) {
-                    // Get day of week in Indonesian
                     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
                     const dateParts = record.tanggal.split('-');
-                    // Create date from YYYY-MM-DD format
                     const date = new Date(
                         parseInt(dateParts[0]), // Year
                         parseInt(dateParts[1]) - 1, // Month (0-indexed)
@@ -162,7 +155,6 @@ class AbsensiService {
             throw error;
         }
     }
-    // Helper to get description for attendance status
     getKehadiranDescription(status) {
         switch (status) {
             case 'HADIR':
@@ -178,7 +170,6 @@ class AbsensiService {
         }
     }
 
-    // Update teacher attendance
     async updateAbsensiGuru(id, data) {
         try {
             const absensi = await prisma.absensiGuru.findUnique({
@@ -248,17 +239,23 @@ class AbsensiService {
         }
     }
 
-    // TODO : absensi harus ngecek guru id 
-    async updateAbsensiSiswa(siswaId, data) {
+    async updateAbsensiSiswa(siswaId, guruId, data) {
         try {
+            // Get existing absensi
             const absensi = await prisma.absensiSiswa.findFirst({
                 where: {
                     siswaId,
+                    kelasProgram: {
+                        guruId
+                    }
+                },
+                include: {
+                    kelasProgram: true
                 }
             });
 
             if (!absensi) {
-                throw new NotFoundError(`Absensi siswa tidak ditemukan`);
+                throw new NotFoundError('Absensi siswa tidak ditemukan atau guru tidak berwenang mengubah absensi ini');
             }
 
             logger.info(`Updating attendance for siswa ID: ${siswaId} ${data.value.statusKehadiran}`);
@@ -276,10 +273,8 @@ class AbsensiService {
                             nis: true
                         }
                     },
-
                 }
             });
-
 
             const formattedResponse = {
                 id: updated.id,
@@ -291,7 +286,88 @@ class AbsensiService {
 
             return formattedResponse;
         } catch (error) {
-            logger.error(`Error updating siswa attendance with ID ${id}:`, error);
+            logger.error(`Error updating siswa attendance:`, error);
+            throw error;
+        }
+    }
+
+    async getAbsensiSiswaForGuru(guruId, filters = {}) {
+        try {
+            const { tanggal } = filters;
+
+            if (!tanggal) {
+                throw new BadRequestError('Tanggal wajib diisi');
+            }
+
+            const kelasPrograms = await prisma.kelasProgram.findMany({
+                where: {
+                    guruId,
+                    absensiSiswa: {
+                        some: {
+                            tanggal
+                        }
+                    }
+                },
+                include: {
+                    kelas: true,
+                    program: true,
+                    jamMengajar: true,
+                    absensiSiswa: {
+                        where: {
+                            tanggal
+                        },
+                        include: {
+                            siswa: {
+                                select: {
+                                    namaMurid: true,
+                                    nis: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            // Group by kelasId
+            const kelasMap = new Map();
+
+            kelasPrograms.forEach(kelasProgram => {
+                const kelasId = kelasProgram.kelasId;
+                const namaKelas = kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas';
+
+                if (!kelasMap.has(kelasId)) {
+                    kelasMap.set(kelasId, {
+                        kelasId,
+                        namaKelas,
+                        tanggal,
+                        program: []
+                    });
+                }
+
+                const kelasEntry = kelasMap.get(kelasId);
+
+                const absensiData = kelasProgram.absensiSiswa.map(record => ({
+                    siswaId: record.siswaId,
+                    namaSiswa: record.siswa.namaMurid,
+                    nis: record.siswa.nis,
+                    status: record.statusKehadiran
+                }));
+
+                kelasEntry.program.push({
+                    programId: kelasProgram.programId,
+                    namaProgram: kelasProgram.program.namaProgram,
+                    hari: kelasProgram.hari,
+                    jamMengajarId: kelasProgram.jamMengajarId,
+                    jamMulai: kelasProgram.jamMengajar.jamMulai,
+                    jamSelesai: kelasProgram.jamMengajar.jamSelesai,
+                    absensi: absensiData
+                });
+            });
+
+            return Array.from(kelasMap.values());
+        } catch (error) {
+            logger.error('Error getting siswa attendance for guru:', error);
             throw error;
         }
     }

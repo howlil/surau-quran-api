@@ -784,7 +784,7 @@ class SiswaService {
         kelasSekolah,
         email,
         programId,
-        programStatus = 'AKTIF',
+        programStatus,
         jadwal = []
       } = data;
 

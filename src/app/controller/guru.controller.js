@@ -4,19 +4,38 @@ const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { prisma } = require('../../lib/config/prisma.config');
 const { NotFoundError } = require('../../lib/http/errors.http');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class GuruController {
   create = ErrorHandler.asyncHandler(async (req, res) => {
     const data = HttpRequest.getBodyParams(req);
+
+    if (req.files) {
+      if (req.files.fotoProfile && req.files.fotoProfile[0]) {
+        data.fotoProfile = req.files.fotoProfile[0].filename;
+      }
+      if (req.files.suratKontrak && req.files.suratKontrak[0]) {
+        data.suratKontrak = req.files.suratKontrak[0].filename;
+      }
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    data.baseUrl = baseUrl;
+
     const result = await guruService.create(data);
-    return Http.Response.created(res, result, 'Guru berhasil dibuat');
+    const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
+    return Http.Response.created(res, 'Guru berhasil dibuat');
   });
 
   update = ErrorHandler.asyncHandler(async (req, res) => {
     const { id } = HttpRequest.getUrlParams(req);
     const data = HttpRequest.getBodyParams(req);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    data.baseUrl = baseUrl;
+
     const result = await guruService.update(id, data);
-    return Http.Response.success(res, result, 'Guru berhasil diperbarui');
+    const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
+    return Http.Response.success(res, 'Guru berhasil diperbarui');
   });
 
   delete = ErrorHandler.asyncHandler(async (req, res) => {
@@ -29,17 +48,27 @@ class GuruController {
     const filters = HttpRequest.getQueryParams(req, [
       'page', 'limit'
     ]);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const result = await guruService.getAll(filters);
-    return Http.Response.success(res, result);
+
+    const transformedData = {
+      ...result,
+      data: FileUtils.transformGuruListFiles(result.data, baseUrl)
+    };
+
+    return Http.Response.success(res, transformedData);
   });
 
-  // Admin: Get all teachers with their schedules
   getAllWithSchedules = ErrorHandler.asyncHandler(async (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const result = await guruService.getAllGuruWithSchedules();
-    return Http.Response.success(res, result, 'Data guru dan jadwal berhasil diambil');
+    const transformedResult = result.map(guru => ({
+      ...guru,
+      fotoProfile: FileUtils.getImageUrl(baseUrl, guru.fotoProfile)
+    }));
+    return Http.Response.success(res, transformedResult, 'Data guru dan jadwal berhasil diambil');
   });
 
-  // Get all class programs with enrolled students
   getKelasProgramWithStudents = ErrorHandler.asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
@@ -47,7 +76,6 @@ class GuruController {
       where: { userId }
     });
 
-    // Check if guru exists
     if (!guru) {
       throw new NotFoundError('Profil guru tidak ditemukan');
     }
@@ -55,8 +83,6 @@ class GuruController {
     const result = await guruService.getKelasProgramWithStudents(guru.id);
     return Http.Response.success(res, result, 'Data kelas program dengan siswa berhasil diambil');
   });
-
-
 }
 
 module.exports = new GuruController();

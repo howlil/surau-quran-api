@@ -102,24 +102,18 @@ class JamMengajarService {
     }
   }
 
-  async getAll(filters = {}) {
+  async getAll() {
     try {
-      const { page = 1, limit = 10, jamMulai, jamSelesai } = filters;
-      
-      const where = {};
-      if (jamMulai) {
-        where.jamMulai = { contains: jamMulai };
-      }
-      if (jamSelesai) {
-        where.jamSelesai = { contains: jamSelesai };
-      }
-
-      return await PrismaUtils.paginate(prisma.jamMengajar, {
-        page,
-        limit,
-        where,
+      const jamMengajarList = await prisma.jamMengajar.findMany({
+        select: {
+          id: true,
+          jamMulai: true,
+          jamSelesai: true
+        },
         orderBy: { jamMulai: 'asc' }
       });
+
+      return jamMengajarList;
     } catch (error) {
       logger.error('Error getting all jamMengajar:', error);
       throw error;

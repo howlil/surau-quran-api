@@ -26,8 +26,7 @@ class KelasController {
 
 
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'namaKelas']);
-        const result = await kelasService.getAll(filters);
+        const result = await kelasService.getAll();
         return Http.Response.success(res, result);
     });
 

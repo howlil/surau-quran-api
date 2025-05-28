@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const { logger } = require('./src/lib/config/logger.config');
 const Http = require('./src/lib/http');
 const loggerMiddleware = require('./src/app/middleware/logger.middleware');
@@ -13,6 +14,7 @@ class Application {
   constructor() {
     this.app = express();
     this.port = process.env.PORT || 5000;
+    this.baseUrl = process.env.BASE_URL || `http://localhost:${this.port}`;
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -25,9 +27,16 @@ class Application {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(loggerMiddleware);
+
+    this.app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
   }
 
   setupRoutes() {
+    this.app.use((req, res, next) => {
+      req.baseUrl = this.baseUrl;
+      next();
+    });
+
     this.app.use('/api', routes);
 
     this.app.get('/', (req, res) => {

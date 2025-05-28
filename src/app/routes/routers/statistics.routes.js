@@ -5,7 +5,6 @@ const authMiddleware = require('../../middleware/auth.middleware');
 const statisticsController = require('../../controller/statistics.controller');
 const statisticsValidation = require('../../validation/statistics.validation');
 
-// Admin: Get student counts with date filtering
 router.get(
     '/v1/statistics/student-counts',
     authMiddleware.authenticate,
@@ -14,7 +13,6 @@ router.get(
     statisticsController.getStudentCounts
 );
 
-//TODO: masih error
 router.get(
     '/v1/statistics/financial',
     authMiddleware.authenticate,
@@ -23,7 +21,6 @@ router.get(
     statisticsController.getFinancialStatistics
 );
 
-// TODO : masih error
 router.get(
     '/v1/statistics/student-distribution',
     authMiddleware.authenticate,

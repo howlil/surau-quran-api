@@ -1,6 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, ForbiddenError } = require('../../lib/http/errors.http');
+const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const { id } = require('../validation/factory.validation');
@@ -10,7 +10,7 @@ class GuruService {
   //create guru 
   async create(data) {
     try {
-      const { email, password, ...guruData } = data;
+      const { email, baseUrl, ...guruData } = data;
 
       return await PrismaUtils.transaction(async (tx) => {
         const existingUser = await tx.user.findUnique({
@@ -22,7 +22,7 @@ class GuruService {
         }
 
         const NIP = Math.floor(Math.random() * 1000000);
-        const hashedPassword = await PasswordUtils.hash(password);
+        const hashedPassword = await PasswordUtils.hash("@Test123");
 
         const user = await tx.user.create({
           data: {
@@ -72,7 +72,7 @@ class GuruService {
         throw new NotFoundError(`Guru dengan ID ${id} tidak ditemukan`);
       }
 
-      const { email, password, ...guruData } = data;
+      const { email, password, baseUrl, ...guruData } = data;
 
       return await PrismaUtils.transaction(async (tx) => {
         if (email && email !== guru.user.email) {
@@ -165,7 +165,6 @@ class GuruService {
     }
   }
 
-  //admin
   async getAll(filters = {}) {
     try {
       const { page = 1, limit = 10 } = filters;
@@ -245,71 +244,71 @@ class GuruService {
   }
 
   async getKelasProgramWithStudents(guruId) {
-  try {
-    // Ambil data KelasProgram beserta relasinya dengan benar
-    const kelasPrograms = await prisma.kelasProgram.findMany({
-      where: { guruId: guruId },
-      select: {
-        id: true,
-        kelas: {
-          select: {
-            id: true,
-            namaKelas: true
-          }
-        },
-        program: {
-          select: {
-            id: true,
-            namaProgram: true
-          }
-        },
-        hari: true,
-        jamMengajar: {
-          select: {
-            id: true,
-            jamMulai: true,
-            jamSelesai: true
-          }
-        },
-        programSiswa: {
-          select: {
-            siswa: {
-              select: {
-                namaMurid: true,
-                nis: true
+    try {
+      // Ambil data KelasProgram beserta relasinya dengan benar
+      const kelasPrograms = await prisma.kelasProgram.findMany({
+        where: { guruId: guruId },
+        select: {
+          id: true,
+          kelas: {
+            select: {
+              id: true,
+              namaKelas: true
+            }
+          },
+          program: {
+            select: {
+              id: true,
+              namaProgram: true
+            }
+          },
+          hari: true,
+          jamMengajar: {
+            select: {
+              id: true,
+              jamMulai: true,
+              jamSelesai: true
+            }
+          },
+          programSiswa: {
+            select: {
+              siswa: {
+                select: {
+                  namaMurid: true,
+                  nis: true
+                }
               }
             }
           }
         }
-      }
-    });
+      });
 
-    return kelasPrograms.map(kp => ({
-      kelasProgramId: kp.id,
-      kelas: {
-        id: kp.kelas.id,
-        namaKelas: kp.kelas.namaKelas
-      },
-      program: {
-        id: kp.program.id,
-        namaProgram: kp.program.namaProgram
-      },
-      hari: kp.hari,
-      jamMengajar: {
-        id: kp.jamMengajar.id,
-        jamMulai: kp.jamMengajar.jamMulai,
-        jamSelesai: kp.jamMengajar.jamSelesai
-      },
-      siswa: kp.programSiswa.map(ps => ({
-        namaSiswa: ps.siswa.namaMurid,
-        NIS: ps.siswa.nis
-      }))
-    }));
-  } catch (error) {
-    logger.error('Error getting kelas programs with students:', error);
-    throw error;
+      return kelasPrograms.map(kp => ({
+        kelasProgramId: kp.id,
+        kelas: {
+          id: kp.kelas.id,
+          namaKelas: kp.kelas.namaKelas
+        },
+        program: {
+          id: kp.program.id,
+          namaProgram: kp.program.namaProgram
+        },
+        hari: kp.hari,
+        jamMengajar: {
+          id: kp.jamMengajar.id,
+          jamMulai: kp.jamMengajar.jamMulai,
+          jamSelesai: kp.jamMengajar.jamSelesai
+        },
+        siswa: kp.programSiswa.map(ps => ({
+          namaSiswa: ps.siswa.namaMurid,
+          NIS: ps.siswa.nis
+        }))
+      }));
+    } catch (error) {
+      logger.error('Error getting kelas programs with students:', error);
+      throw error;
+    }
   }
-}
 
 
 }

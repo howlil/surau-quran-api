@@ -17,7 +17,7 @@ class AuthController {
       return Http.Response.unauthorized(res, 'Token tidak ditemukan');
     }
     await authService.logout(token);
-    return Http.Response.success(res, null, 'Logout berhasil');
+    return Http.Response.success(res, 'Logout berhasil');
   });
 
   createAdmin = ErrorHandler.asyncHandler(async (req, res) => {
@@ -43,7 +43,19 @@ class AuthController {
     const userId = req.user.id;
     const adminId = req.params.id;
     await authService.deleteAdmin(adminId, userId);
-    return Http.Response.success(res,  'Admin berhasil dihapus');
+    return Http.Response.success(res, 'Admin berhasil dihapus');
+  });
+
+  forgotPassword = ErrorHandler.asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    const result = await authService.requestPasswordReset(email);
+    return Http.Response.success(res, result, result.message);
+  });
+
+  resetPassword = ErrorHandler.asyncHandler(async (req, res) => {
+    const { token, newPassword } = req.body;
+    const result = await authService.resetPassword(token, newPassword);
+    return Http.Response.success(res, result, result.message);
   });
 }
 

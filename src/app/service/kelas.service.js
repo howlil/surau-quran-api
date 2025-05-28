@@ -94,21 +94,16 @@ class KelasService {
         }
     }
 
-    async getAll(filters = {}) {
+    async getAll() {
         try {
-            const { page = 1, limit = 10, namaKelas } = filters;
-
-            const where = {};
-            if (namaKelas) {
-                where.namaKelas = { contains: namaKelas, mode: 'insensitive' };
-            }
-
-            return await PrismaUtils.paginate(prisma.kelas, {
-                page,
-                limit,
-                where,
-                orderBy: { namaKelas: 'asc' }
+            const kelasList = await prisma.kelas.findMany({
+                select: {
+                    id: true,
+                    namaKelas: true
+                }
             });
+
+            return kelasList;
         } catch (error) {
             logger.error('Error getting all kelas:', error);
             throw error;

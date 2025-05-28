@@ -24,8 +24,11 @@ class Http {
 
 
   static setupErrorHandling(app) {
-    app.use(ErrorHandler.notFound);
-    app.use(ErrorHandler.handleError);
+    // Handle 404 errors for undefined routes
+    app.use(ErrorHandler.notFoundHandler);
+
+    // Handle all other errors
+    app.use(ErrorHandler.errorHandler);
   }
 }
 

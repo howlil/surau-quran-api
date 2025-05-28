@@ -25,8 +25,7 @@ class JamMengajarController {
 
 
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'jamMulai', 'jamSelesai']);
-        const result = await jamMengajarService.getAll(filters);
+        const result = await jamMengajarService.getAll();
         return Http.Response.success(res, result);
     });
 }
