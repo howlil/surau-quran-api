@@ -20,4 +20,12 @@ router.get(
   payrollController.getAllPayrollsForAdmin
 );
 
+
+router.get(
+  '/v1/guru/payroll',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['GURU']),
+  payrollController.getAllPayrollsForGuru
+);
+
 module.exports = router;

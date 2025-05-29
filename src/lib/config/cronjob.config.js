@@ -12,7 +12,7 @@ class CronJobs {
   }
 
   static schedulePayrollGeneration() {
-    cron.schedule('* * * 25 *', async () => {
+    cron.schedule('0 0 25 * *', async () => {
       logger.info('Running scheduled monthly payroll generation...');
       try {
         await PayrollCronService.generateMonthlyPayroll();

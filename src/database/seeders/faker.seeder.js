@@ -377,9 +377,13 @@ class FakerSeeder {
     async createTransactionalData() {
         console.log('Creating transactional data...');
         try {
-            // Create Kelas Program
+            // Track which students already have pendaftaran
+            const studentsWithPendaftaran = new Set();
+            const studentsInKelasProgram = new Set();
+
+            // Create fewer Kelas Program (only 1-2 per guru)
             for (const guru of this.users.gurus) {
-                for (let i = 0; i < faker.number.int({ min: 3, max: 10 }); i++) {
+                for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
                     const kelasProgram = await prisma.kelasProgram.create({
                         data: {
                             kelasId: faker.helpers.arrayElement(this.data.kelas).id,
@@ -401,17 +405,28 @@ class FakerSeeder {
                 }
             }
 
-            // Create Program Siswa and related data
-            for (const siswa of this.users.siswas) {
-                // Each siswa has 1-3 programs
-                for (let i = 0; i < faker.number.int({ min: 1, max: 3 }); i++) {
+            // Create Program Siswa with more students per kelas program
+            for (const kelasProgram of this.data.kelasProgram) {
+                // Create 10-20 students per kelas program
+                const studentsPerClass = faker.number.int({ min: 10, max: 20 });
+                const availableStudents = [...this.users.siswas].filter(s => !studentsInKelasProgram.has(s.siswa.id)); // Only use students not yet in any kelas
+
+                for (let i = 0; i < studentsPerClass && availableStudents.length > 0; i++) {
+                    // Randomly select a student
+                    const randomIndex = faker.number.int({ min: 0, max: availableStudents.length - 1 });
+                    const siswa = availableStudents.splice(randomIndex, 1)[0];
+                    studentsInKelasProgram.add(siswa.siswa.id);
+
+                    // 70% chance of being verified, all are AKTIF
+                    const isVerified = Math.random() < 0.7;
+
                     const programSiswa = await prisma.programSiswa.create({
                         data: {
                             siswaId: siswa.siswa.id,
-                            programId: faker.helpers.arrayElement(this.data.programs).id,
-                            kelasProgramId: Math.random() > 0.2 ? faker.helpers.arrayElement(this.data.kelasProgram).id : null,
-                            status: faker.helpers.arrayElement(['AKTIF', 'TIDAK_AKTIF', 'CUTI']),
-                            isVerified: Math.random() > 0.2,
+                            programId: kelasProgram.programId,
+                            kelasProgramId: kelasProgram.id,
+                            status: 'AKTIF',
+                            isVerified,
                             createdAt: new Date(),
                             updatedAt: new Date()
                         }
@@ -433,24 +448,8 @@ class FakerSeeder {
                         this.data.jadwalProgramSiswa.push(jadwal);
                     }
 
-                    // Create Riwayat Status Siswa
-                    if (Math.random() > 0.5) {
-                        const riwayat = await prisma.riwayatStatusSiswa.create({
-                            data: {
-                                programSiswaId: programSiswa.id,
-                                statusLama: 'AKTIF',
-                                statusBaru: faker.helpers.arrayElement(['TIDAK_AKTIF', 'CUTI']),
-                                tanggalPerubahan: this.generateDate(),
-                                keterangan: Math.random() > 0.3 ? faker.lorem.sentence() : null,
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        });
-                        this.data.riwayatStatusSiswa.push(riwayat);
-                    }
-
-                    // Create Periode SPP
-                    if (Math.random() > 0.3) {
+                    // Create Periode SPP for verified students
+                    if (isVerified && Math.random() > 0.3) {
                         const periodeSpp = await prisma.periodeSpp.create({
                             data: {
                                 programSiswaId: programSiswa.id,
@@ -466,69 +465,86 @@ class FakerSeeder {
                             }
                         });
                         this.data.periodeSpp.push(periodeSpp);
+                    }
 
-                        // Create Pembayaran for PeriodeSPP
-                        if (Math.random() > 0.3) {
-                            const pembayaran = await prisma.pembayaran.create({
-                                data: {
-                                    tipePembayaran: 'SPP',
-                                    metodePembayaran: faker.helpers.arrayElement([
-                                        'VIRTUAL_ACCOUNT', 'TUNAI', 'BANK_TRANSFER', 'EWALLET'
-                                    ]),
-                                    jumlahTagihan: periodeSpp.totalTagihan,
-                                    statusPembayaran: faker.helpers.arrayElement([
-                                        'UNPAID', 'PENDING', 'PAID', 'SETTLED'
-                                    ]),
-                                    tanggalPembayaran: this.generateDate(),
-                                    createdAt: new Date(),
-                                    updatedAt: new Date()
-                                }
-                            });
-                            this.data.pembayaran.push(pembayaran);
-
-                            // Update PeriodeSPP with pembayaranId
-                            await prisma.periodeSpp.update({
-                                where: { id: periodeSpp.id },
-                                data: { pembayaranId: pembayaran.id }
-                            });
-
-                            // Create XenditPayment for online payments
-                            if (pembayaran.metodePembayaran !== 'TUNAI' && Math.random() > 0.3) {
-                                const xenditPayment = await prisma.xenditPayment.create({
-                                    data: {
-                                        pembayaranId: pembayaran.id,
-                                        xenditInvoiceId: `xnd_${faker.string.alphanumeric(20)}`,
-                                        xenditExternalId: `ext_${faker.string.alphanumeric(10)}`,
-                                        xenditPaymentUrl: `https://checkout.xendit.co/web/${faker.string.alphanumeric(15)}`,
-                                        xenditPaymentChannel: pembayaran.metodePembayaran,
-                                        xenditExpireDate: moment().add(1, 'day').format('DD-MM-YYYY HH:mm'),
-                                        xenditPaidAt: Math.random() > 0.5 ? this.generateDate() : null,
-                                        xenditStatus: faker.helpers.arrayElement(['PENDING', 'PAID', 'SETTLED', 'EXPIRED']),
-                                        createdAt: new Date(),
-                                        updatedAt: new Date()
-                                    }
-                                });
-                                this.data.xenditPayment.push(xenditPayment);
+                    // Create Pendaftaran only for verified students who don't have one yet
+                    if (isVerified && Math.random() > 0.3 && !studentsWithPendaftaran.has(siswa.siswa.id)) {
+                        const pendaftaran = await prisma.pendaftaran.create({
+                            data: {
+                                siswaId: siswa.siswa.id,
+                                biayaPendaftaran: faker.number.int({ min: 100000, max: 300000 }),
+                                tanggalDaftar: this.generateDate(),
+                                diskon: Math.random() > 0.7 ? faker.number.int({ min: 10000, max: 50000 }) : 0,
+                                totalBiaya: faker.number.int({ min: 100000, max: 300000 }),
+                                voucher_id: Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers).id : null,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
                             }
-                        }
+                        });
+                        this.data.pendaftaran.push(pendaftaran);
+                        studentsWithPendaftaran.add(siswa.siswa.id);
                     }
                 }
+            }
 
-                // Create Pendaftaran for new students
-                if (Math.random() > 0.3) {
-                    const pendaftaran = await prisma.pendaftaran.create({
+            // Create uninitialized Program Siswa (not yet assigned to kelas program)
+            const remainingStudents = this.users.siswas.filter(s => !studentsInKelasProgram.has(s.siswa.id));
+            for (const kelasProgram of this.data.kelasProgram) {
+                // Create 5-10 uninitialized students per program
+                const uninitializedCount = faker.number.int({ min: 5, max: 10 });
+                const availableStudents = [...remainingStudents];
+
+                for (let i = 0; i < uninitializedCount && availableStudents.length > 0; i++) {
+                    const randomIndex = faker.number.int({ min: 0, max: availableStudents.length - 1 });
+                    const siswa = availableStudents.splice(randomIndex, 1)[0];
+
+                    // Create Program Siswa without kelasProgram assignment
+                    const programSiswa = await prisma.programSiswa.create({
                         data: {
                             siswaId: siswa.siswa.id,
-                            biayaPendaftaran: faker.number.int({ min: 100000, max: 300000 }),
-                            tanggalDaftar: this.generateDate(),
-                            diskon: Math.random() > 0.7 ? faker.number.int({ min: 10000, max: 50000 }) : 0,
-                            totalBiaya: faker.number.int({ min: 100000, max: 300000 }),
-                            voucher_id: Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers).id : null,
+                            programId: kelasProgram.programId,
+                            kelasProgramId: null, // Explicitly set to null
+                            status: 'AKTIF',
+                            isVerified: false, // Uninitialized students are not verified
                             createdAt: new Date(),
                             updatedAt: new Date()
                         }
                     });
-                    this.data.pendaftaran.push(pendaftaran);
+                    this.data.programSiswa.push(programSiswa);
+
+                    // Create matching Jadwal Program Siswa (same hari and jamMengajar as kelasProgram)
+                    await prisma.jadwalProgramSiswa.create({
+                        data: {
+                            programSiswaId: programSiswa.id,
+                            hari: kelasProgram.hari, // Match kelasProgram's schedule
+                            jamMengajarId: kelasProgram.jamMengajarId, // Match kelasProgram's time
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        }
+                    });
+                }
+            }
+
+            // Create Payroll data for each guru (moved before attendance creation)
+            for (const guru of this.users.gurus) {
+                // Create payroll records for multiple months
+                for (let month = 1; month <= 12; month++) {
+                    const payroll = await prisma.payroll.create({
+                        data: {
+                            guruId: guru.guru.id,
+                            periode: `${month.toString().padStart(2, '0')}-2025`,
+                            bulan: month.toString().padStart(2, '0'),
+                            tahun: 2025,
+                            gajiPokok: faker.number.int({ min: 1000000, max: 5000000 }),
+                            insentif: faker.number.int({ min: 100000, max: 500000 }),
+                            potongan: faker.number.int({ min: 0, max: 200000 }),
+                            totalGaji: faker.number.int({ min: 1000000, max: 5000000 }),
+                            status: faker.helpers.arrayElement(['DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL']),
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        }
+                    });
+                    this.data.payroll.push(payroll);
                 }
             }
 
@@ -542,11 +558,25 @@ class FakerSeeder {
                     const sks = faker.number.int({ min: 1, max: 4 });
                     const suratIzin = statusKehadiran === 'IZIN' ? `surat_izin_${faker.string.alphanumeric(8)}.pdf` : null;
 
+                    // Generate a random date in 2025
+                    const attendanceDate = moment(faker.date.between({
+                        from: '2025-01-01',
+                        to: '2025-12-31'
+                    }));
+
+                    // Find the corresponding payroll record for this month
+                    const payrollForMonth = this.data.payroll.find(p =>
+                        p.guruId === kelasProgram.guruId &&
+                        p.bulan === attendanceDate.format('MM') &&
+                        p.tahun === 2025
+                    );
+
                     const absensiGuru = await prisma.absensiGuru.create({
                         data: {
                             kelasProgramId: kelasProgram.id,
                             guruId: kelasProgram.guruId,
-                            tanggal: this.generateDate(),
+                            payrollId: payrollForMonth.id, // Link to the corresponding payroll
+                            tanggal: attendanceDate.format('DD-MM-YYYY'),
                             jamMasuk: this.generateTime(),
                             jamKeluar: this.generateTime(),
                             sks,
@@ -582,26 +612,6 @@ class FakerSeeder {
                         this.data.absensiSiswa.push(absensiSiswa);
                     }
                 }
-            }
-
-            // Create Payroll data for each guru
-            for (const guru of this.users.gurus) {
-                const payroll = await prisma.payroll.create({
-                    data: {
-                        guruId: guru.guru.id,
-                        periode: `${moment().format('MM')}-2025`,
-                        bulan: moment().format('MM'),
-                        tahun: 2025,
-                        gajiPokok: faker.number.int({ min: 1000000, max: 5000000 }),
-                        insentif: faker.number.int({ min: 100000, max: 500000 }),
-                        potongan: faker.number.int({ min: 0, max: 200000 }),
-                        totalGaji: faker.number.int({ min: 1000000, max: 5000000 }),
-                        status: faker.helpers.arrayElement(['DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL']),
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    }
-                });
-                this.data.payroll.push(payroll);
             }
 
             console.log('Transactional data created successfully');

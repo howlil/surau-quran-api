@@ -35,6 +35,7 @@ router.get('/v1/kelas',
 router.get('/v1/kelas/initial-student',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
+    validationMiddleware.validateQuery(kelasValidation.getInitialStudentQuery()),
     kelasController.getInitialStudentIntoClass
 );
 

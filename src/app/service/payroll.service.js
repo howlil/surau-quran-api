@@ -65,7 +65,8 @@ class PayrollService {
               noRekening: true,
               namaBank: true
             }
-          }
+          },
+          payrollDisbursement: true
         }
       });
 
@@ -96,10 +97,17 @@ class PayrollService {
             select: {
               id: true,
               nama: true,
-              nip: true
+              nip: true,
+              noRekening: true,
+              namaBank: true
             }
           },
           absensiGuru: {
+            where: {
+              tanggal: {
+                startsWith: `${where.tahun || new Date().getFullYear()}-${String(where.bulan || new Date().getMonth() + 1).padStart(2, '0')}`
+              }
+            },
             select: {
               id: true,
               tanggal: true,
@@ -119,14 +127,19 @@ class PayrollService {
                 }
               }
             }
+          },
+          payrollDisbursement: {
+            include: {
+              xenditDisbursement: true
+            }
           }
         },
         orderBy: { createdAt: 'desc' }
       });
 
       const formattedData = result.data.map(payroll => {
-        // Calculate attendance statistics
         const absensiStats = this.calculateAbsensiStats(payroll.absensiGuru);
+        const disbursementStatus = this.getDisbursementStatus(payroll.payrollDisbursement);
 
         return {
           id: payroll.id,
@@ -138,6 +151,15 @@ class PayrollService {
           periode: payroll.periode,
           totalGaji: Number(payroll.totalGaji),
           status: payroll.status,
+          pembayaran: {
+            status: disbursementStatus.status,
+            tanggalProses: disbursementStatus.tanggalProses,
+            metodePembayaran: 'BANK_TRANSFER',
+            detailBank: {
+              namaBank: payroll.guru.namaBank,
+              noRekening: payroll.guru.noRekening
+            }
+          },
           updatedAt: payroll.updatedAt,
           detail: {
             gajiPokok: Number(payroll.gajiPokok),
@@ -162,12 +184,33 @@ class PayrollService {
 
       return {
         data: formattedData,
-        meta: result.meta
+        pagination: result.meta
       };
     } catch (error) {
       logger.error('Error getting all payrolls for admin:', error);
       throw error;
     }
+  }
+
+  getDisbursementStatus(payrollDisbursement) {
+    if (!payrollDisbursement) {
+      return {
+        status: 'PENDING',
+        tanggalProses: null
+      };
+    }
+
+    if (payrollDisbursement.xenditDisbursement) {
+      return {
+        status: payrollDisbursement.xenditDisbursement.xenditStatus,
+        tanggalProses: payrollDisbursement.tanggalProses
+      };
+    }
+
+    return {
+      status: 'DIPROSES',
+      tanggalProses: payrollDisbursement.tanggalProses
+    };
   }
 
   calculateAbsensiStats(absensiList) {
@@ -198,7 +241,6 @@ class PayrollService {
     };
 
     absensiList.forEach(absensi => {
-      // Count attendance status
       stats.rincianKehadiran[absensi.statusKehadiran.toLowerCase()]++;
 
       if (absensi.statusKehadiran === 'HADIR') {
@@ -210,7 +252,6 @@ class PayrollService {
         stats.rincianKelas[tipeKelas].sks += absensi.sks;
         stats.rincianKelas[tipeKelas].honor += absensi.sks * HONOR_RATES[tipeKelas];
 
-        // Add incentive if applicable
         if (absensi.insentifKehadiran) {
           stats.totalInsentif += Number(absensi.insentifKehadiran);
         }
@@ -229,6 +270,122 @@ class PayrollService {
     });
 
     return stats;
+  }
+
+
+  async getAllPayrollsForGuru(guruId, filters = {}) {
+    try {
+      const { page = 1, limit = 10, bulan } = filters;
+
+      const where = {
+        guruId
+      };
+
+      if (bulan) {
+        where.bulan = bulan;
+      }
+
+      const result = await PrismaUtils.paginate(prisma.payroll, {
+        page,
+        limit,
+        where,
+        include: {
+          guru: {
+            select: {
+              id: true,
+              nama: true,
+              nip: true,
+              noRekening: true,
+              namaBank: true
+            }
+          },
+          absensiGuru: {
+            where: {
+              tanggal: {
+                startsWith: `${where.tahun || new Date().getFullYear()}-${String(where.bulan || new Date().getMonth() + 1).padStart(2, '0')}`
+              }
+            },
+            select: {
+              id: true,
+              tanggal: true,
+              jamMasuk: true,
+              jamKeluar: true,
+              statusKehadiran: true,
+              sks: true,
+              terlambat: true,
+              menitTerlambat: true,
+              potonganTerlambat: true,
+              potonganTanpaKabar: true,
+              potonganTanpaSuratIzin: true,
+              insentifKehadiran: true,
+              kelasProgram: {
+                select: {
+                  tipeKelas: true
+                }
+              }
+            }
+          },
+          payrollDisbursement: {
+            include: {
+              xenditDisbursement: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      logger.info(result.data);
+
+      const formattedData = result.data.map(payroll => {
+        const absensiStats = this.calculateAbsensiStats(payroll.absensiGuru);
+        const disbursementStatus = this.getDisbursementStatus(payroll.payrollDisbursement);
+
+        return {
+          id: payroll.id,
+          bulan: payroll.bulan,
+          tahun: payroll.tahun,
+          periode: payroll.periode,
+          totalGaji: Number(payroll.totalGaji),
+          status: payroll.status,
+          pembayaran: {
+            status: disbursementStatus.status,
+            tanggalProses: disbursementStatus.tanggalProses,
+            metodePembayaran: 'BANK_TRANSFER',
+            detailBank: {
+              namaBank: payroll.guru.namaBank,
+              noRekening: payroll.guru.noRekening
+            }
+          },
+          updatedAt: payroll.updatedAt,
+          detail: {
+            gajiPokok: Number(payroll.gajiPokok),
+            insentif: Number(payroll.insentif),
+            potongan: Number(payroll.potongan),
+            absensi: {
+              totalKehadiran: absensiStats.totalKehadiran,
+              totalSKS: absensiStats.totalSKS,
+              totalInsentif: absensiStats.totalInsentif,
+              totalPotongan: absensiStats.totalPotongan,
+              rincianKelas: absensiStats.rincianKelas,
+              rincianKehadiran: {
+                hadir: absensiStats.rincianKehadiran.hadir,
+                izin: absensiStats.rincianKehadiran.izin,
+                sakit: absensiStats.rincianKehadiran.sakit,
+                tidakHadir: absensiStats.rincianKehadiran.tidakHadir
+              }
+            }
+          }
+        };
+      });
+
+      return {
+        data: formattedData,
+        pagination: result.meta
+      };
+    } catch (error) {
+      logger.error('Error getting payrolls for guru:', error);
+      throw error;
+    }
   }
 }
 

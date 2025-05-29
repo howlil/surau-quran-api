@@ -6,14 +6,15 @@ const { logger } = require('../../lib/config/logger.config');
 class PayrollCronService {
   static init() {
     logger.info('Initializing payroll cron jobs...');
-    
+
     this.scheduleMonthlyPayrollGeneration();
-    
+
     logger.info('Payroll cron jobs scheduled successfully');
   }
 
   static scheduleMonthlyPayrollGeneration() {
-    cron.schedule('* * * 25 *', async () => {
+    // Run at 00:00 (midnight) on the 25th of every month
+    cron.schedule('0 0 25 * *', async () => {
       logger.info('Starting monthly payroll generation...');
       await this.generateMonthlyPayroll();
     }, {
@@ -97,7 +98,7 @@ class PayrollCronService {
       }
 
       logger.info(`Monthly payroll generation completed. Success: ${results.length}, Errors: ${errors.length}`);
-      
+
       return {
         success: results,
         errors,
@@ -115,7 +116,7 @@ class PayrollCronService {
 
   static async runManualPayrollGeneration(bulan, tahun) {
     logger.info(`Running manual payroll generation for ${bulan} ${tahun}...`);
-    
+
     try {
       const periode = `${bulan} ${tahun}`;
 
@@ -190,7 +191,7 @@ class PayrollCronService {
       }
 
       logger.info(`Manual payroll generation completed for ${periode}. Success: ${results.length}, Errors: ${errors.length}`);
-      
+
       return {
         success: results,
         errors,

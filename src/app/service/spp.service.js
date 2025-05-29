@@ -84,7 +84,7 @@ class SppService {
 
             return {
                 data: formattedData,
-                meta: result.meta
+                pagination: result.meta
             };
         } catch (error) {
             logger.error('Error getting SPP data for admin:', error);
@@ -112,7 +112,7 @@ class SppService {
             if (programSiswaIds.length === 0) {
                 return {
                     data: [],
-                    meta: {
+                    pagination: {
                         total: 0,
                         limit,
                         page,
@@ -171,7 +171,7 @@ class SppService {
 
             return {
                 data: formattedData,
-                meta: result.meta
+                pagination: result.meta
             };
         } catch (error) {
             logger.error('Error getting SPP data for student:', error);

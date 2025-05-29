@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { errorHandler } = require('./lib/http/error.handler.http');
 const routes = require('./app/routes');
+const CronJobs = require('./lib/config/cronjob.config');
 
 const app = express();
 
@@ -18,6 +19,9 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+
+    // Initialize cron jobs after server starts
+    CronJobs.init();
 });
 
 module.exports = app; 
