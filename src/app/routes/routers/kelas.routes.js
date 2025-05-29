@@ -31,11 +31,13 @@ router.get('/v1/kelas',
 );
 
 
+// TODO : tambahkan pagination di level progrem / kelasprgramId
 router.get('/v1/kelas/initial-student',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
     kelasController.getInitialStudentIntoClass
 );
+
 
 router.patch(
     '/v1/kelas-program/:kelasProgramId/initial-student',

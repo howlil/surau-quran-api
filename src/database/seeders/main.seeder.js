@@ -122,7 +122,7 @@ class MainSeeder {
                 }
             }
 
-       
+
             for (let i = 0; i < 20; i++) {
                 const userData = await UserFactory.createRandomUser('ADMIN');
                 const randomUser = await prisma.user.create({

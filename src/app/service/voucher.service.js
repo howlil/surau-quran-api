@@ -1,7 +1,8 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
+const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const { Prisma } = require('@prisma/client');
 
 class VoucherService {
   async create(data) {
@@ -93,41 +94,33 @@ class VoucherService {
   }
 
   async getAll(filters = {}) {
+    const { page = 1, limit = 10 } = filters;
     try {
-      const { page = 1, limit = 10, kodeVoucher, tipe, isActive } = filters;
-      
-      const where = {};
-      if (kodeVoucher) {
-        where.kodeVoucher = { contains: kodeVoucher, mode: 'insensitive' };
-      }
-      if (tipe) {
-        where.tipe = tipe;
-      }
-      if (isActive !== undefined) {
-        where.isActive = isActive === 'true';
-      }
-
-      return await PrismaUtils.paginate(prisma.voucher, {
+      const voucherList = await PrismaUtils.paginate(prisma.voucher, {
         page,
         limit,
-        where,
-        include: {
-          _count: {
-            select: {
-              pendaftaran: true,
-              periodeSpp: true
-            }
-          }
+        select: {
+          id: true,
+          kodeVoucher: true,
+          tipe: true,
+          nominal: true,
+          isActive: true,
+          jumlahPenggunaan: true
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: {
+          createdAt: 'desc'
+        }
       });
+
+      return voucherList;
     } catch (error) {
       logger.error('Error getting all vouchers:', error);
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestError('Invalid field selection in voucher query');
+      }
       throw error;
     }
   }
-
- 
 }
 
 module.exports = new VoucherService();

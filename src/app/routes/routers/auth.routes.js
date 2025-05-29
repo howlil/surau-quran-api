@@ -17,25 +17,25 @@ router.post('/v1/logout',
 );
 
 // Admin management routes - only accessible by admins
-router.post('/v1/admins',
+router.post('/v1/admin',
   authMiddleware.authenticate,
   validationMiddleware.validateBody(authValidation.createAdmin()),
   authController.createAdmin
 );
 
-router.get('/v1/admins',
+router.get('/v1/admin',
   authMiddleware.authenticate,
   authController.getAllAdmins
 );
 
 
-router.patch('/v1/admins/:id',
+router.patch('/v1/admin/:id',
   authMiddleware.authenticate,
   validationMiddleware.validateBody(authValidation.updateAdmin()),
   authController.updateAdmin
 );
 
-router.delete('/v1/admins/:id',
+router.delete('/v1/admin/:id',
   authMiddleware.authenticate,
   authController.deleteAdmin
 );

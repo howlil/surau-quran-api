@@ -5,7 +5,9 @@ const {
   ForbiddenError,
   NotFoundError,
   ConflictError,
-  BadRequestError
+  BadRequestError,
+  ValidationError,
+  HttpError
 } = require('./errors.http');
 
 class ErrorHandler {
@@ -26,6 +28,15 @@ class ErrorHandler {
 
   static errorHandler(error, req, res, next) {
     logger.error(`Error processing ${req.method} ${req.originalUrl}:`, error);
+
+    // Handle generic Error objects that might not be instances of our custom errors
+    if (error instanceof Error && !(error instanceof HttpError)) {
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+        errors: process.env.NODE_ENV === 'development' ? [{ message: error.message }] : null
+      });
+    }
 
     // Handle specific error types
     if (error instanceof UnauthorizedError) {
@@ -68,6 +79,14 @@ class ErrorHandler {
       });
     }
 
+    if (error instanceof ValidationError) {
+      return res.status(422).json({
+        success: false,
+        message: error.message || 'Validation failed',
+        errors: error.data || null
+      });
+    }
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return res.status(400).json({
         success: false,
@@ -80,11 +99,19 @@ class ErrorHandler {
     }
 
     if (error instanceof Prisma.PrismaClientValidationError) {
+      // Extract field name from error message if possible
+      const fieldMatch = error.message.match(/Unknown field `([^`]+)`/);
+      const modelMatch = error.message.match(/model `([^`]+)`/);
+
+      const errorMessage = fieldMatch && modelMatch
+        ? `Field '${fieldMatch[1]}' tidak tersedia pada model ${modelMatch[1]}`
+        : 'Invalid data provided';
+
       return res.status(400).json({
         success: false,
-        message: 'Invalid data provided',
+        message: errorMessage,
         errors: [{
-          message: error.message
+          message: process.env.NODE_ENV === 'development' ? error.message : errorMessage
         }]
       });
     }
@@ -114,7 +141,6 @@ class ErrorHandler {
     }
 
     // Handle unknown errors
-    logger.error('Unhandled error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',

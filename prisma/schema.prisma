@@ -101,7 +101,6 @@ model Guru {
   pendidikanTerakhir String?
   noRekening         String?
   namaBank           String?
-  tarifPerJam        Decimal? @db.Decimal(10, 2)
   suratKontrak       String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -111,6 +110,7 @@ model Guru {
   kelasProgram KelasProgram[]
   payroll      Payroll[]
   AbsensiGuru  AbsensiGuru[]
+  
 }
 
 model Kelas {
@@ -153,7 +153,7 @@ model KelasProgram {
   hari          HARI
   jamMengajarId String
   guruId        String?
-  tipeKelas     String?
+  tipeKelas     TipeKelas @default(GROUP) 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -163,8 +163,16 @@ model KelasProgram {
   jamMengajar  JamMengajar    @relation(fields: [jamMengajarId], references: [id])
   guru         Guru?          @relation(fields: [guruId], references: [id])
   programSiswa ProgramSiswa[] // Relasi langsung ke ProgramSiswa
-  absensiGuru  AbsensiGuru[]
   absensiSiswa AbsensiSiswa[]
+  absensiGuru  AbsensiGuru[]
+}
+
+
+enum TipeKelas {
+  GROUP       // Rp 35,000/sesi
+  PRIVATE     // Rp 35,000/sesi
+  SUBSTITUTE  // Rp 25,000/sesi (Guru Pengganti)
+  ONLINE      // Rp 25,000/sesi (Online diluar Surau)
 }
 
 // Model Pendaftaran (sekali untuk satu siswa)
@@ -249,7 +257,6 @@ model AbsensiSiswa {
   siswa        Siswa        @relation(fields: [siswaId], references: [id])
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
-
 model AbsensiGuru {
   id              String          @id @default(uuid())
   kelasProgramId  String
@@ -261,6 +268,14 @@ model AbsensiGuru {
   sks             Int
   suratIzin       String?
   statusKehadiran StatusKehadiran
+  // Add these fields for tracking lateness and penalties
+  terlambat       Boolean         @default(false)
+  menitTerlambat  Int?
+  potonganTerlambat Decimal?      @db.Decimal(10, 2) // Rp 10,000 for late
+  potonganTanpaKabar Decimal?     @db.Decimal(10, 2) // Rp 20,000 for absence without notice
+  potonganTanpaSuratIzin Decimal? @db.Decimal(10, 2) // Rp 10,000 for absence without permission letter
+  // Incentive tracking
+  insentifKehadiran Decimal?      @db.Decimal(10, 2) // Rp 10,000 if minimum 2 SKS per day
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -269,6 +284,7 @@ model AbsensiGuru {
   payroll      Payroll?     @relation(fields: [payrollId], references: [id])
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
+
 
 model Voucher {
   id               String      @id @default(uuid())
@@ -339,18 +355,18 @@ model XenditPayment {
 }
 
 model Payroll {
-  id        String        @id @default(uuid())
-  guruId    String
-  periode   String
-  bulan     String
-  tahun     Int
-  gajiPokok Decimal       @db.Decimal(10, 2)
-  insentif  Decimal?      @db.Decimal(10, 2)
-  potongan  Decimal       @db.Decimal(10, 2)
-  totalGaji Decimal       @db.Decimal(10, 2)
-  status    StatusPayroll
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id            String        @id @default(uuid())
+  guruId        String
+  periode       String
+  bulan         String
+  tahun         Int
+  gajiPokok     Decimal       @db.Decimal(10, 2)
+  insentif      Decimal?      @db.Decimal(10, 2)
+  potongan      Decimal       @db.Decimal(10, 2)
+  totalGaji     Decimal       @db.Decimal(10, 2)
+  status        StatusPayroll
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
   guru                Guru                 @relation(fields: [guruId], references: [id])

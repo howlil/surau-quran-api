@@ -9,18 +9,18 @@ class AbsensiGuruFactory {
         const randomDate = new Date(threeMonthsAgo.getTime() + randomTimeOffset - (index * 24 * 60 * 60 * 1000));
         const tanggal = randomDate.toISOString().split('T')[0];
 
-        // Random jam masuk between 7 AM and 7 PM
-        const startHour = Math.floor(Math.random() * 12) + 7;
-        const startMinute = Math.floor(Math.random() * 60);
+        // Random jam masuk between 10:00 and 20:45 as per rules
+        const startHour = Math.floor(Math.random() * 11) + 10; // 10:00 to 20:00
+        const startMinute = Math.floor(Math.random() * 46); // 0 to 45 minutes
         const jamMasuk = `${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`;
 
-        // Teaching duration 1-3 hours
-        const endHour = startHour + Math.floor(Math.random() * 3) + 1;
-        const endMinute = startMinute;
-        const jamKeluar = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+        // Teaching duration 1.5 hours (1 SKS) as per rules
+        const endHour = startHour + 1;
+        const endMinute = startMinute + 30;
+        const jamKeluar = `${String(endHour).padStart(2, '0')}:${String(endMinute >= 60 ? endMinute - 60 : endMinute).padStart(2, '0')}`;
 
-        // SKS (teaching credits): 1-4
-        const sks = Math.floor(Math.random() * 4) + 1;
+        // SKS (1 SKS = 1.5 hours)
+        const sks = Math.floor(Math.random() * 3) + 1; // 1-3 SKS
 
         const statuses = ['HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT'];
         const statusWeights = [0.8, 0.1, 0.05, 0.05]; // Weighted probabilities
@@ -37,10 +37,25 @@ class AbsensiGuruFactory {
             }
         }
 
+        const statusKehadiran = statuses[statusIndex];
+
+        // Calculate penalties based on rules
+        const terlambat = Math.random() < 0.1; // 10% chance of being late
+        const menitTerlambat = terlambat ? Math.floor(Math.random() * 30) + 1 : null;
+        const potonganTerlambat = terlambat ? 10000 : null; // Rp 10,000 for late
+
+        // Penalties for absence
+        const potonganTanpaKabar = statusKehadiran === 'TIDAK_HADIR' ? 20000 : null; // Rp 20,000 for absence without notice
+
         // If not present, add surat izin for IZIN or SAKIT
-        const suratIzin = ['IZIN', 'SAKIT'].includes(statuses[statusIndex])
+        const suratIzin = ['IZIN', 'SAKIT'].includes(statusKehadiran)
             ? `surat_izin_${Math.random().toString(36).substring(7)}.pdf`
             : null;
+
+        const potonganTanpaSuratIzin = (statusKehadiran === 'IZIN' || statusKehadiran === 'SAKIT') && !suratIzin ? 10000 : null;
+
+        // Incentive for attendance with minimum 2 SKS
+        const insentifKehadiran = statusKehadiran === 'HADIR' && sks >= 2 ? 10000 : null;
 
         return {
             kelasProgramId,
@@ -51,7 +66,13 @@ class AbsensiGuruFactory {
             jamKeluar,
             sks,
             suratIzin,
-            statusKehadiran: statuses[statusIndex]
+            statusKehadiran,
+            terlambat,
+            menitTerlambat,
+            potonganTerlambat,
+            potonganTanpaKabar,
+            potonganTanpaSuratIzin,
+            insentifKehadiran
         };
     }
 }

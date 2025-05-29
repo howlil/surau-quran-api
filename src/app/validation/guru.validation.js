@@ -9,7 +9,7 @@ class GuruValidation {
           'string.email': 'Email harus valid',
           'any.required': 'Email wajib diisi'
         }),
-      
+
       nama: Joi.string().required()
         .messages({
           'any.required': 'Nama wajib diisi'
@@ -31,12 +31,6 @@ class GuruValidation {
           'string.pattern.base': 'Nomor rekening hanya boleh berisi angka'
         }),
       namaBank: Joi.string().optional(),
-      tarifPerJam: Joi.number().precision(2).positive().required()
-        .messages({
-          'number.base': 'Tarif per jam harus berupa angka',
-          'number.positive': 'Tarif per jam harus lebih dari 0',
-          'any.required': 'Tarif per jam wajib diisi'
-        }),
       suratKontrak: Joi.any().optional()
     });
   }
@@ -47,7 +41,7 @@ class GuruValidation {
         .messages({
           'string.email': 'Email harus valid'
         }),
-      
+
       nama: Joi.string().optional(),
       noWhatsapp: Joi.string().pattern(/^(\+62|62|0)[0-9]{9,12}$/).optional()
         .messages({
@@ -66,16 +60,9 @@ class GuruValidation {
           'string.pattern.base': 'Nomor rekening hanya boleh berisi angka'
         }),
       namaBank: Joi.string().optional(),
-      tarifPerJam: Joi.number().positive().optional()
-        .messages({
-          'number.base': 'Tarif per jam harus berupa angka',
-          'number.positive': 'Tarif per jam harus lebih dari 0'
-        }),
       suratKontrak: Joi.any().optional()
-       
     });
   }
-
 }
 
 module.exports = GuruValidation;

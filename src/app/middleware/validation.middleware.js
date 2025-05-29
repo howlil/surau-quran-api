@@ -1,10 +1,14 @@
-const { BadRequestError } = require('../../lib/http/errors.http');
+const { BadRequestError, ValidationError } = require('../../lib/http/errors.http');
 
 class ValidationMiddleware {
 
   static validateBody(schema) {
     return (req, res, next) => {
       try {
+        if (!schema || typeof schema.validate !== 'function') {
+          throw new ValidationError('Invalid validation schema');
+        }
+
         const { error, value } = schema.validate(req.body);
         if (error) {
           const errors = error.details.map(detail => ({
@@ -24,6 +28,10 @@ class ValidationMiddleware {
   static validateQuery(schema) {
     return (req, res, next) => {
       try {
+        if (!schema || typeof schema.validate !== 'function') {
+          throw new ValidationError('Invalid validation schema');
+        }
+
         const { error, value } = schema.validate(req.query);
         if (error) {
           const errors = error.details.map(detail => ({
@@ -43,6 +51,10 @@ class ValidationMiddleware {
   static validateParams(schema) {
     return (req, res, next) => {
       try {
+        if (!schema || typeof schema.validate !== 'function') {
+          throw new ValidationError('Invalid validation schema');
+        }
+
         const { error, value } = schema.validate(req.params);
         if (error) {
           const errors = error.details.map(detail => ({
@@ -65,6 +77,9 @@ class ValidationMiddleware {
         const errors = [];
 
         if (validators.body) {
+          if (typeof validators.body.validate !== 'function') {
+            throw new ValidationError('Invalid body validation schema');
+          }
           const { error, value } = validators.body.validate(req.body);
           if (error) {
             errors.push(...error.details.map(detail => ({
@@ -77,6 +92,9 @@ class ValidationMiddleware {
         }
 
         if (validators.query) {
+          if (typeof validators.query.validate !== 'function') {
+            throw new ValidationError('Invalid query validation schema');
+          }
           const { error, value } = validators.query.validate(req.query);
           if (error) {
             errors.push(...error.details.map(detail => ({
@@ -89,6 +107,9 @@ class ValidationMiddleware {
         }
 
         if (validators.params) {
+          if (typeof validators.params.validate !== 'function') {
+            throw new ValidationError('Invalid params validation schema');
+          }
           const { error, value } = validators.params.validate(req.params);
           if (error) {
             errors.push(...error.details.map(detail => ({
@@ -113,19 +134,27 @@ class ValidationMiddleware {
 
   static validateRequest(schema, property = 'body') {
     return (req, res, next) => {
-      const { error, value } = schema.validate(req[property], { abortEarly: false });
+      try {
+        if (!schema || typeof schema.validate !== 'function') {
+          throw new ValidationError('Invalid validation schema');
+        }
 
-      if (error) {
-        const errorDetails = error.details.map(detail => ({
-          message: detail.message,
-          path: detail.path
-        }));
+        const { error, value } = schema.validate(req[property], { abortEarly: false });
 
-        return next(new ValidationError('Validation error', errorDetails));
+        if (error) {
+          const errorDetails = error.details.map(detail => ({
+            message: detail.message,
+            path: detail.path
+          }));
+
+          throw new ValidationError('Validation error', errorDetails);
+        }
+
+        req[property] = value;
+        next();
+      } catch (err) {
+        next(err);
       }
-
-      req[property] = value;
-      next();
     };
   }
 

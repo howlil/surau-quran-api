@@ -61,11 +61,17 @@ class GuruController {
 
   getAllWithSchedules = ErrorHandler.asyncHandler(async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const result = await guruService.getAllGuruWithSchedules();
-    const transformedResult = result.map(guru => ({
-      ...guru,
-      fotoProfile: FileUtils.getImageUrl(baseUrl, guru.fotoProfile)
-    }));
+    const filters = HttpRequest.getQueryParams(req, ['page', 'limit']);
+    const result = await guruService.getAllGuruWithSchedules(filters);
+
+    const transformedResult = {
+      ...result,
+      data: result.data.map(guru => ({
+        ...guru,
+        fotoProfile: FileUtils.getImageUrl(baseUrl, guru.fotoProfile)
+      }))
+    };
+
     return Http.Response.success(res, transformedResult, 'Data guru dan jadwal berhasil diambil');
   });
 

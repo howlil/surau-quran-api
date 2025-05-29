@@ -1,7 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class ProgramService {
   async create(data) {
@@ -135,7 +134,7 @@ class ProgramService {
       });
 
       if (!kelasProgram) {
-        throw new Error('KelasProgram tidak ditemukan');
+        throw new NotFoundError(`KelasProgram dengan ID ${kelasProgramId} tidak ditemukan`);
       }
 
       // 2. Cari semua ProgramSiswa yg eligible

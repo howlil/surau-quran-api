@@ -49,7 +49,7 @@ class AbsensiController {
 
         const result = await absensiService.updateAbsensiGuru(id, data);
         const transformedResult = FileUtils.transformAbsensiGuruFiles(result, baseUrl);
-        return Http.Response.success(res, transformedResult, 'Data absensi guru berhasil diperbarui');
+        return Http.Response.success(res,  'Data absensi guru berhasil diperbarui');
     });
 
     updateAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
@@ -64,7 +64,7 @@ class AbsensiController {
         }
 
         const result = await absensiService.updateAbsensiSiswa(siswaId, guru.id, { value: req.body });
-        return Http.Response.success(res, result, 'Berhasil mengupdate absensi siswa');
+        return Http.Response.success(res,  'Berhasil mengupdate absensi siswa');
     });
 }
 

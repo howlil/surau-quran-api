@@ -185,7 +185,6 @@ class GuruService {
           pendidikanTerakhir: true,
           noRekening: true,
           namaBank: true,
-          tarifPerJam: true,
           user: {
             select: {
               email: true,
@@ -201,9 +200,13 @@ class GuruService {
     }
   }
 
-  async getAllGuruWithSchedules() {
+  async getAllGuruWithSchedules(filters = {}) {
     try {
-      const gurus = await prisma.guru.findMany({
+      const { page = 1, limit = 10 } = filters;
+
+      const paginatedResult = await PrismaUtils.paginate(prisma.guru, {
+        page,
+        limit,
         select: {
           id: true,
           nama: true,
@@ -216,27 +219,32 @@ class GuruService {
               hari: true,
               jamMengajarId: true,
               kelasId: true,
-              programId: true
+              programId: true,
+              tipeKelas: true
             }
           }
         },
         orderBy: { nama: 'asc' }
       });
 
-      return gurus.map(guru => ({
-        id: guru.id,
-        nama: guru.nama,
-        keahlian: guru.keahlian,
-        fotoProfile: guru.fotoProfile,
-        pendidikanTerakhir: guru.pendidikanTerakhir,
-        jadwalGuru: guru.kelasProgram.map(kp => ({
-          kelasProgramId: kp.id,
-          kelasId: kp.kelasId,
-          programId: kp.programId,
-          hari: kp.hari,
-          jamMengajarId: kp.jamMengajarId
+      return {
+        ...paginatedResult,
+        data: paginatedResult.data.map(guru => ({
+          id: guru.id,
+          nama: guru.nama,
+          keahlian: guru.keahlian,
+          fotoProfile: guru.fotoProfile,
+          pendidikanTerakhir: guru.pendidikanTerakhir,
+          jadwalGuru: guru.kelasProgram.map(kp => ({
+            kelasProgramId: kp.id,
+            kelasId: kp.kelasId,
+            programId: kp.programId,
+            hari: kp.hari,
+            jamMengajarId: kp.jamMengajarId,
+            tipeKelas: kp.tipeKelas
+          }))
         }))
-      }));
+      };
     } catch (error) {
       logger.error('Error getting simplified guru list:', error);
       throw error;
@@ -245,11 +253,11 @@ class GuruService {
 
   async getKelasProgramWithStudents(guruId) {
     try {
-      // Ambil data KelasProgram beserta relasinya dengan benar
       const kelasPrograms = await prisma.kelasProgram.findMany({
         where: { guruId: guruId },
         select: {
           id: true,
+          tipeKelas: true,
           kelas: {
             select: {
               id: true,
@@ -285,6 +293,7 @@ class GuruService {
 
       return kelasPrograms.map(kp => ({
         kelasProgramId: kp.id,
+        tipeKelas: kp.tipeKelas,
         kelas: {
           id: kp.kelas.id,
           namaKelas: kp.kelas.namaKelas

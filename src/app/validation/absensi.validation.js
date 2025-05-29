@@ -72,17 +72,7 @@ class AbsensiValidation {
                 .messages({
                     'any.required': 'Surat izin wajib diisi untuk status IZIN atau SAKIT'
                 }),
-            sks: Joi.number().integer().min(1).when('statusKehadiran', {
-                is: 'HADIR',
-                then: Joi.required(),
-                otherwise: Joi.optional()
-            })
-                .messages({
-                    'number.base': 'SKS harus berupa angka',
-                    'number.integer': 'SKS harus berupa bilangan bulat',
-                    'number.min': 'SKS minimal 1',
-                    'any.required': 'SKS wajib diisi untuk status HADIR'
-                })
+           
         });
     }
 
