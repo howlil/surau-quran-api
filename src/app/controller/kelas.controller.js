@@ -36,11 +36,23 @@ class KelasController {
         return Http.Response.success(res, result, 'Data siswa awal untuk kelas berhasil diambil');
     });
 
+    createKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
+        const data = HttpRequest.getBodyParams(req);
+        const result = await kelasService.createKelasProgram(data);
+        return Http.Response.created(res, result, 'Kelas program berhasil dibuat');
+    });
+
     patchInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
         const { kelasProgramId } = HttpRequest.getUrlParams(req);
         const data = HttpRequest.getBodyParams(req);
         const result = await kelasService.patchInitialStudentIntoClass(kelasProgramId, data);
         return Http.Response.success(res, result, 'Kelas program berhasil diupdate');
+    });
+
+    deleteKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
+        const { kelasProgramId } = HttpRequest.getUrlParams(req);
+        await kelasService.deleteKelasProgram(kelasProgramId);
+        return Http.Response.success(res, { kelasProgramId }, 'Kelas program berhasil dihapus');
     });
 }
 

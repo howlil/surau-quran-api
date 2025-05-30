@@ -35,7 +35,7 @@ router.get(
 );
 
 router.get(
-    '/v1/program/:kelasProgramId/siswa',
+    '/v1/program/:programId/siswa',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
     ProgramController.getProgramStudents

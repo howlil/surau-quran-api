@@ -31,7 +31,6 @@ router.get('/v1/kelas',
 );
 
 
-// TODO : tambahkan pagination di level progrem / kelasprgramId
 router.get('/v1/kelas/initial-student',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
@@ -46,6 +45,21 @@ router.patch(
     authMiddleware.authorize(['ADMIN']),
     validationMiddleware.validateBody(kelasValidation.patchInitialStudentIntoClass()),
     kelasController.patchInitialStudentIntoClass
+);
+
+router.post(
+    '/v1/kelas-program',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['ADMIN']),
+    validationMiddleware.validateBody(kelasValidation.createKelasProgram()),
+    kelasController.createKelasProgram
+);
+
+router.delete(
+    '/v1/kelas-program/:kelasProgramId',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['ADMIN']),
+    kelasController.deleteKelasProgram
 );
 
 module.exports = router;

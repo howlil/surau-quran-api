@@ -19,7 +19,7 @@ class GuruController {
       }
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     data.baseUrl = baseUrl;
 
     const result = await guruService.create(data);
@@ -30,7 +30,7 @@ class GuruController {
   update = ErrorHandler.asyncHandler(async (req, res) => {
     const { id } = HttpRequest.getUrlParams(req);
     const data = HttpRequest.getBodyParams(req);
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     data.baseUrl = baseUrl;
 
     const result = await guruService.update(id, data);
@@ -48,7 +48,7 @@ class GuruController {
     const filters = HttpRequest.getQueryParams(req, [
       'page', 'limit'
     ]);
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     const result = await guruService.getAll(filters);
 
     const transformedData = {
@@ -60,7 +60,7 @@ class GuruController {
   });
 
   getAllWithSchedules = ErrorHandler.asyncHandler(async (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     const filters = HttpRequest.getQueryParams(req, ['page', 'limit']);
     const result = await guruService.getAllGuruWithSchedules(filters);
 

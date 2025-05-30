@@ -122,34 +122,16 @@ class ProgramService {
 
   }
 
-  async getProgramStudents(kelasProgramId) {
+  async getProgramStudents(programId) {
     try {
-      // 1. Ambil data KelasProgram dulu
-      const kelasProgram = await prisma.kelasProgram.findUnique({
-        where: { id: kelasProgramId },
-        include: {
-          program: true,
-          jamMengajar: true
-        }
-      });
+      // 1.      
 
-      if (!kelasProgram) {
-        throw new NotFoundError(`KelasProgram dengan ID ${kelasProgramId} tidak ditemukan`);
-      }
-
-      // 2. Cari semua ProgramSiswa yg eligible
       const programSiswaList = await prisma.programSiswa.findMany({
         where: {
           kelasProgramId: null,
           status: 'AKTIF',
-          programId: kelasProgram.programId,
-          isVerified: false,
-          JadwalProgramSiswa: {
-            some: {
-              hari: kelasProgram.hari,
-              jamMengajarId: kelasProgram.jamMengajarId
-            }
-          }
+          programId: programId,
+          isVerified: false,          
         },
         include: {
           siswa: true

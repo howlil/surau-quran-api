@@ -30,8 +30,8 @@ class ProgramController {
   });
 
   getProgramStudents = ErrorHandler.asyncHandler(async (req, res) => {
-    const { kelasProgramId } = HttpRequest.getUrlParams(req);
-    const result = await programService.getProgramStudents(kelasProgramId);
+    const { programId } = HttpRequest.getUrlParams(req);
+    const result = await programService.getProgramStudents(programId);
     return Http.Response.success(res, result);
   });
 

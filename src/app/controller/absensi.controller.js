@@ -33,7 +33,7 @@ class AbsensiController {
     getAbsensiGuruByDate = ErrorHandler.asyncHandler(async (req, res) => {
         const filters = HttpRequest.getQueryParams(req, ['tanggal']);
         const result = await absensiService.getAbsensiGuruByDate(filters);
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const transformedResult = FileUtils.transformAbsensiGuruListFiles(result, baseUrl);
         return Http.Response.success(res, transformedResult, 'Data absensi guru berhasil diambil');
     });
@@ -41,7 +41,7 @@ class AbsensiController {
     updateAbsensiGuru = ErrorHandler.asyncHandler(async (req, res) => {
         const { id } = HttpRequest.getUrlParams(req);
         const data = HttpRequest.getBodyParams(req);
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
         if (req.file) {
             data.suratIzin = req.file.filename;
@@ -49,7 +49,7 @@ class AbsensiController {
 
         const result = await absensiService.updateAbsensiGuru(id, data);
         const transformedResult = FileUtils.transformAbsensiGuruFiles(result, baseUrl);
-        return Http.Response.success(res,  'Data absensi guru berhasil diperbarui');
+        return Http.Response.success(res, 'Data absensi guru berhasil diperbarui');
     });
 
     updateAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
@@ -64,7 +64,7 @@ class AbsensiController {
         }
 
         const result = await absensiService.updateAbsensiSiswa(siswaId, guru.id, { value: req.body });
-        return Http.Response.success(res,  'Berhasil mengupdate absensi siswa');
+        return Http.Response.success(res, 'Berhasil mengupdate absensi siswa');
     });
 }
 

@@ -64,7 +64,6 @@ class KelasService {
 
     async delete(id) {
         try {
-            // Check if kelas exists
             const kelas = await prisma.kelas.findUnique({
                 where: { id }
             });
@@ -169,6 +168,7 @@ class KelasService {
         }
     }
 
+
     async patchInitialStudentIntoClass(kelasProgramId, data) {
         try {
             const {
@@ -247,6 +247,168 @@ class KelasService {
 
         } catch (err) {
             logger.error('Error in initialStudentIntoClass:', err);
+            throw err;
+        }
+    }
+
+async createKelasProgram(data) {
+        try {
+            const { kelasId, programId, hari, jamMengajarId, guruId, siswaIds = [] } = data;
+
+            return await PrismaUtils.transaction(async (tx) => {
+                const existingKelasProgram = await tx.kelasProgram.findFirst({
+                    where: {
+                        kelasId,
+                        programId,
+                        hari,
+                        jamMengajarId
+                    }
+                });
+
+                if (existingKelasProgram) {
+                    throw new ConflictError('Kelas program dengan kombinasi ini sudah ada');
+                }
+
+                const kelasProgram = await tx.kelasProgram.create({
+                    data: {
+                        kelasId,
+                        programId,
+                        hari,
+                        jamMengajarId,
+                        guruId
+                    }
+                });
+
+                const processedSiswa = [];
+                if (siswaIds.length > 0) {
+                    const eligibleProgramSiswa = await tx.programSiswa.findMany({
+                        where: {
+                            siswaId: { in: siswaIds },
+                            status: 'AKTIF',
+                            programId,
+                            kelasProgramId: null,
+                            isVerified: false,
+                            JadwalProgramSiswa: {
+                                some: {
+                                    hari,
+                                    jamMengajarId
+                                }
+                            }
+                        },
+                        include: { siswa: true }
+                    });
+
+                    for (const ps of eligibleProgramSiswa) {
+                        await tx.programSiswa.update({
+                            where: { id: ps.id },
+                            data: { 
+                                kelasProgramId: kelasProgram.id,
+                                isVerified: true 
+                            }
+                        });
+
+                        processedSiswa.push({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            NIS: ps.siswa.nis
+                        });
+                    }
+                }
+
+                logger.info(`Created kelas program with ID: ${kelasProgram.id}`);
+                return {
+                    ...kelasProgram,
+                    siswaYangDitambahkan: processedSiswa
+                };
+            });
+        } catch (error) {
+            logger.error('Error creating kelas program:', error);
+            throw error;
+        }
+    }
+
+    async getAllProgramSiswaBasedOnProgramId(programId) {
+        try {
+            const programSiswaList = await prisma.programSiswa.findMany({
+                where: {
+                    programId,
+                    status: 'AKTIF',
+                    kelasProgramId: null,
+                    isVerified: false
+                },
+                include: {
+                    siswa: {
+                        select: {
+                            id: true,
+                            namaMurid: true,
+                            nis: true
+                        }
+                    },
+                    JadwalProgramSiswa: {
+                        include: {
+                            jamMengajar: {
+                                select: {
+                                    id: true,
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const groupedBySchedule = {};
+            
+            programSiswaList.forEach(ps => {
+                ps.JadwalProgramSiswa.forEach(jadwal => {
+                    const key = `${jadwal.hari}_${jadwal.jamMengajarId}`;
+                    
+                    if (!groupedBySchedule[key]) {
+                        groupedBySchedule[key] = {
+                            hari: jadwal.hari,
+                            jamMengajar: jadwal.jamMengajar,
+                            siswa: []
+                        };
+                    }
+                    
+                    groupedBySchedule[key].siswa.push({
+                        siswaId: ps.siswa.id,
+                        namaSiswa: ps.siswa.namaMurid,
+                        NIS: ps.siswa.nis
+                    });
+                });
+            });
+
+            return Object.values(groupedBySchedule);
+        } catch (error) {
+            logger.error('Error getting program siswa based on program ID:', error);
+            throw error;
+        }
+    }
+
+    async deleteKelasProgram(kelasProgramId) {
+        try {
+            const kelasProgram = await prisma.kelasProgram.findUnique({
+                where: { id: kelasProgramId }
+            });
+            if (!kelasProgram) {
+                throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+            }
+            // Cek apakah kelas program ini memiliki siswa yang terdaftar
+            const siswaCount = await prisma.programSiswa.count({
+                where: { kelasProgramId }
+            });
+            if (siswaCount > 0) {
+                throw new ConflictError('Kelas program ini memiliki siswa terdaftar dan tidak dapat dihapus');
+            }
+
+
+            await prisma.kelasProgram.delete({
+                where: { id: kelasProgramId }
+            });
+        } catch (err) {
+            logger.error('Error deleting kelas program:', err);
             throw err;
         }
     }

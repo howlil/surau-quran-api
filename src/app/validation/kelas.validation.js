@@ -22,6 +22,46 @@ class KelasValidation {
     });
   }
 
+
+  static createKelasProgram() {
+    return ValidatorFactory.create({
+      kelasId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Kelas ID harus berupa UUID yang valid',
+          'any.required': 'Kelas ID wajib diisi'
+        }),
+      programId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Program ID harus berupa UUID yang valid',
+          'any.required': 'Program ID wajib diisi'
+        }),
+      hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').required()
+        .messages({
+          'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU',
+          'any.required': 'Hari wajib diisi'
+        }),
+      jamMengajarId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid',
+          'any.required': 'Jam Mengajar ID wajib diisi'
+        }),
+      guruId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Guru ID harus berupa UUID yang valid',
+          'any.required': 'Guru ID wajib diisi'
+        }),
+      siswaIds: Joi.array().items(
+        Joi.string().guid({ version: 'uuidv4' })
+          .messages({
+            'string.guid': 'Setiap Siswa ID harus berupa UUID yang valid'
+          })
+      ).optional()
+        .messages({
+          'array.base': 'Daftar siswa harus berupa array'
+        })
+    });
+  }
+
   static patchInitialStudentIntoClass() {
     return ValidatorFactory.create({
       programId: Joi.string().optional(),

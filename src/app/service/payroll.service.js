@@ -6,6 +6,14 @@ const moment = require('moment');
 
 class PayrollService {
 
+
+  /**
+   * logic bayar payroll 
+   * 
+   * 1. pastikan data kalkulasi terisi semua
+   * 2. bisa bayar sekali bersamaan 
+   */
+
   async updatePayroll(id, data) {
     try {
       const payroll = await prisma.payroll.findUnique({
@@ -271,7 +279,6 @@ class PayrollService {
 
     return stats;
   }
-
 
   async getAllPayrollsForGuru(guruId, filters = {}) {
     try {
