@@ -53,6 +53,14 @@ class SiswaController {
       data: result
     });
   });
+
+
+  updateStatusSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+    const { id } = HttpRequest.getUrlParams(req);
+    const data = HttpRequest.getBodyParams(req);
+    await siswaService.updateStatusSiswa(data.programId, id, data.status);
+    return Http.Response.success(res, 'Status siswa berhasil diperbarui');
+  });
 }
 
 module.exports = new SiswaController();

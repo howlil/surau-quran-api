@@ -9,8 +9,11 @@ class VoucherFactory {
             ? Math.floor(Math.random() * 50) + 10 // 10-60% discount
             : Math.floor(Math.random() * 200000) + 50000; // 50k-250k discount
 
+        const namaVoucher = `${randomPrefix} ${tipe === 'PERSENTASE' ? 'Discount' : 'Cashback'} ${randomSuffix}`;
+
         return {
             kodeVoucher: `${randomPrefix}${randomSuffix}`,
+            namaVoucher,
             tipe,
             nominal,
             isActive: Math.random() > 0.2, // 80% chance to be active

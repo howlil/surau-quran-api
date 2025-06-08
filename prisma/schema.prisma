@@ -29,12 +29,11 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  siswa Siswa?
-  admin Admin?
-  guru  Guru?
-  token Token[]
-  passwordResetTokens   PasswordResetToken[]
-
+  siswa               Siswa?
+  admin               Admin?
+  guru                Guru?
+  token               Token[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Token {
@@ -110,7 +109,6 @@ model Guru {
   kelasProgram KelasProgram[]
   payroll      Payroll[]
   AbsensiGuru  AbsensiGuru[]
-  
 }
 
 model Kelas {
@@ -147,15 +145,15 @@ model JamMengajar {
 }
 
 model KelasProgram {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   kelasId       String?
   programId     String
   hari          HARI
   jamMengajarId String
   guruId        String?
-  tipeKelas     TipeKelas @default(GROUP) 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tipeKelas     TipeKelas @default(GROUP)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
   kelas        Kelas?         @relation(fields: [kelasId], references: [id])
@@ -167,12 +165,11 @@ model KelasProgram {
   absensiGuru  AbsensiGuru[]
 }
 
-
 enum TipeKelas {
-  GROUP       // Rp 35,000/sesi
-  PRIVATE     // Rp 35,000/sesi
-  SUBSTITUTE  // Rp 25,000/sesi (Guru Pengganti)
-  ONLINE      // Rp 25,000/sesi (Online diluar Surau)
+  GROUP // Rp 35,000/sesi
+  PRIVATE // Rp 35,000/sesi
+  SUBSTITUTE // Rp 25,000/sesi (Guru Pengganti)
+  ONLINE // Rp 25,000/sesi (Online diluar Surau)
 }
 
 // Model Pendaftaran (sekali untuk satu siswa)
@@ -236,7 +233,6 @@ model RiwayatStatusSiswa {
   statusLama       StatusSiswa
   statusBaru       StatusSiswa
   tanggalPerubahan String
-  keterangan       String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -257,27 +253,28 @@ model AbsensiSiswa {
   siswa        Siswa        @relation(fields: [siswaId], references: [id])
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
+
 model AbsensiGuru {
-  id              String          @id @default(uuid())
-  kelasProgramId  String
-  payrollId       String?
-  guruId          String
-  tanggal         String
-  jamMasuk        String
-  jamKeluar       String
-  sks             Int
-  suratIzin       String?
-  statusKehadiran StatusKehadiran
+  id                     String          @id @default(uuid())
+  kelasProgramId         String
+  payrollId              String?
+  guruId                 String
+  tanggal                String
+  jamMasuk               String
+  jamKeluar              String
+  sks                    Int
+  suratIzin              String?
+  statusKehadiran        StatusKehadiran
   // Add these fields for tracking lateness and penalties
-  terlambat       Boolean         @default(false)
-  menitTerlambat  Int?
-  potonganTerlambat Decimal?      @db.Decimal(10, 2) // Rp 10,000 for late
-  potonganTanpaKabar Decimal?     @db.Decimal(10, 2) // Rp 20,000 for absence without notice
-  potonganTanpaSuratIzin Decimal? @db.Decimal(10, 2) // Rp 10,000 for absence without permission letter
+  terlambat              Boolean         @default(false)
+  menitTerlambat         Int?
+  potonganTerlambat      Decimal?        @db.Decimal(10, 2) // Rp 10,000 for late
+  potonganTanpaKabar     Decimal?        @db.Decimal(10, 2) // Rp 20,000 for absence without notice
+  potonganTanpaSuratIzin Decimal?        @db.Decimal(10, 2) // Rp 10,000 for absence without permission letter
   // Incentive tracking
-  insentifKehadiran Decimal?      @db.Decimal(10, 2) // Rp 10,000 if minimum 2 SKS per day
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  insentifKehadiran      Decimal?        @db.Decimal(10, 2) // Rp 10,000 if minimum 2 SKS per day
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
   // Relations
   guru         Guru         @relation(fields: [guruId], references: [id])
@@ -285,10 +282,10 @@ model AbsensiGuru {
   kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
 }
 
-
 model Voucher {
   id               String      @id @default(uuid())
   kodeVoucher      String      @unique
+  namaVoucher      String      
   tipe             TipeVoucher
   nominal          Decimal     @db.Decimal(10, 2)
   isActive         Boolean     @default(true)
@@ -355,18 +352,18 @@ model XenditPayment {
 }
 
 model Payroll {
-  id            String        @id @default(uuid())
-  guruId        String
-  periode       String
-  bulan         String
-  tahun         Int
-  gajiPokok     Decimal       @db.Decimal(10, 2)
-  insentif      Decimal?      @db.Decimal(10, 2)
-  potongan      Decimal       @db.Decimal(10, 2)
-  totalGaji     Decimal       @db.Decimal(10, 2)
-  status        StatusPayroll
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id        String        @id @default(uuid())
+  guruId    String
+  periode   String
+  bulan     String
+  tahun     Int
+  gajiPokok Decimal       @db.Decimal(10, 2)
+  insentif  Decimal?      @db.Decimal(10, 2)
+  potongan  Decimal       @db.Decimal(10, 2)
+  totalGaji Decimal       @db.Decimal(10, 2)
+  status    StatusPayroll
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   // Relations
   guru                Guru                 @relation(fields: [guruId], references: [id])
@@ -532,4 +529,3 @@ model PendaftaranTemp {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
-

@@ -108,6 +108,23 @@ class SiswaValidation {
     });
   }
 
+
+  
+  static updateStatusSiswa() {
+    return ValidatorFactory.create({
+      programId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Program ID harus berupa UUID yang valid',
+          'any.required': 'Program ID wajib diisi'
+        }),
+      status: Joi.string().valid('AKTIF', 'TIDAK_AKTIF', 'CUTI').required()
+        .messages({
+          'any.only': 'Status harus salah satu dari: AKTIF, TIDAK_AKTIF, CUTI',
+          'any.required': 'Status wajib diisi'
+        })
+    });
+  }
+
   static adminUpdateSiswa() {
     return ValidatorFactory.create({
       // Basic student information

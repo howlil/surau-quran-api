@@ -36,7 +36,7 @@ class GuruService {
           data: {
             ...guruData,
             userId: user.id,
-            nip: NIP.toString().padStart(6, '0'),
+            nip: NIP.toString().padStart(6, '0')
           },
           include: {
             user: {
@@ -101,9 +101,17 @@ class GuruService {
           });
         }
 
+        // Only update fields that are provided
+        const updateData = {};
+        Object.keys(guruData).forEach(key => {
+          if (guruData[key] !== undefined) {
+            updateData[key] = guruData[key];
+          }
+        });
+
         const updated = await tx.guru.update({
           where: { id },
-          data: guruData,
+          data: updateData,
           include: {
             user: {
               select: {
@@ -169,7 +177,6 @@ class GuruService {
     try {
       const { page = 1, limit = 10 } = filters;
 
-
       return await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
@@ -185,14 +192,14 @@ class GuruService {
           pendidikanTerakhir: true,
           noRekening: true,
           namaBank: true,
+          suratKontrak: true,
           user: {
             select: {
               email: true,
             }
           }
         },
-
-        orderBy: { nama: 'asc' }
+        orderBy: { createdAt: 'desc' }
       });
     } catch (error) {
       logger.error('Error getting all gurus:', error);
@@ -213,6 +220,7 @@ class GuruService {
           keahlian: true,
           fotoProfile: true,
           pendidikanTerakhir: true,
+          suratKontrak: true,
           kelasProgram: {
             select: {
               id: true,
@@ -235,6 +243,7 @@ class GuruService {
           keahlian: guru.keahlian,
           fotoProfile: guru.fotoProfile,
           pendidikanTerakhir: guru.pendidikanTerakhir,
+          suratKontrak: guru.suratKontrak,
           jadwalGuru: guru.kelasProgram.map(kp => ({
             kelasProgramId: kp.id,
             kelasId: kp.kelasId,

@@ -934,6 +934,44 @@ class SiswaService {
       throw error;
     }
   }
+
+  async updateStatusSiswa(programId, siswaId, status) {
+    try {
+      const programSiswa = await prisma.programSiswa.findFirst({
+        where: {
+          programId,
+          siswaId
+        }
+      });
+
+      if (!programSiswa) {
+        throw new NotFoundError(`Program siswa dengan ID ${siswaId} tidak ditemukan untuk program ID ${programId}`);
+      }
+
+      const oldStatus = programSiswa.status;
+
+      const updatedProgramSiswa = await prisma.programSiswa.update({
+        where: { id: programSiswa.id },
+        data: { status }
+      });
+
+      // Catat riwayat perubahan status
+      await prisma.riwayatStatusSiswa.create({
+        data: {
+          programSiswaId: updatedProgramSiswa.id,
+          statusLama: oldStatus,
+          statusBaru: status,
+          tanggalPerubahan: new Date().toISOString().split('T')[0],
+          keterangan: `Status diubah menjadi ${status}`
+        }
+      });
+
+      return updatedProgramSiswa;
+    } catch (error) {
+      logger.error(`Error updating status for siswa ID ${siswaId} in program ID ${programId}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new SiswaService();

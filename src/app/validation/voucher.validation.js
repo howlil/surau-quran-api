@@ -1,4 +1,3 @@
-
 const Joi = require('joi');
 const ValidatorFactory = require('./factory.validation');
 
@@ -9,6 +8,11 @@ class VoucherValidation {
         .messages({
           'string.empty': 'Kode voucher tidak boleh kosong',
           'any.required': 'Kode voucher wajib diisi'
+        }),
+      namaVoucher: Joi.string().required()
+        .messages({
+          'string.empty': 'Nama voucher tidak boleh kosong',
+          'any.required': 'Nama voucher wajib diisi'
         }),
       tipe: Joi.string().valid('PERSENTASE', 'NOMINAL').required()
         .messages({
@@ -41,6 +45,10 @@ class VoucherValidation {
         .messages({
           'string.empty': 'Kode voucher tidak boleh kosong'
         }),
+      namaVoucher: Joi.string().optional()
+        .messages({
+          'string.empty': 'Nama voucher tidak boleh kosong'
+        }),
       tipe: Joi.string().valid('PERSENTASE', 'NOMINAL').optional()
         .messages({
           'any.only': 'Tipe voucher harus PERSENTASE atau NOMINAL'
@@ -63,7 +71,7 @@ class VoucherValidation {
     });
   }
 
- 
+
 }
 
 module.exports = VoucherValidation;

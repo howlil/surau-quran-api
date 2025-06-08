@@ -39,7 +39,7 @@ class ConflictError extends HttpError {
 }
 
 const handlePrismaError = (error) => {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error?.code) {
         switch (error.code) {
             case 'P2002': return new ConflictError('Data sudah ada dalam sistem');
             case 'P2014': return new BadRequestError('ID tidak valid');
@@ -49,11 +49,11 @@ const handlePrismaError = (error) => {
         }
     }
 
-    if (error instanceof Prisma.PrismaClientValidationError) {
+    if (error?.name === 'PrismaClientValidationError') {
         return new BadRequestError('Data yang diberikan tidak valid');
     }
 
-    if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (error?.name === 'PrismaClientInitializationError') {
         logger.error('Database initialization error:', error);
         return new HttpError('Terjadi kesalahan pada koneksi database', 500);
     }
@@ -67,7 +67,7 @@ const errorHandler = (err, req, res, next) => {
     let error = err;
 
     // Handle Prisma Errors
-    if (err instanceof Prisma.PrismaClientError) {
+    if (err?.name?.startsWith('PrismaClient')) {
         error = handlePrismaError(err);
     }
 

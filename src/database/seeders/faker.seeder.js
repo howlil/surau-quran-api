@@ -353,10 +353,12 @@ class FakerSeeder {
 
             // Create Vouchers (some active, some not)
             for (let i = 0; i < TOTAL_RECORDS; i++) {
+                const tipe = faker.helpers.arrayElement(['PERSENTASE', 'NOMINAL']);
                 const voucher = await prisma.voucher.create({
                     data: {
                         kodeVoucher: `VOUCHER${(i + 1).toString().padStart(3, '0')}`,
-                        tipe: faker.helpers.arrayElement(['PERSENTASE', 'NOMINAL']),
+                        namaVoucher: `${tipe === 'PERSENTASE' ? 'Diskon' : 'Cashback'} ${(i + 1).toString().padStart(3, '0')}`,
+                        tipe,
                         nominal: faker.number.int({ min: 10000, max: 100000 }),
                         isActive: Math.random() > 0.2,
                         jumlahPenggunaan: faker.number.int({ min: 0, max: 100 }),

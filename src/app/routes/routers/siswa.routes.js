@@ -27,6 +27,14 @@ router.patch(
   siswaController.adminUpdateSiswa
 );
 
+router.patch(
+  '/v1/siswa/:id/status',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateBody(siswaValidation.updateStatusSiswa()),
+  siswaController.updateStatusSiswa
+);
+
 router.post(
   '/v1/pendaftaran',
   validationMiddleware.validateBody(siswaValidation.pendaftaranSiswa()),

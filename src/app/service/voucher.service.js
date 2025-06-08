@@ -68,8 +68,8 @@ class VoucherService {
       const voucher = await prisma.voucher.findUnique({
         where: { id },
         include: {
-          pendaftaran: true,
-          periodeSpp: true
+          Pendaftaran: true,
+          PeriodeSpp: true
         }
       });
 
@@ -77,7 +77,7 @@ class VoucherService {
         throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
       }
 
-      if (voucher.pendaftaran.length > 0 || voucher.periodeSpp.length > 0) {
+      if (voucher.Pendaftaran.length > 0 || voucher.PeriodeSpp.length > 0) {
         throw new ConflictError('Voucher sedang digunakan dan tidak dapat dihapus');
       }
 
@@ -102,6 +102,7 @@ class VoucherService {
         select: {
           id: true,
           kodeVoucher: true,
+          namaVoucher: true,
           tipe: true,
           nominal: true,
           isActive: true,

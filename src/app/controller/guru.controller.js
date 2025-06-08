@@ -12,10 +12,10 @@ class GuruController {
 
     if (req.files) {
       if (req.files.fotoProfile && req.files.fotoProfile[0]) {
-        data.fotoProfile = req.files.fotoProfile[0].filename;
+        data.fotoProfile = req.files.fotoProfile[0].path;
       }
       if (req.files.suratKontrak && req.files.suratKontrak[0]) {
-        data.suratKontrak = req.files.suratKontrak[0].filename;
+        data.suratKontrak = req.files.suratKontrak[0].path;
       }
     }
 
@@ -24,18 +24,28 @@ class GuruController {
 
     const result = await guruService.create(data);
     const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
-    return Http.Response.created(res, 'Guru berhasil dibuat');
+    return Http.Response.created(res, transformedResult, 'Guru berhasil dibuat');
   });
 
   update = ErrorHandler.asyncHandler(async (req, res) => {
     const { id } = HttpRequest.getUrlParams(req);
     const data = HttpRequest.getBodyParams(req);
+
+    if (req.files) {
+      if (req.files.fotoProfile && req.files.fotoProfile[0]) {
+        data.fotoProfile = req.files.fotoProfile[0].path;
+      }
+      if (req.files.suratKontrak && req.files.suratKontrak[0]) {
+        data.suratKontrak = req.files.suratKontrak[0].path;
+      }
+    }
+
     const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
     data.baseUrl = baseUrl;
 
     const result = await guruService.update(id, data);
     const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
-    return Http.Response.success(res, 'Guru berhasil diperbarui');
+    return Http.Response.success(res, transformedResult, 'Guru berhasil diperbarui');
   });
 
   delete = ErrorHandler.asyncHandler(async (req, res) => {
