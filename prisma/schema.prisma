@@ -216,7 +216,7 @@ model JadwalProgramSiswa {
   programSiswaId String
   hari           HARI
   jamMengajarId  String
-
+  urutan         Int 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

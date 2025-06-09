@@ -98,11 +98,101 @@ class KelasService {
             const kelasList = await prisma.kelas.findMany({
                 select: {
                     id: true,
-                    namaKelas: true
+                    namaKelas: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    kelasProgram: {
+                        select: {
+                            id: true,
+                            hari: true,
+                            tipeKelas: true,
+                            program: {
+                                select: {
+                                    id: true,
+                                    namaProgram: true,
+                                    programSiswa: {
+                                        where: {
+                                            status: 'AKTIF',
+                                            isVerified: false,
+                                            kelasProgramId: null
+                                        },
+                                        select: {
+                                            id: true,
+                                            siswa: {
+                                                select: {
+                                                    id: true,
+                                                    namaMurid: true,
+                                                    nis: true
+                                                }
+                                            },
+                                            JadwalProgramSiswa: {
+                                                select: {
+                                                    id: true,
+                                                    hari: true,
+                                                    urutan: true,
+                                                    jamMengajar: {
+                                                        select: {
+                                                            id: true,
+                                                            jamMulai: true,
+                                                            jamSelesai: true
+                                                        }
+                                                    }
+                                                },
+                                                orderBy: {
+                                                    urutan: 'asc'
+                                                },
+                                                take: 2
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            jamMengajar: {
+                                select: {
+                                    id: true,
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            },
+                            guru: {
+                                select: {
+                                    id: true,
+                                    nama: true,
+                                    nip: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
                 }
             });
 
-            return kelasList;
+            // Transform the data to include eligible students
+            const transformedKelasList = kelasList.map(kelas => ({
+                ...kelas,
+                kelasProgram: kelas.kelasProgram.map(kp => ({
+                    ...kp,
+                    program: {
+                        ...kp.program,
+                        eligibleStudents: kp.program.programSiswa.map(ps => ({
+                            programSiswaId: ps.id,
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            nis: ps.siswa.nis,
+                            jadwal: ps.JadwalProgramSiswa.map(jps => ({
+                                id: jps.id,
+                                hari: jps.hari,
+                                urutan: jps.urutan,
+                                jamMengajar: jps.jamMengajar
+                            }))
+                        }))
+                    }
+                }))
+            }));
+
+            return transformedKelasList;
         } catch (error) {
             logger.error('Error getting all kelas:', error);
             throw error;
@@ -206,7 +296,7 @@ class KelasService {
                         where: {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
-                            programId: kelasProgram.programId,
+                            programId,
                             kelasProgramId: null,
                             isVerified: false,
                             JadwalProgramSiswa: {
@@ -251,7 +341,7 @@ class KelasService {
         }
     }
 
-async createKelasProgram(data) {
+    async createKelasProgram(data) {
         try {
             const { kelasId, programId, hari, jamMengajarId, guruId, siswaIds = [] } = data;
 
@@ -301,9 +391,9 @@ async createKelasProgram(data) {
                     for (const ps of eligibleProgramSiswa) {
                         await tx.programSiswa.update({
                             where: { id: ps.id },
-                            data: { 
+                            data: {
                                 kelasProgramId: kelasProgram.id,
-                                isVerified: true 
+                                isVerified: true
                             }
                         });
 
@@ -359,11 +449,11 @@ async createKelasProgram(data) {
             });
 
             const groupedBySchedule = {};
-            
+
             programSiswaList.forEach(ps => {
                 ps.JadwalProgramSiswa.forEach(jadwal => {
                     const key = `${jadwal.hari}_${jadwal.jamMengajarId}`;
-                    
+
                     if (!groupedBySchedule[key]) {
                         groupedBySchedule[key] = {
                             hari: jadwal.hari,
@@ -371,7 +461,7 @@ async createKelasProgram(data) {
                             siswa: []
                         };
                     }
-                    
+
                     groupedBySchedule[key].siswa.push({
                         siswaId: ps.siswa.id,
                         namaSiswa: ps.siswa.namaMurid,
@@ -390,26 +480,55 @@ async createKelasProgram(data) {
     async deleteKelasProgram(kelasProgramId) {
         try {
             const kelasProgram = await prisma.kelasProgram.findUnique({
-                where: { id: kelasProgramId }
+                where: { id: kelasProgramId },
+                include: {
+                    programSiswa: {
+                        where: { status: 'AKTIF' }
+                    }
+                }
             });
+
             if (!kelasProgram) {
                 throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
             }
-            // Cek apakah kelas program ini memiliki siswa yang terdaftar
-            const siswaCount = await prisma.programSiswa.count({
-                where: { kelasProgramId }
-            });
-            if (siswaCount > 0) {
-                throw new ConflictError('Kelas program ini memiliki siswa terdaftar dan tidak dapat dihapus');
+
+            if (kelasProgram.programSiswa.length > 0) {
+                throw new ConflictError('Kelas program ini memiliki siswa yang terdaftar dan tidak dapat dihapus');
             }
 
+            // Use transaction to ensure data consistency
+            await PrismaUtils.transaction(async (tx) => {
+                // Delete all related records in order
+                // 1. Delete AbsensiSiswa records
+                await tx.absensiSiswa.deleteMany({
+                    where: { kelasProgramId }
+                });
 
-            await prisma.kelasProgram.delete({
-                where: { id: kelasProgramId }
+                // 2. Delete AbsensiGuru records
+                await tx.absensiGuru.deleteMany({
+                    where: { kelasProgramId }
+                });
+
+                // 3. Update ProgramSiswa records to remove kelasProgramId reference
+                await tx.programSiswa.updateMany({
+                    where: { kelasProgramId },
+                    data: {
+                        kelasProgramId: null,
+                        isVerified: false
+                    }
+                });
+
+                // 4. Finally delete the kelas program
+                await tx.kelasProgram.delete({
+                    where: { id: kelasProgramId }
+                });
             });
-        } catch (err) {
-            logger.error('Error deleting kelas program:', err);
-            throw err;
+
+            logger.info(`Deleted kelas program with ID: ${kelasProgramId}`);
+            return { kelasProgramId };
+        } catch (error) {
+            logger.error(`Error deleting kelas program with ID ${kelasProgramId}:`, error);
+            throw error;
         }
     }
 

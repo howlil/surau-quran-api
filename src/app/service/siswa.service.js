@@ -229,6 +229,7 @@ class SiswaService {
             data: {
               programSiswaId: programSiswa.id,
               hari: jadwalItem.hari,
+              urutan: jadwalItem.urutan,
               jamMengajarId: jadwalItem.jamMengajarId
             }
           });
@@ -454,6 +455,7 @@ class SiswaService {
         data.schedule = programAktif
           ? programAktif.JadwalProgramSiswa.map(jadwal => ({
             hari: jadwal.hari,
+            urutan: jadwal.urutan,
             jamMengajarId: jadwal.jamMengajarId,
           }))
           : [];
@@ -499,6 +501,7 @@ class SiswaService {
           : null;
         data.schedule = jadwalArr.map(jadwal => ({
           hari: jadwal.hari,
+          urutan: jadwal.urutan,
           jamMengajarId: jadwal.jamMengajarId,
         }));
       }
@@ -580,6 +583,7 @@ class SiswaService {
               JadwalProgramSiswa: {
                 select: {
                   hari: true,
+                  urutan: true,
                   jamMengajar: {
                     select: {
                       jamMulai: true,
@@ -618,6 +622,9 @@ class SiswaService {
               JadwalProgramSiswa: {
                 include: {
                   jamMengajar: true
+                },
+                orderBy: {
+                  urutan: 'asc'
                 }
               }
             }
@@ -634,11 +641,18 @@ class SiswaService {
         siswaId: siswa.id
       };
 
-      // Filter by month if provided
       if (bulan) {
-        const monthRegex = `-${bulan.padStart(2, '0')}-`; // Format: -MM-
+        const [month, year] = bulan.split('-');
+        if (!month || !year || month.length !== 2 || year.length !== 4) {
+          throw new BadRequestError('Format bulan harus MM-YYYY');
+        }
+
+        const startDate = `${year}-${month}-01`;
+        const endDate = moment(startDate).endOf('month').format('YYYY-MM-DD');
+
         absensiWhere.tanggal = {
-          contains: monthRegex
+          gte: startDate,
+          lte: endDate
         };
       }
 
@@ -691,6 +705,7 @@ class SiswaService {
         ps.JadwalProgramSiswa.forEach(j => {
           jadwal.push({
             hari: j.hari,
+            urutan: j.urutan,
             jam: `${j.jamMengajar.jamMulai} - ${j.jamMengajar.jamSelesai}`
           });
         });

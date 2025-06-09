@@ -23,8 +23,6 @@ class KelasController {
         return Http.Response.success(res, { id }, 'Kelas berhasil dihapus');
     });
 
-
-
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
         const result = await kelasService.getAll();
         return Http.Response.success(res, result);
@@ -51,8 +49,8 @@ class KelasController {
 
     deleteKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
         const { kelasProgramId } = HttpRequest.getUrlParams(req);
-        await kelasService.deleteKelasProgram(kelasProgramId);
-        return Http.Response.success(res, { kelasProgramId }, 'Kelas program berhasil dihapus');
+        const result = await kelasService.deleteKelasProgram(kelasProgramId);
+        return Http.Response.success(res, 'Kelas program berhasil dihapus');
     });
 }
 

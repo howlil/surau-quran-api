@@ -4,7 +4,7 @@ const moment = require('moment');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 
-const prisma = new PrismaClient();
+const prismaClient = new PrismaClient();
 
 const TOTAL_RECORDS = 30;
 const DEFAULT_PASSWORD = '@Test123';
@@ -72,7 +72,13 @@ class FakerSeeder {
             absensiSiswa: [],
             absensiGuru: [],
             payroll: [],
-            riwayatStatusSiswa: []
+            riwayatStatusSiswa: [],
+            users: [],
+            admins: [],
+            gurus: [],
+            siswas: [],
+            programs: [],
+            kelas: []
         };
     }
 
@@ -155,7 +161,7 @@ class FakerSeeder {
 
                 let user;
                 if (defaultUser.role === 'ADMIN') {
-                    user = await prisma.user.create({
+                    user = await prismaClient.user.create({
                         data: {
                             ...userData,
                             admin: {
@@ -170,7 +176,7 @@ class FakerSeeder {
                     });
                     this.users.admins.push(user);
                 } else if (defaultUser.role === 'GURU') {
-                    user = await prisma.user.create({
+                    user = await prismaClient.user.create({
                         data: {
                             ...userData,
                             guru: {
@@ -185,7 +191,7 @@ class FakerSeeder {
                     });
                     this.users.gurus.push(user);
                 } else if (defaultUser.role === 'SISWA') {
-                    user = await prisma.user.create({
+                    user = await prismaClient.user.create({
                         data: {
                             ...userData,
                             siswa: {
@@ -210,7 +216,7 @@ class FakerSeeder {
 
                 // Create Admin
                 userPromises.push(
-                    prisma.user.create({
+                    prismaClient.user.create({
                         data: {
                             id: uuidv4(),
                             email: `admin.${i + 1}@surauquran.com`,
@@ -232,7 +238,7 @@ class FakerSeeder {
 
                 // Create Guru with some incomplete data
                 userPromises.push(
-                    prisma.user.create({
+                    prismaClient.user.create({
                         data: {
                             id: uuidv4(),
                             email: `guru.${i + 1}@surauquran.com`,
@@ -264,7 +270,7 @@ class FakerSeeder {
 
                 // Create Siswa with some incomplete data
                 userPromises.push(
-                    prisma.user.create({
+                    prismaClient.user.create({
                         data: {
                             id: uuidv4(),
                             email: `siswa.${i + 1}@surauquran.com`,
@@ -316,7 +322,7 @@ class FakerSeeder {
         try {
             // Create Kelas
             for (const kelasName of KELAS_NAMES) {
-                const kelas = await prisma.kelas.create({
+                const kelas = await prismaClient.kelas.create({
                     data: {
                         namaKelas: kelasName,
                         createdAt: new Date(),
@@ -328,7 +334,7 @@ class FakerSeeder {
 
             // Create Programs
             for (const programName of PROGRAM_NAMES) {
-                const program = await prisma.program.create({
+                const program = await prismaClient.program.create({
                     data: {
                         namaProgram: programName,
                         createdAt: new Date(),
@@ -340,7 +346,7 @@ class FakerSeeder {
 
             // Create Jam Mengajar
             for (const shift of SHIFT_TIMES) {
-                const jamMengajar = await prisma.jamMengajar.create({
+                const jamMengajar = await prismaClient.jamMengajar.create({
                     data: {
                         jamMulai: shift.start,
                         jamSelesai: shift.end,
@@ -354,7 +360,7 @@ class FakerSeeder {
             // Create Vouchers (some active, some not)
             for (let i = 0; i < TOTAL_RECORDS; i++) {
                 const tipe = faker.helpers.arrayElement(['PERSENTASE', 'NOMINAL']);
-                const voucher = await prisma.voucher.create({
+                const voucher = await prismaClient.voucher.create({
                     data: {
                         kodeVoucher: `VOUCHER${(i + 1).toString().padStart(3, '0')}`,
                         namaVoucher: `${tipe === 'PERSENTASE' ? 'Diskon' : 'Cashback'} ${(i + 1).toString().padStart(3, '0')}`,
@@ -386,7 +392,7 @@ class FakerSeeder {
             // Create fewer Kelas Program (only 1-2 per guru)
             for (const guru of this.users.gurus) {
                 for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
-                    const kelasProgram = await prisma.kelasProgram.create({
+                    const kelasProgram = await prismaClient.kelasProgram.create({
                         data: {
                             kelasId: faker.helpers.arrayElement(this.data.kelas).id,
                             programId: faker.helpers.arrayElement(this.data.programs).id,
@@ -407,131 +413,90 @@ class FakerSeeder {
                 }
             }
 
-            // Create Program Siswa with more students per kelas program
-            for (const kelasProgram of this.data.kelasProgram) {
-                // Create 10-20 students per kelas program
-                const studentsPerClass = faker.number.int({ min: 10, max: 20 });
-                const availableStudents = [...this.users.siswas].filter(s => !studentsInKelasProgram.has(s.siswa.id)); // Only use students not yet in any kelas
+            // Randomly select 60% of students to have kelas program assigned
+            const shuffledSiswas = [...this.users.siswas].sort(() => Math.random() - 0.5);
+            const siswaWithKelasCount = Math.floor(this.users.siswas.length * 0.6);
+            const siswaWithKelas = shuffledSiswas.slice(0, siswaWithKelasCount);
+            const siswaWithoutKelas = shuffledSiswas.slice(siswaWithKelasCount);
 
-                for (let i = 0; i < studentsPerClass && availableStudents.length > 0; i++) {
-                    // Randomly select a student
-                    const randomIndex = faker.number.int({ min: 0, max: availableStudents.length - 1 });
-                    const siswa = availableStudents.splice(randomIndex, 1)[0];
-                    studentsInKelasProgram.add(siswa.siswa.id);
+            console.log(`Assigning ${siswaWithKelas.length} students to kelas program`);
+            console.log(`Leaving ${siswaWithoutKelas.length} students without kelas program`);
 
-                    // 70% chance of being verified, all are AKTIF
-                    const isVerified = Math.random() < 0.7;
-
-                    const programSiswa = await prisma.programSiswa.create({
+            // Create programSiswa for students WITH kelas program
+            for (const siswa of siswaWithKelas) {
+                for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
+                    const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
+                    const programSiswa = await prismaClient.programSiswa.create({
                         data: {
                             siswaId: siswa.siswa.id,
                             programId: kelasProgram.programId,
                             kelasProgramId: kelasProgram.id,
                             status: 'AKTIF',
-                            isVerified,
-                            createdAt: new Date(),
-                            updatedAt: new Date()
+                            isVerified: true, // Students with kelas are verified
+                            createdAt: faker.date.past(),
+                            updatedAt: faker.date.past()
                         }
                     });
                     this.data.programSiswa.push(programSiswa);
 
-                    // Create Jadwal Program Siswa
-                    const jadwalCount = faker.number.int({ min: 1, max: 3 });
-                    for (let j = 0; j < jadwalCount; j++) {
-                        const jadwal = await prisma.jadwalProgramSiswa.create({
-                            data: {
-                                programSiswaId: programSiswa.id,
-                                hari: faker.helpers.arrayElement(['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']),
-                                jamMengajarId: faker.helpers.arrayElement(this.data.jamMengajar).id,
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        });
-                        this.data.jadwalProgramSiswa.push(jadwal);
-                    }
-
-                    // Create Periode SPP for verified students
-                    if (isVerified && Math.random() > 0.3) {
-                        const periodeSpp = await prisma.periodeSpp.create({
-                            data: {
-                                programSiswaId: programSiswa.id,
-                                bulan: moment().format('MM'),
-                                tahun: 2025,
-                                tanggalTagihan: this.generateDate(),
-                                jumlahTagihan: faker.number.int({ min: 100000, max: 500000 }),
-                                diskon: Math.random() > 0.7 ? faker.number.int({ min: 10000, max: 50000 }) : null,
-                                totalTagihan: faker.number.int({ min: 100000, max: 500000 }),
-                                voucher_id: Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers).id : null,
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        });
-                        this.data.periodeSpp.push(periodeSpp);
-                    }
-
-                    // Create Pendaftaran only for verified students who don't have one yet
-                    if (isVerified && Math.random() > 0.3 && !studentsWithPendaftaran.has(siswa.siswa.id)) {
-                        const pendaftaran = await prisma.pendaftaran.create({
-                            data: {
-                                siswaId: siswa.siswa.id,
-                                biayaPendaftaran: faker.number.int({ min: 100000, max: 300000 }),
-                                tanggalDaftar: this.generateDate(),
-                                diskon: Math.random() > 0.7 ? faker.number.int({ min: 10000, max: 50000 }) : 0,
-                                totalBiaya: faker.number.int({ min: 100000, max: 300000 }),
-                                voucher_id: Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers).id : null,
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        });
-                        this.data.pendaftaran.push(pendaftaran);
-                        studentsWithPendaftaran.add(siswa.siswa.id);
-                    }
-                }
-            }
-
-            // Create uninitialized Program Siswa (not yet assigned to kelas program)
-            const remainingStudents = this.users.siswas.filter(s => !studentsInKelasProgram.has(s.siswa.id));
-            for (const kelasProgram of this.data.kelasProgram) {
-                // Create 5-10 uninitialized students per program
-                const uninitializedCount = faker.number.int({ min: 5, max: 10 });
-                const availableStudents = [...remainingStudents];
-
-                for (let i = 0; i < uninitializedCount && availableStudents.length > 0; i++) {
-                    const randomIndex = faker.number.int({ min: 0, max: availableStudents.length - 1 });
-                    const siswa = availableStudents.splice(randomIndex, 1)[0];
-
-                    // Create Program Siswa without kelasProgram assignment
-                    const programSiswa = await prisma.programSiswa.create({
-                        data: {
-                            siswaId: siswa.siswa.id,
-                            programId: kelasProgram.programId,
-                            kelasProgramId: null, // Explicitly set to null
-                            status: 'AKTIF',
-                            isVerified: false, // Uninitialized students are not verified
-                            createdAt: new Date(),
-                            updatedAt: new Date()
-                        }
-                    });
-                    this.data.programSiswa.push(programSiswa);
-
-                    // Create matching Jadwal Program Siswa (same hari and jamMengajar as kelasProgram)
-                    await prisma.jadwalProgramSiswa.create({
+                    // Create matching Jadwal Program Siswa
+                    await prismaClient.jadwalProgramSiswa.create({
                         data: {
                             programSiswaId: programSiswa.id,
-                            hari: kelasProgram.hari, // Match kelasProgram's schedule
-                            jamMengajarId: kelasProgram.jamMengajarId, // Match kelasProgram's time
-                            createdAt: new Date(),
-                            updatedAt: new Date()
+                            hari: kelasProgram.hari,
+                            jamMengajarId: kelasProgram.jamMengajarId,
+                            urutan: 1,
+                            createdAt: faker.date.future(),
+                            updatedAt: faker.date.future()
                         }
                     });
                 }
             }
 
-            // Create Payroll data for each guru (moved before attendance creation)
+            // Create programSiswa for students WITHOUT kelas program (active but unverified)
+            for (const siswa of siswaWithoutKelas) {
+                // Each student without kelas can have 1-3 programs they're waiting to be assigned to
+                const programCount = faker.number.int({ min: 1, max: 3 });
+                
+                for (let i = 0; i < programCount; i++) {
+                    const program = faker.helpers.arrayElement(this.data.programs);
+                    
+                    // Check if this student already has this program
+                    const existingProgram = this.data.programSiswa.find(
+                        ps => ps.siswaId === siswa.siswa.id && ps.programId === program.id
+                    );
+                    
+                    if (!existingProgram) {
+                        const programSiswa = await prismaClient.programSiswa.create({
+                            data: {
+                                siswaId: siswa.siswa.id,
+                                programId: program.id,
+                                kelasProgramId: null, // No kelas assigned yet
+                                status: 'AKTIF', // Active status
+                                isVerified: false, // Not verified yet
+                                createdAt: faker.date.recent(),
+                                updatedAt: faker.date.recent()
+                            }
+                        });
+                        this.data.programSiswa.push(programSiswa);
+                        
+                        console.log(`Created unverified program for student ${siswa.siswa.namaMurid} - Program: ${program.namaProgram}`);
+                    }
+                }
+            }
+
+            // Log statistics
+            const verifiedCount = this.data.programSiswa.filter(ps => ps.isVerified).length;
+            const unverifiedCount = this.data.programSiswa.filter(ps => !ps.isVerified).length;
+            console.log(`Total ProgramSiswa created: ${this.data.programSiswa.length}`);
+            console.log(`Verified (with kelas): ${verifiedCount}`);
+            console.log(`Unverified (without kelas): ${unverifiedCount}`);
+
+            // Create Payroll data for each guru
             for (const guru of this.users.gurus) {
                 // Create payroll records for multiple months
                 for (let month = 1; month <= 12; month++) {
-                    const payroll = await prisma.payroll.create({
+                    const payroll = await prismaClient.payroll.create({
                         data: {
                             guruId: guru.guru.id,
                             periode: `${month.toString().padStart(2, '0')}-2025`,
@@ -550,7 +515,7 @@ class FakerSeeder {
                 }
             }
 
-            // Create Absensi data
+            // Create Absensi data (only for students WITH kelas program)
             for (const kelasProgram of this.data.kelasProgram) {
                 // Create Absensi Guru
                 for (let i = 0; i < faker.number.int({ min: 5, max: 15 }); i++) {
@@ -573,7 +538,7 @@ class FakerSeeder {
                         p.tahun === 2025
                     );
 
-                    const absensiGuru = await prisma.absensiGuru.create({
+                    const absensiGuru = await prismaClient.absensiGuru.create({
                         data: {
                             kelasProgramId: kelasProgram.id,
                             guruId: kelasProgram.guruId,
@@ -601,7 +566,7 @@ class FakerSeeder {
                 const programSiswaList = this.data.programSiswa.filter(ps => ps.kelasProgramId === kelasProgram.id);
                 for (const programSiswa of programSiswaList) {
                     for (let i = 0; i < faker.number.int({ min: 5, max: 15 }); i++) {
-                        const absensiSiswa = await prisma.absensiSiswa.create({
+                        const absensiSiswa = await prismaClient.absensiSiswa.create({
                             data: {
                                 kelasProgramId: kelasProgram.id,
                                 siswaId: programSiswa.siswaId,
@@ -637,4 +602,4 @@ class FakerSeeder {
     }
 }
 
-module.exports = new FakerSeeder(); 
+module.exports = new FakerSeeder();
