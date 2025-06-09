@@ -424,73 +424,101 @@ class FakerSeeder {
 
             // Create programSiswa for students WITH kelas program
             for (const siswa of siswaWithKelas) {
-                for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
-                    const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
-                    const programSiswa = await prismaClient.programSiswa.create({
+                const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
+
+                // Each student has only ONE active program
+                const programSiswa = await prismaClient.programSiswa.create({
+                    data: {
+                        siswaId: siswa.siswa.id,
+                        programId: kelasProgram.programId,
+                        kelasProgramId: kelasProgram.id,
+                        status: 'AKTIF',
+                        isVerified: true, // Students with kelas are verified
+                        createdAt: faker.date.past(),
+                        updatedAt: faker.date.past()
+                    }
+                });
+                this.data.programSiswa.push(programSiswa);
+
+                // Create matching Jadwal Program Siswa
+                await prismaClient.jadwalProgramSiswa.create({
+                    data: {
+                        programSiswaId: programSiswa.id,
+                        hari: kelasProgram.hari,
+                        jamMengajarId: kelasProgram.jamMengajarId,
+                        urutan: 1,
+                        createdAt: faker.date.future(),
+                        updatedAt: faker.date.future()
+                    }
+                });
+
+                // 30% chance to have old inactive programs (history)
+                if (Math.random() < 0.3) {
+                    const oldProgram = faker.helpers.arrayElement(this.data.programs.filter(p => p.id !== kelasProgram.programId));
+                    const oldProgramSiswa = await prismaClient.programSiswa.create({
                         data: {
                             siswaId: siswa.siswa.id,
-                            programId: kelasProgram.programId,
-                            kelasProgramId: kelasProgram.id,
-                            status: 'AKTIF',
-                            isVerified: true, // Students with kelas are verified
-                            createdAt: faker.date.past(),
-                            updatedAt: faker.date.past()
+                            programId: oldProgram.id,
+                            kelasProgramId: null, // Old program might not have kelas assigned
+                            status: 'TIDAK_AKTIF', // Inactive program
+                            isVerified: true,
+                            createdAt: faker.date.past({ years: 2 }),
+                            updatedAt: faker.date.past({ years: 1 })
                         }
                     });
-                    this.data.programSiswa.push(programSiswa);
-
-                    // Create matching Jadwal Program Siswa
-                    await prismaClient.jadwalProgramSiswa.create({
-                        data: {
-                            programSiswaId: programSiswa.id,
-                            hari: kelasProgram.hari,
-                            jamMengajarId: kelasProgram.jamMengajarId,
-                            urutan: 1,
-                            createdAt: faker.date.future(),
-                            updatedAt: faker.date.future()
-                        }
-                    });
+                    this.data.programSiswa.push(oldProgramSiswa);
                 }
             }
 
             // Create programSiswa for students WITHOUT kelas program (active but unverified)
             for (const siswa of siswaWithoutKelas) {
-                // Each student without kelas can have 1-3 programs they're waiting to be assigned to
-                const programCount = faker.number.int({ min: 1, max: 3 });
-                
-                for (let i = 0; i < programCount; i++) {
-                    const program = faker.helpers.arrayElement(this.data.programs);
-                    
-                    // Check if this student already has this program
-                    const existingProgram = this.data.programSiswa.find(
-                        ps => ps.siswaId === siswa.siswa.id && ps.programId === program.id
-                    );
-                    
-                    if (!existingProgram) {
-                        const programSiswa = await prismaClient.programSiswa.create({
-                            data: {
-                                siswaId: siswa.siswa.id,
-                                programId: program.id,
-                                kelasProgramId: null, // No kelas assigned yet
-                                status: 'AKTIF', // Active status
-                                isVerified: false, // Not verified yet
-                                createdAt: faker.date.recent(),
-                                updatedAt: faker.date.recent()
-                            }
-                        });
-                        this.data.programSiswa.push(programSiswa);
-                        
-                        console.log(`Created unverified program for student ${siswa.siswa.namaMurid} - Program: ${program.namaProgram}`);
+                const program = faker.helpers.arrayElement(this.data.programs);
+
+                // Each student has only ONE active program (waiting for class assignment)
+                const programSiswa = await prismaClient.programSiswa.create({
+                    data: {
+                        siswaId: siswa.siswa.id,
+                        programId: program.id,
+                        kelasProgramId: null, // No kelas assigned yet
+                        status: 'AKTIF', // Active status
+                        isVerified: false, // Not verified yet
+                        createdAt: faker.date.recent(),
+                        updatedAt: faker.date.recent()
                     }
+                });
+                this.data.programSiswa.push(programSiswa);
+
+                console.log(`Created unverified program for student ${siswa.siswa.namaMurid} - Program: ${program.namaProgram}`);
+
+                // 20% chance to have old inactive programs (history)
+                if (Math.random() < 0.2) {
+                    const oldProgram = faker.helpers.arrayElement(this.data.programs.filter(p => p.id !== program.id));
+                    const oldProgramSiswa = await prismaClient.programSiswa.create({
+                        data: {
+                            siswaId: siswa.siswa.id,
+                            programId: oldProgram.id,
+                            kelasProgramId: null,
+                            status: faker.helpers.arrayElement(['TIDAK_AKTIF', 'CUTI']), // Inactive or on leave
+                            isVerified: false,
+                            createdAt: faker.date.past({ years: 2 }),
+                            updatedAt: faker.date.past({ years: 1 })
+                        }
+                    });
+                    this.data.programSiswa.push(oldProgramSiswa);
                 }
             }
 
             // Log statistics
-            const verifiedCount = this.data.programSiswa.filter(ps => ps.isVerified).length;
-            const unverifiedCount = this.data.programSiswa.filter(ps => !ps.isVerified).length;
+            const activeCount = this.data.programSiswa.filter(ps => ps.status === 'AKTIF').length;
+            const inactiveCount = this.data.programSiswa.filter(ps => ps.status === 'TIDAK_AKTIF').length;
+            const cutiCount = this.data.programSiswa.filter(ps => ps.status === 'CUTI').length;
+            const verifiedCount = this.data.programSiswa.filter(ps => ps.isVerified && ps.status === 'AKTIF').length;
+            const unverifiedCount = this.data.programSiswa.filter(ps => !ps.isVerified && ps.status === 'AKTIF').length;
+
             console.log(`Total ProgramSiswa created: ${this.data.programSiswa.length}`);
-            console.log(`Verified (with kelas): ${verifiedCount}`);
-            console.log(`Unverified (without kelas): ${unverifiedCount}`);
+            console.log(`Active programs: ${activeCount} (Verified: ${verifiedCount}, Unverified: ${unverifiedCount})`);
+            console.log(`Inactive programs: ${inactiveCount}`);
+            console.log(`Cuti programs: ${cutiCount}`);
 
             // Create Payroll data for each guru
             for (const guru of this.users.gurus) {
@@ -563,7 +591,10 @@ class FakerSeeder {
                 }
 
                 // Create Absensi Siswa for each ProgramSiswa in this KelasProgram
-                const programSiswaList = this.data.programSiswa.filter(ps => ps.kelasProgramId === kelasProgram.id);
+                const programSiswaList = this.data.programSiswa.filter(ps =>
+                    ps.kelasProgramId === kelasProgram.id && ps.status === 'AKTIF'
+                );
+
                 for (const programSiswa of programSiswaList) {
                     for (let i = 0; i < faker.number.int({ min: 5, max: 15 }); i++) {
                         const absensiSiswa = await prismaClient.absensiSiswa.create({
@@ -577,6 +608,31 @@ class FakerSeeder {
                             }
                         });
                         this.data.absensiSiswa.push(absensiSiswa);
+                    }
+                }
+            }
+
+            // Create Riwayat Status Siswa for some students
+            const studentsWithHistory = faker.helpers.arrayElements(this.users.siswas, Math.floor(this.users.siswas.length * 0.3));
+            for (const siswa of studentsWithHistory) {
+                const programSiswaForThisStudent = this.data.programSiswa.filter(ps => ps.siswaId === siswa.siswa.id);
+
+                if (programSiswaForThisStudent.length > 0) {
+                    const activeProgramSiswa = programSiswaForThisStudent.find(ps => ps.status === 'AKTIF');
+                    if (activeProgramSiswa) {
+                        // Create riwayat status siswa
+                        if (activeProgramSiswa.isVerified) {
+                            await prismaClient.riwayatStatusSiswa.create({
+                                data: {
+                                    programSiswaId: activeProgramSiswa.id,
+                                    statusLama: 'TIDAK_AKTIF',
+                                    statusBaru: 'AKTIF',
+                                    tanggalPerubahan: this.generateDate(),
+                                    createdAt: faker.date.recent(),
+                                    updatedAt: faker.date.recent()
+                                }
+                            });
+                        }
                     }
                 }
             }

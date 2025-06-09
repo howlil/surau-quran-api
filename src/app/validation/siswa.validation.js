@@ -72,17 +72,29 @@ class SiswaValidation {
         }),
       jadwal: Joi.array().items(
         Joi.object({
-          hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').required()
+          id: Joi.string().guid({ version: 'uuidv4' }).optional()
             .messages({
-              'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU',
-              'any.required': 'Hari wajib diisi'
+              'string.guid': 'Jadwal ID harus berupa UUID yang valid'
             }),
-          jamMengajarId: Joi.string().guid({ version: 'uuidv4' }).required()
+          hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').optional()
             .messages({
-              'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid',
-              'any.required': 'Jam Mengajar ID wajib diisi'
-            })
-        })
+              'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU'
+            }),
+          jamMengajarId: Joi.string().guid({ version: 'uuidv4' }).optional()
+            .messages({
+              'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid'
+            }),
+          urutan: Joi.number().integer().valid(1, 2).optional()
+            .messages({
+              'number.base': 'Urutan harus berupa angka',
+              'number.integer': 'Urutan harus berupa bilangan bulat',
+              'any.only': 'Urutan harus 1 atau 2'
+            }),
+          isDeleted: Joi.boolean().optional()
+        }).or('hari', 'jamMengajarId', 'id', 'isDeleted')
+          .messages({
+            'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
+          })
       ).min(1).required()
         .messages({
           'array.min': 'Jadwal harus memilih minimal 1 pilihan',
@@ -109,7 +121,7 @@ class SiswaValidation {
   }
 
 
-  
+
   static updateStatusSiswa() {
     return ValidatorFactory.create({
       programId: Joi.string().guid({ version: 'uuidv4' }).required()
@@ -193,15 +205,13 @@ class SiswaValidation {
         .messages({
           'string.guid': 'Program ID harus berupa UUID yang valid'
         }),
-      programStatus: Joi.string().valid('AKTIF', 'TIDAK_AKTIF', 'CUTI').optional()
-        .messages({
-          'any.only': 'Status harus salah satu dari: AKTIF, TIDAK_AKTIF, CUTI'
-        }),
-
       // Schedule array for the program - with identification for updates
       jadwal: Joi.array().items(
         Joi.object({
-
+          id: Joi.string().guid({ version: 'uuidv4' }).optional()
+            .messages({
+              'string.guid': 'Jadwal ID harus berupa UUID yang valid'
+            }),
           hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').optional()
             .messages({
               'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU'
@@ -210,9 +220,16 @@ class SiswaValidation {
             .messages({
               'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid'
             }),
-        }).or('hari', 'jamMengajarId')
+          urutan: Joi.number().integer().valid(1, 2).optional()
+            .messages({
+              'number.base': 'Urutan harus berupa angka',
+              'number.integer': 'Urutan harus berupa bilangan bulat',
+              'any.only': 'Urutan harus 1 atau 2'
+            }),
+          isDeleted: Joi.boolean().optional()
+        }).or('hari', 'jamMengajarId', 'id', 'isDeleted')
           .messages({
-            'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, atau isDeleted'
+            'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
           })
       ).optional()
     });

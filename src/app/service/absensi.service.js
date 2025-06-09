@@ -183,8 +183,8 @@ class AbsensiService {
             // Format data
             const absensiData = {
                 statusKehadiran: data.statusKehadiran,
-                jamMasuk: data.jamMasuk,
-                jamKeluar: data.jamKeluar,
+                jamMasuk: data.statusKehadiran === 'HADIR' ? data.jamMasuk : null,
+                jamKeluar: data.statusKehadiran === 'HADIR' ? data.jamKeluar : null,
                 ...(data.keterangan && { keterangan: data.keterangan }),
                 ...(data.suratIzin && { suratIzin: data.suratIzin })
             };

@@ -260,8 +260,8 @@ model AbsensiGuru {
   payrollId              String?
   guruId                 String
   tanggal                String
-  jamMasuk               String
-  jamKeluar              String
+  jamMasuk               String?
+  jamKeluar              String?
   sks                    Int
   suratIzin              String?
   statusKehadiran        StatusKehadiran
