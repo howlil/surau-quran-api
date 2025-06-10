@@ -360,12 +360,16 @@ class FakerSeeder {
             // Create Vouchers (some active, some not)
             for (let i = 0; i < TOTAL_RECORDS; i++) {
                 const tipe = faker.helpers.arrayElement(['PERSENTASE', 'NOMINAL']);
+                const nominal = tipe === 'PERSENTASE' 
+                    ? faker.number.int({ min: 5, max: 20 }) // 5%-20% for percentage
+                    : faker.number.int({ min: 10000, max: 50000 }); // 10K-50K for nominal
+                
                 const voucher = await prismaClient.voucher.create({
                     data: {
                         kodeVoucher: `VOUCHER${(i + 1).toString().padStart(3, '0')}`,
                         namaVoucher: `${tipe === 'PERSENTASE' ? 'Diskon' : 'Cashback'} ${(i + 1).toString().padStart(3, '0')}`,
                         tipe,
-                        nominal: faker.number.int({ min: 10000, max: 100000 }),
+                        nominal,
                         isActive: Math.random() > 0.2,
                         jumlahPenggunaan: faker.number.int({ min: 0, max: 100 }),
                         createdAt: new Date(),
@@ -425,13 +429,18 @@ class FakerSeeder {
             // Create programSiswa for students WITH kelas program
             for (const siswa of siswaWithKelas) {
                 const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
-                const biayaPendaftaran = faker.number.int({ min: 200000, max: 500000 });
+                const biayaPendaftaran = faker.number.int({ min: 100000, max: 250000 });
                 const voucher = Math.random() > 0.7 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                const diskon = voucher ? 
-                    (voucher.tipe === 'PERSENTASE' ? 
-                        biayaPendaftaran * (Number(voucher.nominal) / 100) : 
-                        Number(voucher.nominal)) : 0;
-                const totalBiaya = biayaPendaftaran - diskon;
+                
+                let diskon = 0;
+                if (voucher) {
+                    if (voucher.tipe === 'PERSENTASE') {
+                        diskon = Math.min(biayaPendaftaran * (Number(voucher.nominal) / 100), biayaPendaftaran * 0.5);
+                    } else {
+                        diskon = Math.min(Number(voucher.nominal), biayaPendaftaran * 0.5);
+                    }
+                }
+                const totalBiaya = Math.max(biayaPendaftaran - diskon, 0);
 
                 // Create pembayaran for pendaftaran
                 const pembayaran = await prismaClient.pembayaran.create({
@@ -483,8 +492,9 @@ class FakerSeeder {
                         programSiswaId: programSiswa.id,
                         hari: kelasProgram.hari,
                         jamMengajarId: kelasProgram.jamMengajarId,
-                        createdAt: faker.date.future(),
-                        updatedAt: faker.date.future()
+                        urutan: 1,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
                     }
                 });
 
@@ -496,13 +506,18 @@ class FakerSeeder {
                     
                     const bulan = sppDate.toLocaleString('id-ID', { month: 'long' });
                     const tahun = sppDate.getFullYear();
-                    const jumlahTagihan = faker.number.int({ min: 250000, max: 400000 });
+                    const jumlahTagihan = faker.number.int({ min: 150000, max: 300000 });
                     const sppVoucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                    const sppDiskon = sppVoucher ? 
-                        (sppVoucher.tipe === 'PERSENTASE' ? 
-                            jumlahTagihan * (Number(sppVoucher.nominal) / 100) : 
-                            Number(sppVoucher.nominal)) : 0;
-                    const totalTagihan = jumlahTagihan - sppDiskon;
+                    
+                    let sppDiskon = 0;
+                    if (sppVoucher) {
+                        if (sppVoucher.tipe === 'PERSENTASE') {
+                            sppDiskon = Math.min(jumlahTagihan * (Number(sppVoucher.nominal) / 100), jumlahTagihan * 0.5);
+                        } else {
+                            sppDiskon = Math.min(Number(sppVoucher.nominal), jumlahTagihan * 0.5);
+                        }
+                    }
+                    const totalTagihan = Math.max(jumlahTagihan - sppDiskon, 0);
 
                     // 70% chance to have payment for SPP
                     let sppPembayaranId = null;
@@ -566,13 +581,18 @@ class FakerSeeder {
             // Create programSiswa for students WITHOUT kelas program (active but unverified)
             for (const siswa of siswaWithoutKelas) {
                 const program = faker.helpers.arrayElement(this.data.programs);
-                const biayaPendaftaran = faker.number.int({ min: 200000, max: 500000 });
+                const biayaPendaftaran = faker.number.int({ min: 100000, max: 250000 });
                 const voucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                const diskon = voucher ? 
-                    (voucher.tipe === 'PERSENTASE' ? 
-                        biayaPendaftaran * (Number(voucher.nominal) / 100) : 
-                        Number(voucher.nominal)) : 0;
-                const totalBiaya = biayaPendaftaran - diskon;
+                
+                let diskon = 0;
+                if (voucher) {
+                    if (voucher.tipe === 'PERSENTASE') {
+                        diskon = Math.min(biayaPendaftaran * (Number(voucher.nominal) / 100), biayaPendaftaran * 0.5);
+                    } else {
+                        diskon = Math.min(Number(voucher.nominal), biayaPendaftaran * 0.5);
+                    }
+                }
+                const totalBiaya = Math.max(biayaPendaftaran - diskon, 0);
 
                 // Create pembayaran for pendaftaran (50% chance of being paid)
                 let pembayaranId = null;
@@ -633,8 +653,9 @@ class FakerSeeder {
                         programSiswaId: programSiswa.id,
                         hari: faker.helpers.arrayElement(['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']),
                         jamMengajarId: jamMengajar.id,
-                        createdAt: faker.date.recent(),
-                        updatedAt: faker.date.recent()
+                        urutan: 1,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
                     }
                 });
 
