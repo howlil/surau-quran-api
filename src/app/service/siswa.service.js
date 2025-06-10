@@ -589,6 +589,7 @@ class SiswaService {
                   urutan: true,
                   jamMengajar: {
                     select: {
+                      id: true,
                       jamMulai: true,
                       jamSelesai: true
                     }

@@ -7,12 +7,7 @@ const moment = require('moment');
 class PayrollService {
 
 
-  /**
-   * logic bayar payroll 
-   * 
-   * 1. pastikan data kalkulasi terisi semua
-   * 2. bisa bayar sekali bersamaan 
-   */
+
 
   async updatePayroll(id, data) {
     try {

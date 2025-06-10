@@ -425,6 +425,43 @@ class FakerSeeder {
             // Create programSiswa for students WITH kelas program
             for (const siswa of siswaWithKelas) {
                 const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
+                const biayaPendaftaran = faker.number.int({ min: 200000, max: 500000 });
+                const voucher = Math.random() > 0.7 ? faker.helpers.arrayElement(this.data.vouchers) : null;
+                const diskon = voucher ? 
+                    (voucher.tipe === 'PERSENTASE' ? 
+                        biayaPendaftaran * (Number(voucher.nominal) / 100) : 
+                        Number(voucher.nominal)) : 0;
+                const totalBiaya = biayaPendaftaran - diskon;
+
+                // Create pembayaran for pendaftaran
+                const pembayaran = await prismaClient.pembayaran.create({
+                    data: {
+                        tipePembayaran: 'PENDAFTARAN',
+                        metodePembayaran: faker.helpers.arrayElement(['VIRTUAL_ACCOUNT', 'TUNAI', 'BANK_TRANSFER', 'EWALLET']),
+                        jumlahTagihan: totalBiaya,
+                        statusPembayaran: 'PAID',
+                        tanggalPembayaran: this.generateDate(2024, 2025),
+                        createdAt: faker.date.past(),
+                        updatedAt: faker.date.past()
+                    }
+                });
+                this.data.pembayaran.push(pembayaran);
+
+                // Create pendaftaran
+                const pendaftaran = await prismaClient.pendaftaran.create({
+                    data: {
+                        siswaId: siswa.siswa.id,
+                        biayaPendaftaran,
+                        tanggalDaftar: this.generateDate(2024, 2025),
+                        diskon,
+                        totalBiaya,
+                        voucher_id: voucher?.id || null,
+                        pembayaranId: pembayaran.id,
+                        createdAt: faker.date.past(),
+                        updatedAt: faker.date.past()
+                    }
+                });
+                this.data.pendaftaran.push(pendaftaran);
 
                 // Each student has only ONE active program
                 const programSiswa = await prismaClient.programSiswa.create({
@@ -446,11 +483,67 @@ class FakerSeeder {
                         programSiswaId: programSiswa.id,
                         hari: kelasProgram.hari,
                         jamMengajarId: kelasProgram.jamMengajarId,
-                        urutan: 1,
                         createdAt: faker.date.future(),
                         updatedAt: faker.date.future()
                     }
                 });
+
+                // Create PeriodeSpp for current and next few months
+                const currentDate = new Date();
+                for (let i = 0; i < 3; i++) {
+                    const sppDate = new Date(currentDate);
+                    sppDate.setMonth(sppDate.getMonth() + i);
+                    
+                    const bulan = sppDate.toLocaleString('id-ID', { month: 'long' });
+                    const tahun = sppDate.getFullYear();
+                    const jumlahTagihan = faker.number.int({ min: 250000, max: 400000 });
+                    const sppVoucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
+                    const sppDiskon = sppVoucher ? 
+                        (sppVoucher.tipe === 'PERSENTASE' ? 
+                            jumlahTagihan * (Number(sppVoucher.nominal) / 100) : 
+                            Number(sppVoucher.nominal)) : 0;
+                    const totalTagihan = jumlahTagihan - sppDiskon;
+
+                    // 70% chance to have payment for SPP
+                    let sppPembayaranId = null;
+                    if (Math.random() > 0.3) {
+                        const sppPembayaran = await prismaClient.pembayaran.create({
+                            data: {
+                                tipePembayaran: 'SPP',
+                                metodePembayaran: faker.helpers.arrayElement(['VIRTUAL_ACCOUNT', 'TUNAI', 'BANK_TRANSFER', 'EWALLET']),
+                                jumlahTagihan: totalTagihan,
+                                statusPembayaran: faker.helpers.weightedArrayElement([
+                                    { weight: 0.6, value: 'PAID' },
+                                    { weight: 0.2, value: 'PENDING' },
+                                    { weight: 0.1, value: 'UNPAID' },
+                                    { weight: 0.1, value: 'EXPIRED' }
+                                ]),
+                                tanggalPembayaran: this.generateDate(2024, 2025),
+                                createdAt: faker.date.past(),
+                                updatedAt: faker.date.past()
+                            }
+                        });
+                        this.data.pembayaran.push(sppPembayaran);
+                        sppPembayaranId = sppPembayaran.id;
+                    }
+
+                    const periodeSpp = await prismaClient.periodeSpp.create({
+                        data: {
+                            programSiswaId: programSiswa.id,
+                            bulan,
+                            tahun,
+                            tanggalTagihan: `${tahun}-${String(sppDate.getMonth() + 1).padStart(2, '0')}-25`,
+                            jumlahTagihan,
+                            diskon: sppDiskon,
+                            totalTagihan,
+                            pembayaranId: sppPembayaranId,
+                            voucher_id: sppVoucher?.id || null,
+                            createdAt: faker.date.past(),
+                            updatedAt: faker.date.past()
+                        }
+                    });
+                    this.data.periodeSpp.push(periodeSpp);
+                }
 
                 // 30% chance to have old inactive programs (history)
                 if (Math.random() < 0.3) {
@@ -473,6 +566,51 @@ class FakerSeeder {
             // Create programSiswa for students WITHOUT kelas program (active but unverified)
             for (const siswa of siswaWithoutKelas) {
                 const program = faker.helpers.arrayElement(this.data.programs);
+                const biayaPendaftaran = faker.number.int({ min: 200000, max: 500000 });
+                const voucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
+                const diskon = voucher ? 
+                    (voucher.tipe === 'PERSENTASE' ? 
+                        biayaPendaftaran * (Number(voucher.nominal) / 100) : 
+                        Number(voucher.nominal)) : 0;
+                const totalBiaya = biayaPendaftaran - diskon;
+
+                // Create pembayaran for pendaftaran (50% chance of being paid)
+                let pembayaranId = null;
+                if (Math.random() > 0.5) {
+                    const pembayaran = await prismaClient.pembayaran.create({
+                        data: {
+                            tipePembayaran: 'PENDAFTARAN',
+                            metodePembayaran: faker.helpers.arrayElement(['VIRTUAL_ACCOUNT', 'TUNAI', 'BANK_TRANSFER', 'EWALLET']),
+                            jumlahTagihan: totalBiaya,
+                            statusPembayaran: faker.helpers.weightedArrayElement([
+                                { weight: 0.7, value: 'PAID' },
+                                { weight: 0.2, value: 'PENDING' },
+                                { weight: 0.1, value: 'UNPAID' }
+                            ]),
+                            tanggalPembayaran: this.generateDate(2024, 2025),
+                            createdAt: faker.date.recent(),
+                            updatedAt: faker.date.recent()
+                        }
+                    });
+                    this.data.pembayaran.push(pembayaran);
+                    pembayaranId = pembayaran.id;
+                }
+
+                // Create pendaftaran for unverified students too
+                const pendaftaran = await prismaClient.pendaftaran.create({
+                    data: {
+                        siswaId: siswa.siswa.id,
+                        biayaPendaftaran,
+                        tanggalDaftar: this.generateDate(2024, 2025),
+                        diskon,
+                        totalBiaya,
+                        voucher_id: voucher?.id || null,
+                        pembayaranId,
+                        createdAt: faker.date.recent(),
+                        updatedAt: faker.date.recent()
+                    }
+                });
+                this.data.pendaftaran.push(pendaftaran);
 
                 // Each student has only ONE active program (waiting for class assignment)
                 const programSiswa = await prismaClient.programSiswa.create({
@@ -487,6 +625,18 @@ class FakerSeeder {
                     }
                 });
                 this.data.programSiswa.push(programSiswa);
+
+                // Create jadwal for unverified students (they still have preferred schedule)
+                const jamMengajar = faker.helpers.arrayElement(this.data.jamMengajar);
+                await prismaClient.jadwalProgramSiswa.create({
+                    data: {
+                        programSiswaId: programSiswa.id,
+                        hari: faker.helpers.arrayElement(['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']),
+                        jamMengajarId: jamMengajar.id,
+                        createdAt: faker.date.recent(),
+                        updatedAt: faker.date.recent()
+                    }
+                });
 
                 console.log(`Created unverified program for student ${siswa.siswa.namaMurid} - Program: ${program.namaProgram}`);
 
@@ -519,6 +669,9 @@ class FakerSeeder {
             console.log(`Active programs: ${activeCount} (Verified: ${verifiedCount}, Unverified: ${unverifiedCount})`);
             console.log(`Inactive programs: ${inactiveCount}`);
             console.log(`Cuti programs: ${cutiCount}`);
+            console.log(`Total Pendaftaran created: ${this.data.pendaftaran.length}`);
+            console.log(`Total Pembayaran created: ${this.data.pembayaran.length}`);
+            console.log(`Total PeriodeSpp created: ${this.data.periodeSpp.length}`);
 
             // Create Payroll data for each guru
             for (const guru of this.users.gurus) {
