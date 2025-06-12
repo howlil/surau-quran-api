@@ -4,6 +4,10 @@ const { logger } = require('../../lib/config/logger.config');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const { NotFoundError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const siswaService = require('./siswa.service');
+const PasswordUtils = require('../../lib/utils/password.utils');
+const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
+const EmailUtils = require('../../lib/utils/email.utils');
 
 class PaymentService {
 
@@ -38,9 +42,10 @@ class PaymentService {
       const pembayaran = await prisma.pembayaran.create({
         data: {
           tipePembayaran: 'PENDAFTARAN',
+          metodePembayaran: 'VIRTUAL_ACCOUNT',
           jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-          statusPembayaran: xenditInvoice.status,
-          tanggalPembayaran: xenditInvoice.updated.toISOString().split('T')[0],
+          statusPembayaran: 'PENDING',
+          tanggalPembayaran: new Date().toISOString().split('T')[0]
         }
       });
 
@@ -125,9 +130,9 @@ class PaymentService {
         for (const periodeSppId of periodeSppIds) {
           await tx.periodeSpp.update({
             where: { id: periodeSppId },
-            data: { 
+            data: {
               pembayaranId: pembayaran.id,
-              ...(voucherId && { 
+              ...(voucherId && {
                 voucher_id: voucherId,
                 diskon: payment.discountAmount / periodeSppIds.length
               })
@@ -160,7 +165,9 @@ class PaymentService {
 
   async handleXenditCallback(callbackData) {
     try {
+      logger.info('Received Xendit callback:', callbackData);
       const processedData = XenditUtils.processInvoiceCallback(callbackData);
+      logger.info('Processed callback data:', processedData);
 
       const xenditPayment = await prisma.xenditPayment.findUnique({
         where: { xenditInvoiceId: processedData.xenditInvoiceId },
@@ -170,10 +177,14 @@ class PaymentService {
       });
 
       if (!xenditPayment) {
+        logger.error(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
         throw new NotFoundError(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
       }
 
+      logger.info(`Found payment record for invoice ID: ${processedData.xenditInvoiceId}`);
+
       await prisma.$transaction(async (tx) => {
+        logger.info('Updating Xendit payment record');
         await tx.xenditPayment.update({
           where: { id: xenditPayment.id },
           data: {
@@ -183,29 +194,155 @@ class PaymentService {
           }
         });
 
+        logger.info('Updating payment record');
         await tx.pembayaran.update({
           where: { id: xenditPayment.pembayaranId },
           data: {
             metodePembayaran: processedData.paymentMethod,
-            statusPembayaran: processedData.status,
+            statusPembayaran: processedData.status === 'PAID' ? 'PAID' : 'PENDING',
             tanggalPembayaran: processedData.paidAt ?
               new Date(processedData.paidAt).toISOString().split('T')[0] :
               new Date().toISOString().split('T')[0]
           }
         });
+
+        // If this is a pendaftaran payment, process the pendaftaran
+        if (xenditPayment && xenditPayment.pembayaran.tipePembayaran === 'PENDAFTARAN') {
+          try {
+            // Get pendaftaranTemp data directly
+            const pendaftaranTemp = await tx.pendaftaranTemp.findFirst({
+              where: { pembayaranId: xenditPayment.pembayaranId }
+            });
+
+            if (!pendaftaranTemp) {
+              // Check if this might be a duplicate callback for an already processed payment
+              const existingPendaftaran = await tx.pendaftaran.findUnique({
+                where: { pembayaranId: xenditPayment.pembayaranId },
+                include: { siswa: true }
+              });
+
+              if (existingPendaftaran) {
+                logger.info(`Found existing pendaftaran for payment ID: ${xenditPayment.pembayaranId}. Skipping processing.`);
+                return; // Exit early as this is a duplicate callback
+              }
+
+              logger.error(`PendaftaranTemp not found for payment ID: ${xenditPayment.pembayaranId}`);
+              throw new NotFoundError(`PendaftaranTemp not found for payment ID: ${xenditPayment.pembayaranId}`);
+            }
+
+            // Generate a secure password for the new user
+            const generatedPassword = DataGeneratorUtils.generatePassword();
+            const hashedPassword = await PasswordUtils.hash(generatedPassword);
+
+            // Create user
+            const user = await tx.user.create({
+              data: {
+                email: pendaftaranTemp.email,
+                password: hashedPassword,
+                role: 'SISWA'
+              }
+            });
+
+            // Create siswa record
+            const siswa = await tx.siswa.create({
+              data: {
+                userId: user.id,
+                namaMurid: pendaftaranTemp.namaMurid,
+                namaPanggilan: pendaftaranTemp.namaPanggilan,
+                tanggalLahir: pendaftaranTemp.tanggalLahir,
+                jenisKelamin: pendaftaranTemp.jenisKelamin,
+                alamat: pendaftaranTemp.alamat,
+                strataPendidikan: pendaftaranTemp.strataPendidikan,
+                kelasSekolah: pendaftaranTemp.kelasSekolah,
+                namaSekolah: pendaftaranTemp.namaSekolah,
+                namaOrangTua: pendaftaranTemp.namaOrangTua,
+                namaPenjemput: pendaftaranTemp.namaPenjemput,
+                noWhatsapp: pendaftaranTemp.noWhatsapp,
+                isRegistered: true
+              }
+            });
+
+            // Create program siswa record with status
+            const programSiswa = await tx.programSiswa.create({
+              data: {
+                siswaId: siswa.id,
+                programId: pendaftaranTemp.programId,
+                status: 'AKTIF',
+                isVerified: true
+              }
+            });
+
+            // Parse and create jadwal
+            const jadwalArr = JSON.parse(pendaftaranTemp.jadwalJson || '[]');
+            for (const jadwal of jadwalArr) {
+              await tx.jadwalProgramSiswa.create({
+                data: {
+                  programSiswaId: programSiswa.id,
+                  hari: jadwal.hari,
+                  jamMengajarId: jadwal.jamMengajarId,
+                  urutan: jadwal.urutan || 1
+                }
+              });
+            }
+
+            // Create pendaftaran record
+            await tx.pendaftaran.create({
+              data: {
+                siswaId: siswa.id,
+                pembayaranId: xenditPayment.pembayaranId,
+                biayaPendaftaran: pendaftaranTemp.biayaPendaftaran,
+                diskon: pendaftaranTemp.diskon,
+                totalBiaya: pendaftaranTemp.totalBiaya,
+                voucher_id: pendaftaranTemp.voucherId,
+                tanggalDaftar: new Date().toISOString().split('T')[0]
+              }
+            });
+
+            // Delete temporary registration data
+            await tx.pendaftaranTemp.delete({
+              where: { id: pendaftaranTemp.id }
+            });
+
+            // Send welcome email with credentials - but don't let email failure block the transaction
+            try {
+              await EmailUtils.sendWelcomeEmail({
+                email: user.email,
+                name: siswa.namaMurid,
+                password: generatedPassword // Pass the unencrypted password to the email
+              });
+              logger.info(`Welcome email sent successfully to: ${user.email}`);
+            } catch (emailError) {
+              // Log the error but don't throw it, so the transaction can still complete
+              logger.error(`Failed to send welcome email to ${user.email}:`, {
+                error: emailError.message,
+                stack: emailError.stack
+              });
+              logger.info(`Registration completed successfully for ${user.email}, but welcome email could not be sent`);
+            }
+
+            logger.info(`Successfully processed pendaftaran for payment ID: ${xenditPayment.pembayaranId}`);
+          } catch (error) {
+            logger.error(`Error processing pendaftaran for payment ID: ${xenditPayment.pembayaranId}:`, {
+              error: error.message,
+              stack: error.stack
+            });
+            throw error; // Throw error to rollback transaction
+          }
+        }
       });
 
-      return {
-        success: true,
-        payment: {
-          id: xenditPayment.pembayaranId,
-          statusPembayaran: processedData.status,
-          tipePembayaran: xenditPayment.pembayaran.tipePembayaran,
-          xenditInvoiceId: processedData.xenditInvoiceId
-        }
-      };
+      // Get updated payment data
+      const updatedPayment = await prisma.pembayaran.findUnique({
+        where: { id: xenditPayment.pembayaranId }
+      });
+
+      logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);
+      return updatedPayment;
     } catch (error) {
-      logger.error('Error handling Xendit callback:', error);
+      logger.error('Error handling Xendit callback:', {
+        error: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }

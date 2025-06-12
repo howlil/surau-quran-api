@@ -39,30 +39,47 @@ class SppService {
             }
 
             const result = await PrismaUtils.paginate(prisma.periodeSpp, {
-                page,
-                limit,
+                page: Number(page),
+                limit: Number(limit),
                 where,
                 include: {
                     programSiswa: {
                         include: {
                             siswa: {
                                 select: {
+                                    id: true,
                                     namaMurid: true,
-                                    nis: true
+                                    nis: true,
+                                    noWhatsapp: true
                                 }
                             },
                             program: {
                                 select: {
+                                    id: true,
                                     namaProgram: true
+                                }
+                            },
+                            kelasProgram: {
+                                select: {
+                                    id: true,
+                                    hari: true,
+                                    jamMengajar: {
+                                        select: {
+                                            jamMulai: true,
+                                            jamSelesai: true
+                                        }
+                                    }
                                 }
                             }
                         }
                     },
                     pembayaran: {
                         select: {
+                            id: true,
                             tanggalPembayaran: true,
                             jumlahTagihan: true,
-                            statusPembayaran: true
+                            statusPembayaran: true,
+                            metodePembayaran: true
                         }
                     }
                 },
@@ -71,20 +88,46 @@ class SppService {
 
             const formattedData = result.data.map(spp => ({
                 id: spp.id,
-                namaSiswa: spp.programSiswa.siswa.namaMurid,
-                nis: spp.programSiswa.siswa.nis,
-                program: spp.programSiswa.program.namaProgram,
-                bulan: spp.bulan,
-                tahun: spp.tahun,
-                tanggalTagihan: spp.tanggalTagihan,
-                tanggalPembayaran: spp.pembayaran?.tanggalPembayaran || null,
-                jumlahBayar: spp.pembayaran?.jumlahTagihan || null,
-                statusPembayaran: spp.pembayaran?.statusPembayaran || 'UNPAID'
+                siswa: {
+                    id: spp.programSiswa.siswa.id,
+                    nama: spp.programSiswa.siswa.namaMurid,
+                    nis: spp.programSiswa.siswa.nis,
+                    noWhatsapp: spp.programSiswa.siswa.noWhatsapp
+                },
+                program: {
+                    id: spp.programSiswa.program.id,
+                    nama: spp.programSiswa.program.namaProgram
+                },
+                kelas: spp.programSiswa.kelasProgram ? {
+                    id: spp.programSiswa.kelasProgram.id,
+                    hari: spp.programSiswa.kelasProgram.hari,
+                    jam: {
+                        mulai: spp.programSiswa.kelasProgram.jamMengajar.jamMulai,
+                        selesai: spp.programSiswa.kelasProgram.jamMengajar.jamSelesai
+                    }
+                } : null,
+                periode: {
+                    bulan: spp.bulan,
+                    tahun: spp.tahun,
+                    tanggalTagihan: spp.tanggalTagihan
+                },
+                pembayaran: spp.pembayaran ? {
+                    id: spp.pembayaran.id,
+                    tanggal: spp.pembayaran.tanggalPembayaran,
+                    jumlah: Number(spp.pembayaran.jumlahTagihan),
+                    status: spp.pembayaran.statusPembayaran,
+                    metode: spp.pembayaran.metodePembayaran
+                } : null,
+                tagihan: {
+                    jumlah: Number(spp.jumlahTagihan),
+                    diskon: Number(spp.diskon),
+                    total: Number(spp.totalTagihan)
+                }
             }));
 
             return {
                 data: formattedData,
-                pagination: result.meta
+                pagination: result.pagination
             };
         } catch (error) {
             logger.error('Error getting SPP data for admin:', error);
@@ -283,7 +326,7 @@ class SppService {
         }
     }
 
-   
+
 }
 
 module.exports = new SppService();

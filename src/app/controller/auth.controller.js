@@ -1,6 +1,8 @@
 const authService = require('../service/auth.service');
 const Http = require('../../lib/http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const { logger } = require('../../lib/config/logger.config');
+const { NotFoundError } = require('../../lib/http/error.handler.http');
 
 class AuthController {
 
@@ -47,9 +49,40 @@ class AuthController {
   });
 
   forgotPassword = ErrorHandler.asyncHandler(async (req, res) => {
-    const { email } = req.body;
-    const result = await authService.requestPasswordReset(email);
-    return Http.Response.success(res, result, result.message);
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return Http.Response.badRequest(res, 'Email is required');
+      }
+
+      const result = await authService.requestPasswordReset(email);
+
+      // Check if token was returned (email sending failed)
+      if (result.token) {
+        // In development mode, return the token for testing
+        if (process.env.NODE_ENV === 'development') {
+          return Http.Response.success(res, {
+            message: result.message,
+            token: result.token,
+            resetLink: `${process.env.FRONTEND_URL}/reset-password?token=${result.token}`
+          }, 'Password reset token generated but email could not be sent');
+        }
+      }
+
+      return Http.Response.success(res, result, 'Password reset email sent');
+    } catch (error) {
+      logger.error('Error processing forgot password request:', error);
+
+      // Don't expose whether an email exists or not
+      if (error instanceof NotFoundError) {
+        return Http.Response.success(res, {
+          message: 'If the email exists, a password reset email has been sent'
+        });
+      }
+
+      return Http.Response.error(res, error.message);
+    }
   });
 
   resetPassword = ErrorHandler.asyncHandler(async (req, res) => {

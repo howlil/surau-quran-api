@@ -99,6 +99,19 @@ class GuruController {
     const result = await guruService.getKelasProgramWithStudents(guru.id);
     return Http.Response.success(res, result, 'Data kelas program dengan siswa berhasil diambil');
   });
+
+  downloadContract = ErrorHandler.asyncHandler(async (req, res) => {
+    const { id } = HttpRequest.getUrlParams(req);
+    const { filePath, fileName } = await guruService.getContractFile(id);
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    // Stream the file
+    const fileStream = require('fs').createReadStream(filePath);
+    fileStream.pipe(res);
+  });
 }
 
 module.exports = new GuruController();

@@ -6,24 +6,32 @@ class AbsensiService {
 
     async getAbsensiSiswaForAdmin(filters = {}) {
         try {
-            const { tanggal } = filters;
+            const { kelasId, tanggal } = filters;
+
+            if (!kelasId) {
+                throw new BadRequestError('ID Kelas wajib diisi');
+            }
+
+            const where = {
+                kelasId
+            };
+
+            if (tanggal) {
+                where.absensiSiswa = {
+                    some: {
+                        tanggal
+                    }
+                };
+            }
 
             const kelasPrograms = await prisma.kelasProgram.findMany({
-                where: {
-                    absensiSiswa: {
-                        some: {
-                            tanggal
-                        }
-                    }
-                },
+                where,
                 include: {
                     kelas: true,
                     program: true,
                     jamMengajar: true,
                     absensiSiswa: {
-                        where: {
-                            tanggal
-                        },
+                        where: tanggal ? { tanggal } : undefined,
                         include: {
                             siswa: {
                                 select: {
@@ -37,6 +45,14 @@ class AbsensiService {
                 orderBy: { createdAt: 'desc' }
             });
 
+            if (kelasPrograms.length === 0) {
+                return {
+                    kelasId,
+                    namaKelas: 'Kelas tidak ditemukan',
+                    program: []
+                };
+            }
+
             // Group by kelasId
             const kelasMap = new Map();
 
@@ -48,7 +64,7 @@ class AbsensiService {
                     kelasMap.set(kelasId, {
                         kelasId,
                         namaKelas,
-                        tanggal,
+                        tanggal: tanggal || null,
                         program: []
                     });
                 }
@@ -77,7 +93,7 @@ class AbsensiService {
             });
 
             // Convert the map to an array
-            return Array.from(kelasMap.values());
+            return Array.from(kelasMap.values())[0]; // Return single object since we're filtering by kelasId
         } catch (error) {
             logger.error('Error getting siswa attendance by kelas:', error);
             throw error;
@@ -183,8 +199,8 @@ class AbsensiService {
             // Format data
             const absensiData = {
                 statusKehadiran: data.statusKehadiran,
-                jamMasuk: data.statusKehadiran === 'HADIR' ? data.jamMasuk : null,
-                jamKeluar: data.statusKehadiran === 'HADIR' ? data.jamKeluar : null,
+                jamMasuk: data.jamMasuk || null,
+                jamKeluar: data.jamKeluar || null,
                 ...(data.keterangan && { keterangan: data.keterangan }),
                 ...(data.suratIzin && { suratIzin: data.suratIzin })
             };

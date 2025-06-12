@@ -297,6 +297,7 @@ CREATE TABLE `Payroll` (
     `potongan` DECIMAL(10, 2) NOT NULL,
     `totalGaji` DECIMAL(10, 2) NOT NULL,
     `status` ENUM('DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL') NOT NULL,
+    `tanggalKalkulasi` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 

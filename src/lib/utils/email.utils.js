@@ -1,299 +1,177 @@
+const EmailConfig = require('../config/email.config');
 const { logger } = require('../config/logger.config');
 
 class EmailUtils {
-  static async sendWelcomeEmail(userData) {
+  static async #sendEmail({ to, subject, html }) {
     try {
-      const { email, namaMurid, password, nis } = userData;
+      const transporter = EmailConfig.getTransporter();
+      const from = EmailConfig.getFromAddress();
 
-      const emailContent = this.generateWelcomeEmailContent({
-        namaMurid,
-        email,
-        password,
-        nis
+      logger.info('Sending email:', { to, subject, from });
+
+      const info = await transporter.sendMail({
+        from,
+        to,
+        subject,
+        html
       });
 
-      logger.info(`Welcome email content generated for ${email}:`);
-      logger.info(emailContent);
+      logger.info('Email sent successfully:', {
+        messageId: info.messageId,
+        to,
+        subject
+      });
 
-      return {
-        success: true,
-        recipient: email,
-        subject: 'Selamat Datang di Surau Quran - Akun Anda Telah Aktif',
-        content: emailContent
-      };
+      return info;
     } catch (error) {
-      logger.error('Error sending welcome email:', error);
+      logger.error('Error sending email:', {
+        error: error.message,
+        stack: error.stack,
+        to,
+        subject
+      });
       throw error;
     }
   }
 
-  static async sendPaymentReminderEmail(paymentData) {
-    try {
-      const { email, namaMurid, invoiceUrl, expireDate, amount } = paymentData;
-
-      const emailContent = this.generatePaymentReminderContent({
-        namaMurid,
-        invoiceUrl,
-        expireDate,
-        amount
-      });
-
-      logger.info(`Payment reminder email content generated for ${email}:`);
-      logger.info(emailContent);
-
-      return {
-        success: true,
-        recipient: email,
-        subject: 'Reminder Pembayaran Pendaftaran Surau Quran',
-        content: emailContent
-      };
-    } catch (error) {
-      logger.error('Error sending payment reminder email:', error);
-      throw error;
+  static async sendPasswordResetEmail({ email, resetLink }) {
+    if (!email || !resetLink) {
+      throw new Error('Email and reset link are required');
     }
+
+    const subject = 'Reset Password - Surau Quran';
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Reset Password</h2>
+                <p>Halo,</p>
+                <p>Kami menerima permintaan untuk mereset password akun Anda. Klik tombol di bawah untuk mereset password:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetLink}" 
+                       style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
+                        Reset Password
+                    </a>
+                </div>
+                <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
+                <p>Link ini akan kadaluarsa dalam 30 menit.</p>
+                <hr style="margin: 20px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Email ini dikirim secara otomatis, mohon tidak membalas email ini.
+                    Jika Anda membutuhkan bantuan, silakan hubungi admin.
+                </p>
+            </div>
+        `;
+
+    return this.#sendEmail({ to: email, subject, html });
   }
 
-  static async sendPaymentSuccessEmail(paymentData) {
-    try {
-      const { email, namaMurid, amount, paidAt } = paymentData;
-
-      const emailContent = this.generatePaymentSuccessContent({
-        namaMurid,
-        amount,
-        paidAt
-      });
-
-      logger.info(`Payment success email content generated for ${email}:`);
-      logger.info(emailContent);
-
-      return {
-        success: true,
-        recipient: email,
-        subject: 'Pembayaran Berhasil - Surau Quran',
-        content: emailContent
-      };
-    } catch (error) {
-      logger.error('Error sending payment success email:', error);
-      throw error;
+  static async sendPasswordChangedEmail({ email }) {
+    if (!email) {
+      throw new Error('Email is required');
     }
+
+    const subject = 'Password Berhasil Diubah - Surau Quran';
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Password Berhasil Diubah</h2>
+                <p>Halo,</p>
+                <p>Password akun Anda di Surau Quran telah berhasil diubah.</p>
+                <p>Jika Anda tidak melakukan perubahan ini, segera hubungi admin kami.</p>
+                <hr style="margin: 20px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Email ini dikirim secara otomatis, mohon tidak membalas email ini.
+                    Jika Anda membutuhkan bantuan, silakan hubungi admin.
+                </p>
+            </div>
+        `;
+
+    return this.#sendEmail({ to: email, subject, html });
   }
 
-  static generateWelcomeEmailContent({ namaMurid, email, password, nis }) {
-    return `
-=== SELAMAT DATANG DI SURAU QURAN ===
-
-Assalamu'alaikum ${namaMurid},
-
-Alhamdulillah, pendaftaran Anda telah berhasil dan akun Anda sudah aktif!
-
-Detail Akun:
-- Email: ${email}
-- Password: ${password}
-- NIS: ${nis}
-
-PENTING: 
-- Silakan login menggunakan email dan password di atas
-- Segera ubah password Anda setelah login pertama
-- Simpan NIS Anda untuk keperluan administrasi
-
-Anda sekarang dapat mengakses sistem untuk:
-- Melihat jadwal kelas
-- Memantau kehadiran
-- Melakukan pembayaran SPP
-- Dan fitur lainnya
-
-Jika ada pertanyaan, silakan hubungi admin kami.
-
-Barakallahu fiikum,
-Tim Surau Quran
-
-=== SURAU QURAN MANAGEMENT SYSTEM ===
-    `.trim();
-  }
-
-  static generatePaymentReminderContent({ namaMurid, invoiceUrl, expireDate, amount }) {
-    const formattedAmount = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(amount);
-
-    const formattedDate = new Date(expireDate).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    return `
-=== REMINDER PEMBAYARAN PENDAFTARAN ===
-
-Assalamu'alaikum ${namaMurid},
-
-Kami ingatkan bahwa pembayaran pendaftaran Anda belum diselesaikan.
-
-Detail Pembayaran:
-- Jumlah: ${formattedAmount}
-- Batas Waktu: ${formattedDate}
-
-Untuk menyelesaikan pembayaran, silakan klik link berikut:
-${invoiceUrl}
-
-PENTING:
-- Pembayaran harus diselesaikan sebelum batas waktu
-- Setelah batas waktu, link pembayaran akan expired
-- Hubungi admin jika mengalami kesulitan
-
-Barakallahu fiikum,
-Tim Surau Quran
-
-=== SURAU QURAN MANAGEMENT SYSTEM ===
-    `.trim();
-  }
-
-  static generatePaymentSuccessContent({ namaMurid, amount, paidAt }) {
-    const formattedAmount = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(amount);
-
-    const formattedDate = new Date(paidAt).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    return `
-=== PEMBAYARAN BERHASIL ===
-
-Assalamu'alaikum ${namaMurid},
-
-Alhamdulillah, pembayaran Anda telah berhasil diproses!
-
-Detail Pembayaran:
-- Jumlah: ${formattedAmount}
-- Tanggal: ${formattedDate}
-- Status: LUNAS
-
-Akun Anda akan segera diaktifkan dan detail login akan dikirim melalui email terpisah.
-
-Terima kasih atas kepercayaan Anda.
-
-Barakallahu fiikum,
-Tim Surau Quran
-
-=== SURAU QURAN MANAGEMENT SYSTEM ===
-    `.trim();
-  }
-
-  static async sendSppReminderEmail(sppData) {
-    try {
-      const { email, namaMurid, periode, amount, dueDate } = sppData;
-
-      const emailContent = this.generateSppReminderContent({
-        namaMurid,
-        periode,
-        amount,
-        dueDate
-      });
-
-      logger.info(`SPP reminder email content generated for ${email}:`);
-      logger.info(emailContent);
-
-      return {
-        success: true,
-        recipient: email,
-        subject: `Reminder SPP ${periode} - Surau Quran`,
-        content: emailContent
-      };
-    } catch (error) {
-      logger.error('Error sending SPP reminder email:', error);
-      throw error;
+  static async sendWelcomeEmail({ email, name, password }) {
+    if (!email || !name) {
+      throw new Error('Email and name are required');
     }
+
+    const subject = 'Selamat Datang di Surau Quran';
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Selamat Datang di Surau Quran</h2>
+                <p>Halo ${name},</p>
+                <p>Terima kasih telah bergabung dengan Surau Quran. Kami senang Anda bergabung dengan kami.</p>
+                <p>Anda sekarang dapat mengakses semua fitur yang tersedia di platform kami.</p>
+                ${password ? `
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>Informasi Login:</strong></p>
+                    <p style="margin: 5px 0;">Email: ${email}</p>
+                    <p style="margin: 5px 0;">Password: ${password}</p>
+                    <p style="margin: 10px 0 0 0; color: #dc3545; font-size: 12px;">
+                        Harap segera ubah password Anda setelah login pertama.
+                    </p>
+                </div>
+                ` : ''}
+                <hr style="margin: 20px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Email ini dikirim secara otomatis, mohon tidak membalas email ini.
+                    Jika Anda membutuhkan bantuan, silakan hubungi admin.
+                </p>
+            </div>
+        `;
+
+    return this.#sendEmail({ to: email, subject, html });
   }
 
-  static generateSppReminderContent({ namaMurid, periode, amount, dueDate }) {
-    const formattedAmount = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(amount);
-
-    const formattedDate = new Date(dueDate).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    return `
-=== REMINDER PEMBAYARAN SPP ===
-
-Assalamu'alaikum ${namaMurid},
-
-Kami ingatkan bahwa SPP bulan ${periode} sudah jatuh tempo.
-
-Detail SPP:
-- Periode: ${periode}
-- Jumlah: ${formattedAmount}
-- Jatuh Tempo: ${formattedDate}
-
-Silakan lakukan pembayaran melalui sistem atau hubungi admin.
-
-Barakallahu fiikum,
-Tim Surau Quran
-
-=== SURAU QURAN MANAGEMENT SYSTEM ===
-    `.trim();
-  }
-
-  static async sendPasswordResetEmail(resetData) {
-    try {
-      const { email, resetLink } = resetData;
-
-      const emailContent = this.generatePasswordResetContent({
-        email,
-        resetLink
-      });
-
-      logger.info(`Password reset email content generated for ${email}:`);
-      logger.info(emailContent);
-
-      return {
-        success: true,
-        recipient: email,
-        subject: 'Reset Password - Surau Quran',
-        content: emailContent
-      };
-    } catch (error) {
-      logger.error('Error sending password reset email:', error);
-      throw error;
+  static async sendPaymentReminder({ email, name, amount, dueDate }) {
+    if (!email || !name || !amount || !dueDate) {
+      throw new Error('Email, name, amount, and due date are required');
     }
+
+    const subject = 'Pengingat Pembayaran - Surau Quran';
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Pengingat Pembayaran</h2>
+                <p>Halo ${name},</p>
+                <p>Ini adalah pengingat bahwa Anda memiliki pembayaran yang akan jatuh tempo:</p>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin: 10px 0;"><strong>Jumlah:</strong> Rp ${amount.toLocaleString()}</li>
+                    <li style="margin: 10px 0;"><strong>Jatuh Tempo:</strong> ${new Date(dueDate).toLocaleDateString()}</li>
+                </ul>
+                <p>Mohon segera lakukan pembayaran untuk menghindari keterlambatan.</p>
+                <hr style="margin: 20px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Email ini dikirim secara otomatis, mohon tidak membalas email ini.
+                    Jika Anda membutuhkan bantuan, silakan hubungi admin.
+                </p>
+            </div>
+        `;
+
+    return this.#sendEmail({ to: email, subject, html });
   }
 
-  static generatePasswordResetContent({ email, resetLink }) {
-    return `
-=== RESET PASSWORD - SURAU QURAN ===
+  static async sendPaymentSuccess({ email, name, amount, paymentDate }) {
+    if (!email || !name || !amount || !paymentDate) {
+      throw new Error('Email, name, amount, and payment date are required');
+    }
 
-Assalamu'alaikum,
+    const subject = 'Konfirmasi Pembayaran Berhasil - Surau Quran';
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Pembayaran Berhasil</h2>
+                <p>Halo ${name},</p>
+                <p>Pembayaran Anda telah berhasil diproses:</p>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin: 10px 0;"><strong>Jumlah:</strong> Rp ${amount.toLocaleString()}</li>
+                    <li style="margin: 10px 0;"><strong>Tanggal:</strong> ${new Date(paymentDate).toLocaleDateString()}</li>
+                </ul>
+                <p>Terima kasih atas pembayaran Anda.</p>
+                <hr style="margin: 20px 0;">
+                <p style="color: #666; font-size: 12px;">
+                    Email ini dikirim secara otomatis, mohon tidak membalas email ini.
+                    Jika Anda membutuhkan bantuan, silakan hubungi admin.
+                </p>
+            </div>
+        `;
 
-Kami menerima permintaan untuk mereset password akun Anda.
-
-Untuk mereset password Anda, silakan klik link berikut:
-${resetLink}
-
-PENTING:
-- Link ini hanya berlaku selama 30 menit
-- Jika Anda tidak meminta reset password, abaikan email ini
-- Jangan bagikan link ini kepada siapapun
-
-Jika ada pertanyaan, silakan hubungi admin kami.
-
-Barakallahu fiikum,
-Tim Surau Quran
-
-=== SURAU QURAN MANAGEMENT SYSTEM ===
-    `.trim();
+    return this.#sendEmail({ to: email, subject, html });
   }
 }
 

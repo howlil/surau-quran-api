@@ -99,100 +99,13 @@ class KelasService {
                 select: {
                     id: true,
                     namaKelas: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    kelasProgram: {
-                        select: {
-                            id: true,
-                            hari: true,
-                            tipeKelas: true,
-                            program: {
-                                select: {
-                                    id: true,
-                                    namaProgram: true,
-                                    programSiswa: {
-                                        where: {
-                                            status: 'AKTIF',
-                                            isVerified: false,
-                                            kelasProgramId: null
-                                        },
-                                        select: {
-                                            id: true,
-                                            siswa: {
-                                                select: {
-                                                    id: true,
-                                                    namaMurid: true,
-                                                    nis: true
-                                                }
-                                            },
-                                            JadwalProgramSiswa: {
-                                                select: {
-                                                    id: true,
-                                                    hari: true,
-                                                    urutan: true,
-                                                    jamMengajar: {
-                                                        select: {
-                                                            id: true,
-                                                            jamMulai: true,
-                                                            jamSelesai: true
-                                                        }
-                                                    }
-                                                },
-                                                orderBy: {
-                                                    urutan: 'asc'
-                                                },
-                                                take: 2
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            jamMengajar: {
-                                select: {
-                                    id: true,
-                                    jamMulai: true,
-                                    jamSelesai: true
-                                }
-                            },
-                            guru: {
-                                select: {
-                                    id: true,
-                                    nama: true,
-                                    nip: true
-                                }
-                            }
-                        }
-                    }
                 },
                 orderBy: {
                     createdAt: 'desc'
                 }
             });
 
-            // Transform the data to include eligible students
-            const transformedKelasList = kelasList.map(kelas => ({
-                ...kelas,
-                kelasProgram: kelas.kelasProgram.map(kp => ({
-                    ...kp,
-                    program: {
-                        ...kp.program,
-                        eligibleStudents: kp.program.programSiswa.map(ps => ({
-                            programSiswaId: ps.id,
-                            siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            nis: ps.siswa.nis,
-                            jadwal: ps.JadwalProgramSiswa.map(jps => ({
-                                id: jps.id,
-                                hari: jps.hari,
-                                urutan: jps.urutan,
-                                jamMengajar: jps.jamMengajar
-                            }))
-                        }))
-                    }
-                }))
-            }));
-
-            return transformedKelasList;
+            return kelasList;
         } catch (error) {
             logger.error('Error getting all kelas:', error);
             throw error;
@@ -275,8 +188,9 @@ class KelasService {
             if (jamMengajarId) updateData.jamMengajarId = jamMengajarId;
             if (guruId) updateData.guruId = guruId;
 
-            let kelasProgram = null;
-            await prisma.$transaction(async (tx) => {
+            return await PrismaUtils.transaction(async (tx) => {
+                // Update kelas program if there are changes
+                let kelasProgram = null;
                 if (Object.keys(updateData).length > 0) {
                     kelasProgram = await tx.kelasProgram.update({
                         where: { id: kelasProgramId },
@@ -288,6 +202,10 @@ class KelasService {
                     });
                 }
 
+                if (!kelasProgram) {
+                    throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+                }
+
                 // Proses penambahan siswa
                 let siswaDitambah = [];
                 if (tambahSiswaIds.length > 0) {
@@ -296,7 +214,7 @@ class KelasService {
                         where: {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
-                            programId,
+                            programId: kelasProgram.programId,
                             kelasProgramId: null,
                             isVerified: false,
                             JadwalProgramSiswa: {
@@ -306,14 +224,22 @@ class KelasService {
                                 }
                             }
                         },
-                        include: { siswa: true }
+                        include: {
+                            siswa: true,
+                            JadwalProgramSiswa: true
+                        }
                     });
 
+                    // Update each programSiswa record
                     for (const ps of programSiswaList) {
-                        await tx.programSiswa.update({
+                        const updatedPs = await tx.programSiswa.update({
                             where: { id: ps.id },
-                            data: { kelasProgramId: kelasProgramId, isVerified: true }
+                            data: {
+                                kelasProgramId: kelasProgramId,
+                                isVerified: true
+                            }
                         });
+
                         siswaDitambah.push({
                             siswaId: ps.siswa.id,
                             namaSiswa: ps.siswa.namaMurid,
@@ -322,19 +248,12 @@ class KelasService {
                     }
                 }
 
-                // Return response di luar $transaction agar keluar dari scope
-                kelasProgram = {
-                    ...kelasProgram,
+                return {
+                    kelasProgramId,
+                    updateData,
                     siswaDitambah
                 };
             });
-
-            return {
-                kelasProgramId,
-                updateData,
-                siswaDitambah: kelasProgram.siswaDitambah || []
-            };
-
         } catch (err) {
             logger.error('Error in initialStudentIntoClass:', err);
             throw err;

@@ -236,7 +236,7 @@ class FakerSeeder {
                     })
                 );
 
-                // Create Guru with some incomplete data
+                // Create Guru with complete data
                 userPromises.push(
                     prismaClient.user.create({
                         data: {
@@ -250,15 +250,16 @@ class FakerSeeder {
                                 create: {
                                     nip: `${(i + 2).toString().padStart(6, '0')}`,
                                     nama: faker.person.fullName(),
-                                    noWhatsapp: Math.random() > 0.2 ? faker.phone.number('08##########') : null,
-                                    alamat: Math.random() > 0.1 ? faker.location.streetAddress() : null,
+                                    noWhatsapp: faker.phone.number('08##########'),
+                                    alamat: faker.location.streetAddress(),
                                     jenisKelamin: Math.random() > 0.5 ? 'LAKI_LAKI' : 'PEREMPUAN',
+                                    tanggalLahir: faker.date.between({ from: '1980-01-01', to: '2000-12-31' }).toISOString().split('T')[0],
                                     fotoProfile: hasPhoto ? `guru_${i + 1}.jpg` : null,
-                                    keahlian: Math.random() > 0.1 ? faker.helpers.arrayElement(['Tahfidz', 'Tajwid', 'Qiraat']) : null,
-                                    pendidikanTerakhir: Math.random() > 0.1 ? faker.helpers.arrayElement(['S1', 'S2', 'S3']) : null,
-                                    noRekening: Math.random() > 0.1 ? faker.finance.accountNumber() : null,
-                                    namaBank: Math.random() > 0.1 ? faker.helpers.arrayElement(['BCA', 'Mandiri', 'BNI', 'BSI']) : null,
-                                    suratKontrak: Math.random() > 0.4 ? `kontrak_${i + 1}.pdf` : null,
+                                    keahlian: faker.helpers.arrayElement(['Tahfidz', 'Tajwid', 'Qiraat']),
+                                    pendidikanTerakhir: faker.helpers.arrayElement(['S1', 'S2', 'S3']),
+                                    noRekening: faker.finance.accountNumber(),
+                                    namaBank: faker.helpers.arrayElement(['BCA', 'Mandiri', 'BNI', 'BSI']),
+                                    suratKontrak: `kontrak_${i + 1}.pdf`,
                                     createdAt: new Date(),
                                     updatedAt: new Date()
                                 }
@@ -360,10 +361,10 @@ class FakerSeeder {
             // Create Vouchers (some active, some not)
             for (let i = 0; i < TOTAL_RECORDS; i++) {
                 const tipe = faker.helpers.arrayElement(['PERSENTASE', 'NOMINAL']);
-                const nominal = tipe === 'PERSENTASE' 
+                const nominal = tipe === 'PERSENTASE'
                     ? faker.number.int({ min: 5, max: 20 }) // 5%-20% for percentage
                     : faker.number.int({ min: 10000, max: 50000 }); // 10K-50K for nominal
-                
+
                 const voucher = await prismaClient.voucher.create({
                     data: {
                         kodeVoucher: `VOUCHER${(i + 1).toString().padStart(3, '0')}`,
@@ -393,9 +394,10 @@ class FakerSeeder {
             const studentsWithPendaftaran = new Set();
             const studentsInKelasProgram = new Set();
 
-            // Create fewer Kelas Program (only 1-2 per guru)
+            // Create Kelas Program for each guru (2-3 classes per guru)
             for (const guru of this.users.gurus) {
-                for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
+                const numClasses = faker.number.int({ min: 2, max: 3 });
+                for (let i = 0; i < numClasses; i++) {
                     const kelasProgram = await prismaClient.kelasProgram.create({
                         data: {
                             kelasId: faker.helpers.arrayElement(this.data.kelas).id,
@@ -431,7 +433,7 @@ class FakerSeeder {
                 const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
                 const biayaPendaftaran = faker.number.int({ min: 100000, max: 250000 });
                 const voucher = Math.random() > 0.7 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                
+
                 let diskon = 0;
                 if (voucher) {
                     if (voucher.tipe === 'PERSENTASE') {
@@ -503,12 +505,12 @@ class FakerSeeder {
                 for (let i = 0; i < 3; i++) {
                     const sppDate = new Date(currentDate);
                     sppDate.setMonth(sppDate.getMonth() + i);
-                    
+
                     const bulan = sppDate.toLocaleString('id-ID', { month: 'long' });
                     const tahun = sppDate.getFullYear();
                     const jumlahTagihan = faker.number.int({ min: 150000, max: 300000 });
                     const sppVoucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                    
+
                     let sppDiskon = 0;
                     if (sppVoucher) {
                         if (sppVoucher.tipe === 'PERSENTASE') {
@@ -583,7 +585,7 @@ class FakerSeeder {
                 const program = faker.helpers.arrayElement(this.data.programs);
                 const biayaPendaftaran = faker.number.int({ min: 100000, max: 250000 });
                 const voucher = Math.random() > 0.8 ? faker.helpers.arrayElement(this.data.vouchers) : null;
-                
+
                 let diskon = 0;
                 if (voucher) {
                     if (voucher.tipe === 'PERSENTASE') {

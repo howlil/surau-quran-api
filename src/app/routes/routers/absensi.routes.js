@@ -9,7 +9,7 @@ const {
 } = require('../../middleware/upload.middleware');
 
 
-router.get('/v1/absensi/siswa',
+router.get('/v1/absensi/siswa/:kelasId',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
     validationMiddleware.validateQuery(absensiValidation.tanggal()),

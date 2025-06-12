@@ -95,6 +95,7 @@ model Guru {
   noWhatsapp         String?
   alamat             String?
   jenisKelamin       Gender?
+  tanggalLahir       String?
   fotoProfile        String?
   keahlian           String?
   pendidikanTerakhir String?
@@ -362,6 +363,7 @@ model Payroll {
   potongan  Decimal       @db.Decimal(10, 2)
   totalGaji Decimal       @db.Decimal(10, 2)
   status    StatusPayroll
+  tanggalKalkulasi DateTime @default(now())
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -435,6 +437,7 @@ enum StatusPembayaran {
   UNPAID
   PENDING
   PAID
+  LUNAS
   SETTLED
   EXPIRED
   INACTIVE

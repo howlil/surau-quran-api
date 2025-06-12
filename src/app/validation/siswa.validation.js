@@ -95,9 +95,10 @@ class SiswaValidation {
           .messages({
             'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
           })
-      ).min(1).required()
+      ).min(1).max(2).required()
         .messages({
           'array.min': 'Jadwal harus memilih minimal 1 pilihan',
+          'array.max': 'Jadwal maksimal 2 pilihan',
           'any.required': 'Jadwal wajib diisi'
         }),
       kodeVoucher: Joi.string().uppercase().min(3).max(50).optional()
@@ -226,12 +227,14 @@ class SiswaValidation {
               'number.integer': 'Urutan harus berupa bilangan bulat',
               'any.only': 'Urutan harus 1 atau 2'
             }),
-          isDeleted: Joi.boolean().optional()
-        }).or('hari', 'jamMengajarId', 'id', 'isDeleted')
+        }).or('hari', 'jamMengajarId', 'id')
           .messages({
             'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
           })
-      ).optional()
+      ).max(2).optional()
+        .messages({
+          'array.max': 'Jadwal maksimal 2 pilihan'
+        })
     });
   }
 }

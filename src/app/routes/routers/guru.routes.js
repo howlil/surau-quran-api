@@ -21,7 +21,7 @@ const uploadGuruFiles = multer({
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 
+    fileSize: 5 * 1024 * 1024
   }
 });
 
@@ -88,6 +88,14 @@ router.get(
   authMiddleware.authenticate,
   authMiddleware.authorize(['GURU']),
   guruController.getKelasProgramWithStudents
+);
+
+// Download contract file
+router.get(
+  '/v1/guru/:id/contract',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN', 'GURU']),
+  guruController.downloadContract
 );
 
 module.exports = router;

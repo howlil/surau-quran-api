@@ -9,8 +9,9 @@ const { prisma } = require('../../lib/config/prisma.config');
 
 class AbsensiController {
     getAbsensiSiswaForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
+        const { kelasId } = HttpRequest.getUrlParams(req);
         const filters = HttpRequest.getQueryParams(req, ['tanggal']);
-        const result = await absensiService.getAbsensiSiswaForAdmin(filters);
+        const result = await absensiService.getAbsensiSiswaForAdmin({ ...filters, kelasId });
         return Http.Response.success(res, result);
     });
 
@@ -49,7 +50,7 @@ class AbsensiController {
 
         const result = await absensiService.updateAbsensiGuru(id, data);
         const transformedResult = FileUtils.transformAbsensiGuruFiles(result, baseUrl);
-        return Http.Response.success(res, transformedResult,'Data absensi guru berhasil diperbarui');
+        return Http.Response.success(res, transformedResult, 'Data absensi guru berhasil diperbarui');
     });
 
     updateAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {

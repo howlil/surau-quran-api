@@ -101,10 +101,10 @@ class GuruService {
           });
         }
 
-        // Only update fields that are provided
+        // Update all fields that are provided, including null values
         const updateData = {};
         Object.keys(guruData).forEach(key => {
-          if (guruData[key] !== undefined) {
+          if (key in guruData) {  // Check if the key exists in the data
             updateData[key] = guruData[key];
           }
         });
@@ -187,6 +187,7 @@ class GuruService {
           noWhatsapp: true,
           alamat: true,
           jenisKelamin: true,
+          tanggalLahir: true,
           fotoProfile: true,
           keahlian: true,
           pendidikanTerakhir: true,
@@ -220,6 +221,7 @@ class GuruService {
           keahlian: true,
           fotoProfile: true,
           pendidikanTerakhir: true,
+          tanggalLahir: true,
           suratKontrak: true,
           kelasProgram: {
             select: {
@@ -243,6 +245,7 @@ class GuruService {
           keahlian: guru.keahlian,
           fotoProfile: guru.fotoProfile,
           pendidikanTerakhir: guru.pendidikanTerakhir,
+          tanggalLahir: guru.tanggalLahir,
           suratKontrak: guru.suratKontrak,
           jadwalGuru: guru.kelasProgram.map(kp => ({
             kelasProgramId: kp.id,
@@ -328,7 +331,34 @@ class GuruService {
     }
   }
 
+  async getContractFile(guruId) {
+    try {
+      const guru = await prisma.guru.findUnique({
+        where: { id: guruId },
+        select: {
+          id: true,
+          nama: true,
+          suratKontrak: true
+        }
+      });
 
+      if (!guru) {
+        throw new NotFoundError(`Guru dengan ID ${guruId} tidak ditemukan`);
+      }
+
+      if (!guru.suratKontrak) {
+        throw new NotFoundError('Surat kontrak tidak ditemukan');
+      }
+
+      return {
+        filePath: guru.suratKontrak,
+        fileName: `Surat_Kontrak_${guru.nama.replace(/\s+/g, '_')}.pdf`
+      };
+    } catch (error) {
+      logger.error(`Error getting contract file for guru ${guruId}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new GuruService();

@@ -4,12 +4,15 @@ class AbsensiValidation {
 
     tanggal() {
         return Joi.object({
+            kelasId: Joi.string().required()
+                .messages({
+                    'any.required': 'ID Kelas wajib diisi'
+                }),
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
-                .required()
+                .optional()
                 .messages({
-                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
-                    'any.required': 'Parameter tanggal wajib diisi'
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
                 }),
         });
     }
@@ -35,26 +38,16 @@ class AbsensiValidation {
                 }),
             jamMasuk: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .when('statusKehadiran', {
-                    is: 'HADIR',
-                    then: Joi.required(),
-                    otherwise: Joi.optional()
-                })
+                .optional()
+                .allow(null)
                 .messages({
-                    'string.empty': 'Jam masuk tidak boleh kosong',
-                    'any.required': 'Jam masuk wajib diisi untuk status HADIR',
                     'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
                 }),
             jamKeluar: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .when('statusKehadiran', {
-                    is: 'HADIR',
-                    then: Joi.required(),
-                    otherwise: Joi.optional()
-                })
+                .optional()
+                .allow(null)
                 .messages({
-                    'string.empty': 'Jam keluar tidak boleh kosong',
-                    'any.required': 'Jam keluar wajib diisi untuk status HADIR',
                     'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
                 }),
             keterangan: Joi.string().optional()
@@ -72,7 +65,6 @@ class AbsensiValidation {
                 .messages({
                     'any.required': 'Surat izin wajib diisi untuk status IZIN atau SAKIT'
                 }),
-           
         });
     }
 

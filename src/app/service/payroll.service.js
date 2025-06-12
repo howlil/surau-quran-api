@@ -6,9 +6,6 @@ const moment = require('moment');
 
 class PayrollService {
 
-
-
-
   async updatePayroll(id, data) {
     try {
       const payroll = await prisma.payroll.findUnique({
@@ -154,6 +151,7 @@ class PayrollService {
           periode: payroll.periode,
           totalGaji: Number(payroll.totalGaji),
           status: payroll.status,
+          tanggalKalkulasi: payroll.tanggalKalkulasi,
           pembayaran: {
             status: disbursementStatus.status,
             tanggalProses: disbursementStatus.tanggalProses,
@@ -349,6 +347,7 @@ class PayrollService {
           periode: payroll.periode,
           totalGaji: Number(payroll.totalGaji),
           status: payroll.status,
+          tanggalKalkulasi: payroll.tanggalKalkulasi,
           pembayaran: {
             status: disbursementStatus.status,
             tanggalProses: disbursementStatus.tanggalProses,

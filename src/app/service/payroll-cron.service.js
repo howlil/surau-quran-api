@@ -73,7 +73,8 @@ class PayrollCronService {
               insentif: 0,
               potongan: 0,
               totalGaji: gajiPokok,
-              status: 'DRAFT'
+              status: 'DRAFT',
+              tanggalKalkulasi: new Date()
             }
           });
 
@@ -169,7 +170,8 @@ class PayrollCronService {
               insentif: 0,
               potongan: 0,
               totalGaji: gajiPokok,
-              status: 'DRAFT'
+              status: 'DRAFT',
+              tanggalKalkulasi: new Date()
             }
           });
 

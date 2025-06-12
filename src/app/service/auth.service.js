@@ -43,84 +43,124 @@ class AuthService {
     }
 
     async requestPasswordReset(email) {
-        if (!email || typeof email !== 'string') {
-            throw new BadRequestError('Email harus diisi');
-        }
-
-        const cleanEmail = email.toLowerCase().trim();
-        if (!cleanEmail) {
-            throw new BadRequestError('Email tidak boleh kosong');
-        }
-
         try {
+            logger.info(`Starting password reset request for email: ${email}`);
+
             const user = await prisma.user.findUnique({
-                where: { email: cleanEmail },
-                select: { id: true, email: true }
+                where: { email }
             });
 
             if (!user) {
-                return {
-                    success: true,
-                    message: 'Jika email terdaftar, instruksi reset password akan dikirim ke email Anda'
-                };
+                logger.warn(`Password reset requested for non-existent email: ${email}`);
+                throw new NotFoundError('User not found');
             }
 
+            logger.info(`Found user with ID: ${user.id} for password reset request`);
+
             const resetToken = await this.#generateResetToken(user.id);
-            await this.#sendPasswordResetEmail(user.email, resetToken);
+            const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+            logger.info(`Generated reset token for user ID: ${user.id}, token expires at: ${resetTokenExpiry}`);
+
+            const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+            logger.info(`Generated reset link for user ID: ${user.id}`);
+
+            let emailSent = true;
+            try {
+                await EmailUtils.sendPasswordResetEmail({
+                    email: user.email,
+                    resetLink
+                });
+                logger.info(`Successfully sent password reset email to: ${user.email}`);
+            } catch (emailError) {
+                emailSent = false;
+                logger.error('Failed to send password reset email:', {
+                    error: emailError.message,
+                    stack: emailError.stack,
+                    userId: user.id,
+                    email: user.email
+                });
+            }
 
             return {
-                success: true,
-                message: 'Jika email terdaftar, instruksi reset password akan dikirim ke email Anda'
+                message: emailSent
+                    ? 'Password reset email sent successfully'
+                    : 'Password reset token generated but email could not be sent',
+                token: !emailSent ? resetToken : undefined
             };
         } catch (error) {
-            throw handlePrismaError(error);
+            logger.error('Error in requestPasswordReset:', {
+                error: error.message,
+                stack: error.stack,
+                email
+            });
+            throw error;
         }
     }
 
     async resetPassword(token, newPassword) {
-        if (!token || !newPassword) {
-            throw new BadRequestError('Token dan password baru harus diisi');
-        }
-
         try {
-            const now = new Date();
+            logger.info(`Starting password reset process for token: ${token}`);
 
             const resetToken = await prisma.passwordResetToken.findFirst({
                 where: {
                     token,
-                    expiresAt: { gt: now }
+                    expiresAt: {
+                        gt: new Date()
+                    }
                 },
-                select: {
-                    id: true,
-                    userId: true
+                include: {
+                    user: true
                 }
             });
 
             if (!resetToken) {
-                throw new UnauthorizedError('Token reset password tidak valid atau sudah kadaluarsa');
+                logger.warn(`Invalid or expired reset token used: ${token}`);
+                throw new NotFoundError('Invalid or expired reset token');
             }
 
+            const user = resetToken.user;
+            logger.info(`Found valid reset token for user ID: ${user.id}`);
+
             const hashedPassword = await PasswordUtils.hash(newPassword);
+            logger.info(`Generated hashed password for user ID: ${user.id}`);
 
             await prisma.$transaction([
                 prisma.user.update({
-                    where: { id: resetToken.userId },
-                    data: { password: hashedPassword }
+                    where: { id: user.id },
+                    data: {
+                        password: hashedPassword
+                    }
                 }),
-                prisma.passwordResetToken.deleteMany({
-                    where: { userId: resetToken.userId }
-                }),
-                prisma.token.deleteMany({
-                    where: { userId: resetToken.userId }
+                prisma.passwordResetToken.delete({
+                    where: { id: resetToken.id }
                 })
             ]);
 
-            return {
-                success: true,
-                message: 'Password berhasil direset'
-            };
+            logger.info(`Successfully updated password for user ID: ${user.id}`);
+
+            try {
+                await EmailUtils.sendPasswordChangedEmail({
+                    email: user.email
+                });
+                logger.info(`Successfully sent password changed notification to: ${user.email}`);
+            } catch (emailError) {
+                logger.warn('Failed to send password changed notification:', {
+                    error: emailError.message,
+                    userId: user.id,
+                    email: user.email
+                });
+                // Don't throw error here as password was already changed
+            }
+
+            return { message: 'Password reset successfully' };
         } catch (error) {
-            throw handlePrismaError(error);
+            logger.error('Error in resetPassword:', {
+                error: error.message,
+                stack: error.stack,
+                token
+            });
+            throw error;
         }
     }
 
