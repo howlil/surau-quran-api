@@ -49,8 +49,27 @@ class GuruService {
           }
         });
 
+        const schema = {
+          id: guru.id,
+          nama: guru.nama,
+          nip: guru.nip,
+          noWhatsapp: guru.noWhatsapp,
+          alamat: guru.alamat,
+          jenisKelamin: guru.jenisKelamin,
+          tanggalLahir: guru.tanggalLahir,
+          fotoProfile: guru.fotoProfile,
+          keahlian: guru.keahlian,
+          pendidikanTerakhir: guru.pendidikanTerakhir,
+          noRekening: guru.noRekening,
+          namaBank: guru.namaBank,
+          suratKontrak: guru.suratKontrak,
+          user: {
+            email: guru.user.email,
+          }
+        }
+
         logger.info(`Created guru with ID: ${guru.id}`);
-        return guru;
+        return schema;
       });
     } catch (error) {
       logger.error('Error creating guru:', error);
@@ -123,8 +142,27 @@ class GuruService {
           }
         });
 
+        const schema = {
+          id: guru.id,
+          nama: guru.nama,
+          nip: guru.nip,
+          noWhatsapp: guru.noWhatsapp,
+          alamat: guru.alamat,
+          jenisKelamin: guru.jenisKelamin,
+          tanggalLahir: guru.tanggalLahir,
+          fotoProfile: guru.fotoProfile,
+          keahlian: guru.keahlian,
+          pendidikanTerakhir: guru.pendidikanTerakhir,
+          noRekening: guru.noRekening,
+          namaBank: guru.namaBank,
+          suratKontrak: guru.suratKontrak,
+          user: {
+            email: guru.user.email,
+          }
+        }
+
         logger.info(`Updated guru with ID: ${id}`);
-        return updated;
+        return schema;
       });
     } catch (error) {
       logger.error(`Error updating guru with ID ${id}:`, error);

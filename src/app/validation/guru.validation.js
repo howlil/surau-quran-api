@@ -23,11 +23,9 @@ class GuruValidation {
         .messages({
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN'
         }),
-      tanggalLahir: Joi.date().iso().required()
+      tanggalLahir: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
         .messages({
-          'date.base': 'Format tanggal lahir tidak valid',
-          'date.format': 'Format tanggal lahir harus ISO (YYYY-MM-DD)',
-          'any.required': 'Tanggal lahir wajib diisi'
+          'string.pattern.base': 'Format tanggal lahir harus DD-MM-YYYY'
         }),
       fotoProfile: Joi.any().optional(),
       keahlian: Joi.string().optional(),
@@ -58,10 +56,9 @@ class GuruValidation {
         .messages({
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN'
         }),
-      tanggalLahir: Joi.date().iso().optional()
+      tanggalLahir: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
         .messages({
-          'date.base': 'Format tanggal lahir tidak valid',
-          'date.format': 'Format tanggal lahir harus ISO (YYYY-MM-DD)'
+          'string.pattern.base': 'Format tanggal lahir harus DD-MM-YYYY'
         }),
       fotoProfile: Joi.any().optional(),
       keahlian: Joi.string().optional(),

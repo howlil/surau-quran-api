@@ -4,10 +4,6 @@ class AbsensiValidation {
 
     tanggal() {
         return Joi.object({
-            kelasId: Joi.string().required()
-                .messages({
-                    'any.required': 'ID Kelas wajib diisi'
-                }),
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
                 .optional()

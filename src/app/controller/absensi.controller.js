@@ -10,8 +10,8 @@ const { prisma } = require('../../lib/config/prisma.config');
 class AbsensiController {
     getAbsensiSiswaForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
         const { kelasId } = HttpRequest.getUrlParams(req);
-        const filters = HttpRequest.getQueryParams(req, ['tanggal']);
-        const result = await absensiService.getAbsensiSiswaForAdmin({ ...filters, kelasId });
+        const { tanggal } = HttpRequest.getQueryParams(req, ['tanggal']);
+        const result = await absensiService.getAbsensiSiswaForAdmin({ kelasId, tanggal });
         return Http.Response.success(res, result);
     });
 

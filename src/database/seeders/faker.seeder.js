@@ -729,10 +729,10 @@ class FakerSeeder {
                     const sks = faker.number.int({ min: 1, max: 4 });
                     const suratIzin = statusKehadiran === 'IZIN' ? `surat_izin_${faker.string.alphanumeric(8)}.pdf` : null;
 
-                    // Generate a random date in 2025
+                    // Generate a random date in June-July 2025
                     const attendanceDate = moment(faker.date.between({
-                        from: '2025-01-01',
-                        to: '2025-12-31'
+                        from: '2025-06-01',
+                        to: '2025-07-31'
                     }));
 
                     // Find the corresponding payroll record for this month
@@ -777,7 +777,10 @@ class FakerSeeder {
                             data: {
                                 kelasProgramId: kelasProgram.id,
                                 siswaId: programSiswa.siswaId,
-                                tanggal: this.generateDate(),
+                                tanggal: moment(faker.date.between({
+                                    from: '2025-06-01',
+                                    to: '2025-07-31'
+                                })).format('DD-MM-YYYY'),
                                 statusKehadiran: faker.helpers.arrayElement(['HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT']),
                                 createdAt: new Date(),
                                 updatedAt: new Date()
