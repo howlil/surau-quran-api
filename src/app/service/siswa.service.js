@@ -273,6 +273,11 @@ class SiswaService {
         }
       });
 
+      // Generate NIS
+      const currentYear = new Date().getFullYear();
+      const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const nis = `${currentYear}${randomNumber}`;
+
       // Create siswa record
       const siswa = await prisma.siswa.create({
         data: {
@@ -288,7 +293,8 @@ class SiswaService {
           namaOrangTua: pendaftaranTemp.namaOrangTua,
           namaPenjemput: pendaftaranTemp.namaPenjemput,
           noWhatsapp: pendaftaranTemp.noWhatsapp,
-          isRegistered: true
+          isRegistered: true,
+          nis: nis
         }
       });
 

@@ -2,12 +2,18 @@ class FileUtils {
     static getImageUrl(baseUrl, filename) {
         if (!filename) return null;
         const actualFilename = filename.split('\\').pop();
+        if (actualFilename.includes('uploads/images/')) {
+            return `${baseUrl}/${actualFilename}`;
+        }
         return `${baseUrl}/uploads/images/${actualFilename}`;
     }
 
     static getDocumentUrl(baseUrl, filename, type = 'surat_kontrak') {
         if (!filename) return null;
         const actualFilename = filename.split('\\').pop();
+        if (actualFilename.includes(`uploads/documents/${type}/`)) {
+            return `${baseUrl}/${actualFilename}`;
+        }
         return `${baseUrl}/uploads/documents/${type}/${actualFilename}`;
     }
 
