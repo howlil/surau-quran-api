@@ -182,51 +182,55 @@ class KelasService {
                 tambahSiswaIds = []
             } = data;
 
-            const updateData = {};
-            if (programId) updateData.programId = programId;
-            if (hari) updateData.hari = hari;
-            if (jamMengajarId) updateData.jamMengajarId = jamMengajarId;
-            if (guruId) updateData.guruId = guruId;
-
             return await PrismaUtils.transaction(async (tx) => {
-                // Update kelas program if there are changes
-                let kelasProgram = null;
-                if (Object.keys(updateData).length > 0) {
-                    kelasProgram = await tx.kelasProgram.update({
-                        where: { id: kelasProgramId },
-                        data: updateData
-                    });
-                } else {
-                    kelasProgram = await tx.kelasProgram.findUnique({
-                        where: { id: kelasProgramId }
-                    });
-                }
+                // First get the existing kelas program
+                const existingKelasProgram = await tx.kelasProgram.findUnique({
+                    where: { id: kelasProgramId },
+                    include: {
+                        programSiswa: {
+                            where: { status: 'AKTIF' }
+                        }
+                    }
+                });
 
-                if (!kelasProgram) {
+                if (!existingKelasProgram) {
                     throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
                 }
 
-                // Proses penambahan siswa
+                // Update kelas program if there are changes
+                const updateData = {};
+                if (programId) updateData.programId = programId;
+                if (hari) updateData.hari = hari;
+                if (jamMengajarId) updateData.jamMengajarId = jamMengajarId;
+                if (guruId) updateData.guruId = guruId;
+
+                let updatedKelasProgram = existingKelasProgram;
+                if (Object.keys(updateData).length > 0) {
+                    updatedKelasProgram = await tx.kelasProgram.update({
+                        where: { id: kelasProgramId },
+                        data: updateData
+                    });
+                }
+
+                // Handle student updates
                 let siswaDitambah = [];
                 if (tambahSiswaIds.length > 0) {
-                    // Ambil programSiswa yang eligible
+                    // Find eligible students that are already verified in the program
                     const programSiswaList = await tx.programSiswa.findMany({
                         where: {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
-                            programId: kelasProgram.programId,
-                            kelasProgramId: null,
-                            isVerified: false,
+                            programId: updatedKelasProgram.programId,
+                            isVerified: true,
                             JadwalProgramSiswa: {
                                 some: {
-                                    hari: kelasProgram.hari,
-                                    jamMengajarId: kelasProgram.jamMengajarId
+                                    hari: updatedKelasProgram.hari,
+                                    jamMengajarId: updatedKelasProgram.jamMengajarId
                                 }
                             }
                         },
                         include: {
-                            siswa: true,
-                            JadwalProgramSiswa: true
+                            siswa: true
                         }
                     });
 
@@ -235,8 +239,7 @@ class KelasService {
                         const updatedPs = await tx.programSiswa.update({
                             where: { id: ps.id },
                             data: {
-                                kelasProgramId: kelasProgramId,
-                                isVerified: true
+                                kelasProgramId: kelasProgramId
                             }
                         });
 
@@ -265,6 +268,7 @@ class KelasService {
             const { kelasId, programId, hari, jamMengajarId, guruId, siswaIds = [] } = data;
 
             return await PrismaUtils.transaction(async (tx) => {
+                // Check for existing kelas program
                 const existingKelasProgram = await tx.kelasProgram.findFirst({
                     where: {
                         kelasId,
@@ -278,6 +282,7 @@ class KelasService {
                     throw new ConflictError('Kelas program dengan kombinasi ini sudah ada');
                 }
 
+                // Create the kelas program
                 const kelasProgram = await tx.kelasProgram.create({
                     data: {
                         kelasId,
@@ -288,15 +293,16 @@ class KelasService {
                     }
                 });
 
+                // Process student assignments
                 const processedSiswa = [];
                 if (siswaIds.length > 0) {
+                    // Find eligible students that are already verified in the program
                     const eligibleProgramSiswa = await tx.programSiswa.findMany({
                         where: {
                             siswaId: { in: siswaIds },
                             status: 'AKTIF',
                             programId,
-                            kelasProgramId: null,
-                            isVerified: false,
+                            isVerified: true,
                             JadwalProgramSiswa: {
                                 some: {
                                     hari,
@@ -304,15 +310,17 @@ class KelasService {
                                 }
                             }
                         },
-                        include: { siswa: true }
+                        include: {
+                            siswa: true
+                        }
                     });
 
+                    // Update each programSiswa record
                     for (const ps of eligibleProgramSiswa) {
                         await tx.programSiswa.update({
                             where: { id: ps.id },
                             data: {
-                                kelasProgramId: kelasProgram.id,
-                                isVerified: true
+                                kelasProgramId: kelasProgram.id
                             }
                         });
 

@@ -1,6 +1,5 @@
 const helmet = require('helmet');
 const cors = require('cors');
-const { rateLimit } = require('express-rate-limit');
 const { logger } = require('../../lib/config/logger.config');
 const CONSTANT = require('../../lib/constants');
 require('dotenv').config();
@@ -44,23 +43,6 @@ class SecurityMiddleware {
       exposedHeaders: CONSTANT.SECURITY.CORS.EXPOSED_HEADERS,
       credentials: true,
       maxAge: CONSTANT.SECURITY.CORS.MAX_AGE,
-    });
-  }
-
-  static get rateLimit() {
-    return rateLimit({
-      windowMs: CONSTANT.SECURITY.RATE_LIMIT.WINDOW_MS,
-      max: CONSTANT.SECURITY.RATE_LIMIT.MAX_REQUESTS,
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: 'Terlalu banyak permintaan, silakan coba lagi nanti',
-      handler: (req, res, next, options) => {
-        logger.warn(`Rate limit exceeded: ${req.ip}`);
-        res.status(options.statusCode).json({
-          success: false,
-          message: options.message,
-        });
-      },
     });
   }
 
@@ -114,12 +96,7 @@ class SecurityMiddleware {
   static setup(app) {
     app.use(this.helmet);
     
-    app.use(this.cors);
     
-    app.use(this.rateLimit);
-    
-    
-    // Prevent parameter pollution
     app.use(this.preventParameterPollution);
     
     // Sanitize request body

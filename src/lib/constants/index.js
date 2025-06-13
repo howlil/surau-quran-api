@@ -45,10 +45,7 @@ const SECURITY = {
     EXPOSED_HEADERS: ['Content-Range', 'X-Total-Count'],
     MAX_AGE: 86400 
   },
-  RATE_LIMIT: {
-    WINDOW_MS: 15 * 60 * 1000,
-    MAX_REQUESTS: 100
-  }
+
 };
 
 

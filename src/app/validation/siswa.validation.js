@@ -206,6 +206,10 @@ class SiswaValidation {
         .messages({
           'string.guid': 'Program ID harus berupa UUID yang valid'
         }),
+      programStatus: Joi.string().valid('AKTIF', 'TIDAK_AKTIF', 'CUTI').optional()
+        .messages({
+          'any.only': 'Status harus salah satu dari: AKTIF, TIDAK_AKTIF, CUTI'
+        }),
       // Schedule array for the program - with identification for updates
       jadwal: Joi.array().items(
         Joi.object({
@@ -227,7 +231,8 @@ class SiswaValidation {
               'number.integer': 'Urutan harus berupa bilangan bulat',
               'any.only': 'Urutan harus 1 atau 2'
             }),
-        }).or('hari', 'jamMengajarId', 'id')
+          isDeleted: Joi.boolean().optional()
+        }).or('hari', 'jamMengajarId', 'id', 'isDeleted')
           .messages({
             'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
           })

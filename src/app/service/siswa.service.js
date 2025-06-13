@@ -895,62 +895,60 @@ class SiswaService {
 
           // Process jadwal
           if (jadwal && jadwal.length > 0) {
+            // Get current active schedules (excluding deleted ones)
             const currentJadwals = await tx.jadwalProgramSiswa.findMany({
-              where: { programSiswaId },
+              where: {
+                programSiswaId,
+                id: {
+                  notIn: jadwal
+                    .filter(j => j.isDeleted)
+                    .map(j => j.id)
+                }
+              },
               orderBy: { urutan: 'asc' }
             });
 
-            const existingJadwalIds = new Set(currentJadwals.map(j => j.id));
-            let newScheduleCount = 0;
+            // Count new schedules to be added
+            const newSchedules = jadwal.filter(j => !j.id && !j.isDeleted);
+            const totalSchedules = currentJadwals.length + newSchedules.length;
 
+            if (totalSchedules > 2) {
+              throw new BadRequestError('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
+            }
+
+            // Process each schedule
             for (const jadwalItem of jadwal) {
-              if (jadwalItem.id) {
-                // Update existing schedule or delete it
-                if (jadwalItem.isDeleted) {
-                  // Delete schedule
-                  if (!existingJadwalIds.has(jadwalItem.id)) {
-                    throw new NotFoundError(`Jadwal dengan ID ${jadwalItem.id} tidak ditemukan untuk dihapus`);
-                  }
+              if (jadwalItem.isDeleted) {
+                // Delete schedule if it exists
+                if (jadwalItem.id) {
                   await tx.jadwalProgramSiswa.delete({
                     where: { id: jadwalItem.id }
                   });
-                } else {
-                  // Update existing schedule
-                  if (!existingJadwalIds.has(jadwalItem.id)) {
-                    throw new NotFoundError(`Jadwal dengan ID ${jadwalItem.id} tidak ditemukan untuk diperbarui`);
-                  }
-
-                  // Validate that we have the required fields for update
-                  if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
-                    throw new BadRequestError('Hari dan Jam Mengajar ID wajib diisi untuk mengubah jadwal');
-                  }
-
-                  // Verify the jamMengajar exists
-                  const jamMengajar = await tx.jamMengajar.findUnique({
-                    where: { id: jadwalItem.jamMengajarId }
-                  });
-                  if (!jamMengajar) {
-                    throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
-                  }
-
-                  // Update the schedule
-                  await tx.jadwalProgramSiswa.update({
-                    where: { id: jadwalItem.id },
-                    data: {
-                      hari: jadwalItem.hari,
-                      jamMengajarId: jadwalItem.jamMengajarId,
-                      urutan: jadwalItem.urutan || 1 // Default to 1 if not provided
-                    }
-                  });
                 }
-              } else if (!jadwalItem.isDeleted) {
+              } else if (jadwalItem.id) {
+                // Update existing schedule
+                if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
+                  throw new BadRequestError('Hari dan Jam Mengajar ID wajib diisi untuk mengubah jadwal');
+                }
+
+                // Verify the jamMengajar exists
+                const jamMengajar = await tx.jamMengajar.findUnique({
+                  where: { id: jadwalItem.jamMengajarId }
+                });
+                if (!jamMengajar) {
+                  throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
+                }
+
+                await tx.jadwalProgramSiswa.update({
+                  where: { id: jadwalItem.id },
+                  data: {
+                    hari: jadwalItem.hari,
+                    jamMengajarId: jadwalItem.jamMengajarId,
+                    urutan: jadwalItem.urutan || 1
+                  }
+                });
+              } else {
                 // Create new schedule
-                const currentTotalSchedules = currentJadwals.length + newScheduleCount;
-                if (currentTotalSchedules >= 2) {
-                  throw new BadRequestError('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
-                }
-
-                // Ensure hari and jamMengajarId are provided for new schedules
                 if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
                   throw new BadRequestError('Hari dan Jam Mengajar ID wajib diisi untuk jadwal baru');
                 }
@@ -967,10 +965,9 @@ class SiswaService {
                     programSiswaId: programSiswaId,
                     hari: jadwalItem.hari,
                     jamMengajarId: jadwalItem.jamMengajarId,
-                    urutan: jadwalItem.urutan || (currentTotalSchedules + 1)
+                    urutan: jadwalItem.urutan || (currentJadwals.length + 1)
                   }
                 });
-                newScheduleCount++;
               }
             }
           }
