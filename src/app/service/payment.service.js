@@ -183,7 +183,7 @@ class PaymentService {
 
       logger.info(`Found payment record for invoice ID: ${processedData.xenditInvoiceId}`);
 
-      await prisma.$transaction(async (tx) => {
+      return await PrismaUtils.transaction(async (tx) => {
         logger.info('Updating Xendit payment record');
         await tx.xenditPayment.update({
           where: { id: xenditPayment.id },
@@ -223,7 +223,7 @@ class PaymentService {
 
               if (existingPendaftaran) {
                 logger.info(`Found existing pendaftaran for payment ID: ${xenditPayment.pembayaranId}. Skipping processing.`);
-                return; // Exit early as this is a duplicate callback
+                return existingPendaftaran.siswa; // Return existing siswa data
               }
 
               logger.error(`PendaftaranTemp not found for payment ID: ${xenditPayment.pembayaranId}`);
@@ -308,11 +308,10 @@ class PaymentService {
               await EmailUtils.sendWelcomeEmail({
                 email: user.email,
                 name: siswa.namaMurid,
-                password: generatedPassword // Pass the unencrypted password to the email
+                password: generatedPassword
               });
               logger.info(`Welcome email sent successfully to: ${user.email}`);
             } catch (emailError) {
-              // Log the error but don't throw it, so the transaction can still complete
               logger.error(`Failed to send welcome email to ${user.email}:`, {
                 error: emailError.message,
                 stack: emailError.stack
@@ -321,23 +320,24 @@ class PaymentService {
             }
 
             logger.info(`Successfully processed pendaftaran for payment ID: ${xenditPayment.pembayaranId}`);
+            return siswa;
           } catch (error) {
             logger.error(`Error processing pendaftaran for payment ID: ${xenditPayment.pembayaranId}:`, {
               error: error.message,
               stack: error.stack
             });
-            throw error; // Throw error to rollback transaction
+            throw error;
           }
         }
-      });
 
-      // Get updated payment data
-      const updatedPayment = await prisma.pembayaran.findUnique({
-        where: { id: xenditPayment.pembayaranId }
-      });
+        // Get updated payment data
+        const updatedPayment = await tx.pembayaran.findUnique({
+          where: { id: xenditPayment.pembayaranId }
+        });
 
-      logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);
-      return updatedPayment;
+        logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);
+        return updatedPayment;
+      });
     } catch (error) {
       logger.error('Error handling Xendit callback:', {
         error: error.message,
