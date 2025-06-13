@@ -112,11 +112,16 @@ class SiswaValidation {
           'number.positive': 'Jumlah pembayaran harus lebih dari 0',
           'any.required': 'Jumlah pembayaran wajib diisi'
         }),
-      totalBiaya: Joi.number().precision(2).positive().required()
+      totalBiaya: Joi.number().precision(2).positive()
+        .when('kodeVoucher', {
+          is: Joi.exist(),
+          then: Joi.optional(),
+          otherwise: Joi.required()
+        })
         .messages({
           'number.base': 'Total biaya harus berupa angka',
           'number.positive': 'Total biaya harus lebih dari 0',
-          'any.required': 'Total biaya wajib diisi'
+          'any.required': 'Total biaya wajib diisi jika tidak menggunakan voucher'
         }),
     });
   }

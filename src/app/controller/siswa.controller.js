@@ -48,10 +48,7 @@ class SiswaController {
     const invoices = await XenditUtils.getAllInvoice()
 
     const result = await siswaService.getPendaftaranInvoice(invoices, filters);
-    return Http.Response.success(res, {
-      message: 'Invoice pendaftaran berhasil ditemukan',
-      data: result
-    });
+    return Http.Response.success(res, result);
   });
 
 

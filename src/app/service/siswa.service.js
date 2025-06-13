@@ -112,6 +112,7 @@ class SiswaService {
 
       let voucherId = null;
       let actualDiskon = 0;
+      let calculatedTotal = Number(jumlahPembayaran);
 
       if (kodeVoucher) {
         const voucher = await prisma.voucher.findUnique({
@@ -137,20 +138,20 @@ class SiswaService {
           actualDiskon = Number(jumlahPembayaran) * (Number(voucher.nominal) / 100);
         }
 
-        const calculatedTotal = Number(jumlahPembayaran) - actualDiskon;
+        calculatedTotal = Number(jumlahPembayaran) - actualDiskon;
+      }
+
+      // If totalBiaya is provided, validate it matches our calculation
+      if (totalBiaya !== undefined) {
         if (Math.abs(calculatedTotal - Number(totalBiaya)) > 0.01) {
           throw new BadRequestError('Total biaya tidak sesuai dengan perhitungan diskon');
-        }
-      } else {
-        if (Number(jumlahPembayaran) !== Number(totalBiaya)) {
-          throw new BadRequestError('Total biaya harus sama dengan jumlah pembayaran jika tidak ada voucher');
         }
       }
 
       const paymentData = await paymentService.createPendaftaranInvoice({
         email,
         namaMurid: cleanedNamaMurid,
-        totalBiaya,
+        totalBiaya: calculatedTotal,
         noWhatsapp,
         alamat
       });
@@ -174,7 +175,7 @@ class SiswaService {
           kodeVoucher: kodeVoucher?.toUpperCase() || null,
           biayaPendaftaran: jumlahPembayaran,
           diskon: actualDiskon,
-          totalBiaya,
+          totalBiaya: calculatedTotal,
           pembayaranId: paymentData.pembayaranId,
           voucherId
         }
@@ -387,6 +388,11 @@ class SiswaService {
         return invoiceDate === tanggal;
       });
     }
+
+    // Sort invoices by createdAt in descending order (newest first)
+    filteredInvoices.sort((a, b) => {
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
 
     const startIdx = (page - 1) * limit;
     const pagedInvoices = filteredInvoices.slice(startIdx, startIdx + Number(limit));

@@ -96,6 +96,7 @@ class SecurityMiddleware {
   static setup(app) {
     app.use(this.helmet);
     
+    app.use(this.cors);
     
     app.use(this.preventParameterPollution);
     
