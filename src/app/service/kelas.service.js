@@ -221,17 +221,26 @@ class KelasService {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
                             programId: updatedKelasProgram.programId,
-                            isVerified: true,
+                            // isVerified: true
+                        },
+                        include: {
+                            siswa: true,
                             JadwalProgramSiswa: {
-                                some: {
+                                where: {
                                     hari: updatedKelasProgram.hari,
                                     jamMengajarId: updatedKelasProgram.jamMengajarId
                                 }
                             }
-                        },
-                        include: {
-                            siswa: true
                         }
+                    });
+
+                    logger.info('Found eligible students:', {
+                        count: programSiswaList.length,
+                        students: programSiswaList.map(ps => ({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            jadwal: ps.JadwalProgramSiswa
+                        }))
                     });
 
                     // Update each programSiswa record
@@ -302,17 +311,34 @@ class KelasService {
                             siswaId: { in: siswaIds },
                             status: 'AKTIF',
                             programId,
-                            isVerified: true,
+                            // isVerified: true,
+                            // JadwalProgramSiswa: {
+                            //     some: {
+                            //         AND: [
+                            //             { hari },
+                            //             { jamMengajarId }
+                            //         ]
+                            //     }
+                            // }
+                        },
+                        include: {
+                            siswa: true,
                             JadwalProgramSiswa: {
-                                some: {
+                                where: {
                                     hari,
                                     jamMengajarId
                                 }
                             }
-                        },
-                        include: {
-                            siswa: true
                         }
+                    });
+
+                    logger.info('Found eligible students:', {
+                        count: eligibleProgramSiswa.length,
+                        students: eligibleProgramSiswa.map(ps => ({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            jadwal: ps.JadwalProgramSiswa
+                        }))
                     });
 
                     // Update each programSiswa record
@@ -333,10 +359,18 @@ class KelasService {
                 }
 
                 logger.info(`Created kelas program with ID: ${kelasProgram.id}`);
-                return {
-                    ...kelasProgram,
+
+                const schema = {
+                    kelasId: kelasProgram.kelasId,
+                    programId: kelasProgram.programId,
+                    hari: kelasProgram.hari,
+                    jamMengajarId: kelasProgram.jamMengajarId,
+                    guruId: kelasProgram.guruId,
+                    tipeKelas: kelasProgram.tipeKelas,
                     siswaYangDitambahkan: processedSiswa
-                };
+                }
+
+                return schema;
             });
         } catch (error) {
             logger.error('Error creating kelas program:', error);
@@ -351,7 +385,7 @@ class KelasService {
                     programId,
                     status: 'AKTIF',
                     kelasProgramId: null,
-                    isVerified: false
+                    // isVerified: false
                 },
                 include: {
                     siswa: {
