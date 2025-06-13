@@ -914,7 +914,7 @@ class SiswaService {
               orderBy: { urutan: 'asc' }
             });
 
-            // Count new schedules to be added
+            // Count new schedules to be added (excluding deleted ones)
             const newSchedules = jadwal.filter(j => !j.id && !j.isDeleted);
             const totalSchedules = currentJadwals.length + newSchedules.length;
 
@@ -922,8 +922,15 @@ class SiswaService {
               throw new BadRequestError('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
             }
 
+            // Sort jadwal by hari to ensure consistent ordering
+            const sortedJadwal = [...jadwal].sort((a, b) => {
+              const hariOrder = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU', 'MINGGU'];
+              return hariOrder.indexOf(a.hari) - hariOrder.indexOf(b.hari);
+            });
+
             // Process each schedule
-            for (const jadwalItem of jadwal) {
+            let currentUrutan = 1;
+            for (const jadwalItem of sortedJadwal) {
               if (jadwalItem.isDeleted) {
                 // Delete schedule if it exists
                 if (jadwalItem.id) {
@@ -950,9 +957,10 @@ class SiswaService {
                   data: {
                     hari: jadwalItem.hari,
                     jamMengajarId: jadwalItem.jamMengajarId,
-                    urutan: jadwalItem.urutan || 1
+                    urutan: currentUrutan
                   }
                 });
+                currentUrutan++;
               } else {
                 // Create new schedule
                 if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
@@ -971,12 +979,37 @@ class SiswaService {
                     programSiswaId: programSiswaId,
                     hari: jadwalItem.hari,
                     jamMengajarId: jadwalItem.jamMengajarId,
-                    urutan: jadwalItem.urutan || (currentJadwals.length + 1)
+                    urutan: currentUrutan
                   }
                 });
+                currentUrutan++;
               }
             }
+
+            // Reorder remaining schedules if needed
+            const remainingSchedules = await tx.jadwalProgramSiswa.findMany({
+              where: {
+                programSiswaId,
+                id: {
+                  notIn: jadwal
+                    .filter(j => j.isDeleted)
+                    .map(j => j.id)
+                }
+              },
+              orderBy: { hari: 'asc' }
+            });
+
+            // Update urutan for remaining schedules
+            for (let i = 0; i < remainingSchedules.length; i++) {
+              await tx.jadwalProgramSiswa.update({
+                where: { id: remainingSchedules[i].id },
+                data: { urutan: i + 1 }
+              });
+            }
           }
+        } else if (jadwal && jadwal.length > 0) {
+          // If jadwal is provided but no programId, throw error
+          throw new BadRequestError('Program ID wajib diisi untuk menambah atau mengubah jadwal');
         }
 
         logger.info(`Admin updated siswa with ID: ${id}`);
