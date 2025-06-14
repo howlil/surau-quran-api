@@ -3,7 +3,6 @@ const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
-const { id } = require('../validation/factory.validation');
 const EmailUtils = require('../../lib/utils/email.utils');
 
 class GuruService {

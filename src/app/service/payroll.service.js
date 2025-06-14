@@ -1,12 +1,8 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
-const path = require('path');
-const fs = require('fs');
-const guruService = require('../service/guru.service');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
 
 class PayrollService {
 
@@ -393,23 +389,6 @@ class PayrollService {
     }
   }
 
-  downloadContract = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const guru = await guruService.getById(id);
-
-    if (!guru || !guru.suratKontrak) {
-      throw new NotFoundError('Surat kontrak tidak ditemukan');
-    }
-
-    const filePath = path.resolve(guru.suratKontrak);
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundError('File surat kontrak tidak ditemukan di server');
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=\"Surat_Kontrak_${guru.nama.replace(/\\s+/g, '_')}.pdf\"`);
-    fs.createReadStream(filePath).pipe(res);
-  });
 }
 
 module.exports = new PayrollService();
