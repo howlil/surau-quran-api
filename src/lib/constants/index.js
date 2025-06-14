@@ -1,6 +1,5 @@
 
 
-
 const AUTH = {
   JWT_EXPIRES: '30d',
   SALT_ROUNDS: 10,
@@ -19,35 +18,13 @@ const VALIDATION = {
 };
 
 const SECURITY = {
-  HELMET: {
-    CONTENT_SECURITY_POLICY: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"]
-      }
-    },
-    HSTS: {
-      maxAge: 15552000,
-      includeSubDomains: true,
-      preload: true
-    }
-  },
+  
   CORS: {
     ALLOWED_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    ALLOWED_HEADERS: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    EXPOSED_HEADERS: ['Content-Range', 'X-Total-Count'],
-    MAX_AGE: 86400 
+    ALLOWED_HEADERS: ['Content-Type', 'Authorization'],
   },
 
 };
-
 
 
 const PAGINATION = {
@@ -59,7 +36,7 @@ const PAGINATION = {
 const DATE_FORMATS = {
   DEFAULT: 'DD-MM-YYYY',
   TIME: 'HH:mm',
-  MONTH_YEAR: 'MMMM YYYY'
+  MONTH_YEAR: 'MM YYYY'
 };
 
 module.exports = {

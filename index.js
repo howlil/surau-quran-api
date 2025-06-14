@@ -28,7 +28,7 @@ class Application {
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(loggerMiddleware);
 
-    this.app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+    this.app.use('/uploads', express.static(path.resolve('uploads')));
   }
 
   setupRoutes() {
@@ -41,6 +41,10 @@ class Application {
 
     this.app.get('/', (req, res) => {
       Http.Response.success(res, { status: 'ok', timestamp: new Date() }, 'API is running');
+    });
+
+    this.app.use((req, res, next) => {
+      res.status(404).json({ message: `Route tidak ditemukan: ${req.originalUrl}` });
     });
   }
 

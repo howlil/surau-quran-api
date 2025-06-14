@@ -90,11 +90,10 @@ router.get(
   guruController.getKelasProgramWithStudents
 );
 
-// Download contract file
 router.get(
-  '/v1/guru/:id/contract',
+  '/v1/guru/contract',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN', 'GURU']),
+  authMiddleware.authorize(['GURU']),
   guruController.downloadContract
 );
 

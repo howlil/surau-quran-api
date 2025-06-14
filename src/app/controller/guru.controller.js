@@ -31,6 +31,8 @@ class GuruController {
     const { id } = HttpRequest.getUrlParams(req);
     const data = HttpRequest.getBodyParams(req);
 
+    
+
     if (req.files) {
       if (req.files.fotoProfile && req.files.fotoProfile[0]) {
         data.fotoProfile = req.files.fotoProfile[0].path;
@@ -101,8 +103,13 @@ class GuruController {
   });
 
   downloadContract = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const { filePath, fileName } = await guruService.getContractFile(id);
+    const userId = req.user.id;
+
+    const guru = await prisma.guru.findUnique({
+      where: { userId }
+    });
+
+    const { filePath, fileName } = await guruService.getContractFile(guru.id);
 
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');

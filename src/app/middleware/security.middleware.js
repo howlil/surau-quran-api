@@ -1,4 +1,3 @@
-const helmet = require('helmet');
 const cors = require('cors');
 const { logger } = require('../../lib/config/logger.config');
 const CONSTANT = require('../../lib/constants');
@@ -6,43 +5,13 @@ require('dotenv').config();
 
 
 class SecurityMiddleware {
-  static get helmet() {
-    return helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.defaultSrc,
-          scriptSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.scriptSrc,
-          styleSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.styleSrc,
-          imgSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.imgSrc,
-          connectSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.connectSrc,
-          fontSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.fontSrc,
-          objectSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.objectSrc,
-          mediaSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.mediaSrc,
-          frameSrc: CONSTANT.SECURITY.HELMET.CONTENT_SECURITY_POLICY.directives.frameSrc,
-        },
-      },
-      xssFilter: true,
-      noSniff: true,
-      referrerPolicy: { policy: 'same-origin' },
-      hsts: {
-        maxAge: CONSTANT.SECURITY.HELMET.HSTS.maxAge, // 180 days in seconds
-        includeSubDomains: CONSTANT.SECURITY.HELMET.HSTS.includeSubDomains,
-        preload: CONSTANT.SECURITY.HELMET.HSTS.preload,
-      },
-      frameguard: {
-        action: 'deny',
-      },
-    });
-  }
-
+  
   static get cors() {
     return cors({
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: '*',
       methods: CONSTANT.SECURITY.CORS.ALLOWED_METHODS,
       allowedHeaders: CONSTANT.SECURITY.CORS.ALLOWED_HEADERS,
-      exposedHeaders: CONSTANT.SECURITY.CORS.EXPOSED_HEADERS,
       credentials: true,
-      maxAge: CONSTANT.SECURITY.CORS.MAX_AGE,
     });
   }
 
@@ -94,13 +63,11 @@ class SecurityMiddleware {
   }
 
   static setup(app) {
-    app.use(this.helmet);
     
     app.use(this.cors);
     
     app.use(this.preventParameterPollution);
     
-    // Sanitize request body
     app.use(this.sanitizeRequestBody);
     
     logger.info('Security middleware configured');

@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class AbsensiService {
 
@@ -93,14 +94,25 @@ class AbsensiService {
             });
 
             // Convert the map to an array
-            return Array.from(kelasMap.values())[0]; // Return single object since we're filtering by kelasId
+            const result = Array.from(kelasMap.values())[0]; // Return single object since we're filtering by kelasId
+            const transformedResult = {
+                ...result,
+                program: result.program.map(program => ({
+                    ...program,
+                    absensi: program.absensi.map(record => ({
+                        ...record,
+                        suratIzin: FileUtils.getSuratIzinUrl(baseUrl, record.suratIzin)
+                    }))
+                }))
+            };
+            return transformedResult;
         } catch (error) {
             logger.error('Error getting siswa attendance by kelas:', error);
             throw error;
         }
     }
 
-    async getAbsensiGuruByDate(filters = {}) {
+    async getAbsensiGuruByDate(filters = {}, baseUrl) {
         try {
             const { tanggal } = filters;
 
@@ -163,9 +175,19 @@ class AbsensiService {
             });
 
             // Convert to array and sort by date (newest first)
-            return Object.values(groupedByDate).sort((a, b) => {
+            const result = Object.values(groupedByDate).sort((a, b) => {
                 return new Date(b.tanggal) - new Date(a.tanggal);
             });
+
+            const transformedResult = result.map(item => ({
+                ...item,
+                absensi: item.absensi.map(abs => ({
+                    ...abs,
+                    suratIzin: abs.suratIzin ? FileUtils.getSuratIzinUrl(baseUrl, abs.suratIzin) : null
+                }))
+            }));
+
+            return transformedResult;
         } catch (error) {
             logger.error('Error getting grouped guru attendance:', error);
             throw error;
@@ -381,11 +403,27 @@ class AbsensiService {
                 });
             });
 
-            return Array.from(kelasMap.values());
+            const result = Array.from(kelasMap.values());
+            const transformedResult = result.map(item => ({
+                ...item,
+                program: item.program.map(program => ({
+                    ...program,
+                    absensi: program.absensi.map(record => ({
+                        ...record,
+                        suratIzin: FileUtils.getSuratIzinUrl(baseUrl, record.suratIzin)
+                    }))
+                }))
+            }));
+            return transformedResult;
         } catch (error) {
             logger.error('Error getting siswa attendance for guru:', error);
             throw error;
         }
+    }
+
+    static getSuratIzinUrl(baseUrl, filename) {
+        if (!filename) return null;
+        return `${baseUrl}/uploads/documents/surat_izin/${filename}`;
     }
 }
 

@@ -308,6 +308,12 @@ class GuruService {
         select: {
           id: true,
           tipeKelas: true,
+          guru: {
+            select: {
+              id: true,
+              nama: true
+            }
+          },
           kelas: {
             select: {
               id: true,
@@ -347,6 +353,10 @@ class GuruService {
         kelas: {
           id: kp.kelas.id,
           namaKelas: kp.kelas.namaKelas
+        },
+        guru: {
+          id: kp.guru.id,
+          nama: kp.guru.nama
         },
         program: {
           id: kp.program.id,
