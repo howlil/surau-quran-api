@@ -186,6 +186,7 @@ class SppService {
                     },
                     pembayaran: {
                         select: {
+                            id: true,
                             tanggalPembayaran: true,
                             jumlahTagihan: true,
                             statusPembayaran: true
@@ -198,6 +199,7 @@ class SppService {
                 ]
             });
 
+
             const formattedData = result.data.map(spp => ({
                 id: spp.id,
                 program: spp.programSiswa.program.namaProgram,
@@ -208,12 +210,13 @@ class SppService {
                 jumlahTagihan: Number(spp.jumlahTagihan),
                 diskon: Number(spp.diskon),
                 totalTagihan: Number(spp.totalTagihan),
-                statusPembayaran: spp.pembayaran?.statusPembayaran || 'UNPAID',
+                idPembayaran: spp.pembayaran?.id,
+                statusPembayaran: spp.pembayaran?.statusPembayaran,
                 isPaid: !!spp.pembayaran?.statusPembayaran && ['PAID', 'SETTLED'].includes(spp.pembayaran.statusPembayaran)
             }));
 
             return {
-                data: formattedData,
+                formattedData,
                 pagination: result.meta
             };
         } catch (error) {
@@ -326,7 +329,46 @@ class SppService {
         }
     }
 
+    async getSppInvoice(pembayaranId) {
+        // Ambil pembayaran dan relasi
+        const pembayaran = await prisma.pembayaran.findUnique({
+            where: { id: pembayaranId },
+            include: {
+                periodeSpp: {
+                    include: {
+                        programSiswa: {
+                            include: {
+                                siswa: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
+        if (!pembayaran) throw new NotFoundError('Pembayaran tidak ditemukan');
+        if (pembayaran.statusPembayaran !== 'PAID') throw new BadRequestError('Invoice hanya tersedia untuk transaksi yang sudah dibayar');
+
+        const periode = pembayaran.periodeSpp;
+        if (!periode) throw new NotFoundError('Data periode SPP tidak ditemukan');
+
+        const siswa = periode.programSiswa.siswa;
+
+        return {
+            invoiceNumber: pembayaran.id,
+            date: pembayaran.tanggalPembayaran,
+            for: {
+                nama: siswa.namaMurid,
+                email: siswa.user?.email,
+                noWhatsapp: siswa.noWhatsapp
+            },
+            paymentMethod: pembayaran.metodePembayaran,
+            deskripsi: `SPP Bulan ${periode.bulan}`,
+            qty: 1,
+            biaya: Number(periode.jumlahTagihan),
+            total: Number(periode.jumlahTagihan)
+        };
+    }
 }
 
 module.exports = new SppService();

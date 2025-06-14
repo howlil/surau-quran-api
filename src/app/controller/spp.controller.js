@@ -32,6 +32,14 @@ class SppController {
 
         return Http.Response.success(res, result, 'Data SPP siswa berhasil diambil');
     });
+
+    getSppInvoice = ErrorHandler.asyncHandler(async (req, res) => {
+        const { pembayaranId } = req.params;
+        const result = await sppService.getSppInvoice(pembayaranId);
+
+        return Http.Response.success(res, result, 'Invoice SPP berhasil diambil');
+    });
+    
 }
 
 module.exports = new SppController();

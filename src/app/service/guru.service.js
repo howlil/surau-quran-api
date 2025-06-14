@@ -4,6 +4,7 @@ const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const { id } = require('../validation/factory.validation');
+const EmailUtils = require('../../lib/utils/email.utils');
 
 class GuruService {
 
@@ -22,7 +23,8 @@ class GuruService {
         }
 
         const NIP = Math.floor(Math.random() * 1000000);
-        const hashedPassword = await PasswordUtils.hash("@Test123");
+        const plainPassword = "@Test123";
+        const hashedPassword = await PasswordUtils.hash(plainPassword);
 
         const user = await tx.user.create({
           data: {
@@ -47,6 +49,13 @@ class GuruService {
               }
             }
           }
+        });
+
+        // Kirim email ke guru
+        await EmailUtils.sendWelcomeEmail({
+          email,
+          name: guru.nama,
+          password: plainPassword
         });
 
         const schema = {

@@ -23,4 +23,11 @@ router.get(
     sppController.getSppForSiswa
 );
 
+router.get(
+    '/v1/spp/invoice/:pembayaranId',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['SISWA']),
+    sppController.getSppInvoice
+);
+
 module.exports = router;

@@ -1,5 +1,6 @@
 const EmailConfig = require('../config/email.config');
 const { logger } = require('../config/logger.config');
+const PasswordUtils = require('../utils/password.utils');
 
 class EmailUtils {
   static async #sendEmail({ to, subject, html }) {
