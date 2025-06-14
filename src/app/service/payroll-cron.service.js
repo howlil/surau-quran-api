@@ -50,18 +50,79 @@ class PayrollCronService {
             continue;
           }
 
+          // Get attendance data for the current month
           const absensiData = await prisma.absensiGuru.findMany({
             where: {
               guruId: guru.id,
               tanggal: {
                 contains: `${tahun}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
-              },
-              statusKehadiran: 'HADIR'
+              }
+            },
+            include: {
+              kelasProgram: {
+                select: {
+                  tipeKelas: true
+                }
+              }
             }
           });
 
-          const totalSKS = absensiData.reduce((sum, absensi) => sum + absensi.sks, 0);
-          const gajiPokok = Number(guru.tarifPerJam || 0) * totalSKS;
+          const HONOR_RATES = {
+            GROUP: 35000,
+            PRIVATE: 35000,
+            SUBSTITUTE: 25000,
+            ONLINE: 25000
+          };
+
+          let gajiPokok = 0;
+          let totalInsentif = 0;
+          let totalPotongan = 0;
+          let totalSKS = 0;
+
+          // Track daily SKS for incentive calculation
+          const dailySKS = {};
+
+          absensiData.forEach(absensi => {
+            if (absensi.statusKehadiran === 'HADIR') {
+              const tipeKelas = absensi.kelasProgram.tipeKelas;
+              const honorPerSKS = HONOR_RATES[tipeKelas];
+
+              // Add to base salary
+              gajiPokok += absensi.sks * honorPerSKS;
+              totalSKS += absensi.sks;
+
+              // Track daily SKS for incentive
+              if (!dailySKS[absensi.tanggal]) {
+                dailySKS[absensi.tanggal] = 0;
+              }
+              dailySKS[absensi.tanggal] += absensi.sks;
+
+              // Add attendance incentive if applicable
+              if (absensi.insentifKehadiran) {
+                totalInsentif += Number(absensi.insentifKehadiran);
+              }
+            }
+
+            // Calculate penalties
+            if (absensi.potonganTerlambat) {
+              totalPotongan += Number(absensi.potonganTerlambat);
+            }
+            if (absensi.potonganTanpaKabar) {
+              totalPotongan += Number(absensi.potonganTanpaKabar);
+            }
+            if (absensi.potonganTanpaSuratIzin) {
+              totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+            }
+          });
+
+          // Calculate attendance incentive (Rp 10,000 per day with minimum 2 SKS)
+          Object.entries(dailySKS).forEach(([date, sks]) => {
+            if (sks >= 2) {
+              totalInsentif += 10000;
+            }
+          });
+
+          const totalGaji = gajiPokok + totalInsentif - totalPotongan;
 
           const payroll = await prisma.payroll.create({
             data: {
@@ -70,9 +131,9 @@ class PayrollCronService {
               bulan,
               tahun,
               gajiPokok,
-              insentif: 0,
-              potongan: 0,
-              totalGaji: gajiPokok,
+              insentif: totalInsentif,
+              potongan: totalPotongan,
+              totalGaji,
               status: 'DRAFT',
               tanggalKalkulasi: new Date()
             }
@@ -84,6 +145,8 @@ class PayrollCronService {
             payrollId: payroll.id,
             totalSKS,
             gajiPokok,
+            insentif: totalInsentif,
+            potongan: totalPotongan,
             totalGaji: payroll.totalGaji
           });
 
@@ -152,13 +215,74 @@ class PayrollCronService {
               guruId: guru.id,
               tanggal: {
                 contains: `${tahun}-${String(monthNumber).padStart(2, '0')}`
-              },
-              statusKehadiran: 'HADIR'
+              }
+            },
+            include: {
+              kelasProgram: {
+                select: {
+                  tipeKelas: true
+                }
+              }
             }
           });
 
-          const totalSKS = absensiData.reduce((sum, absensi) => sum + absensi.sks, 0);
-          const gajiPokok = Number(guru.tarifPerJam || 0) * totalSKS;
+          // Calculate base salary based on SKS and class type
+          const HONOR_RATES = {
+            GROUP: 35000,
+            PRIVATE: 35000,
+            SUBSTITUTE: 25000,
+            ONLINE: 25000
+          };
+
+          let gajiPokok = 0;
+          let totalInsentif = 0;
+          let totalPotongan = 0;
+          let totalSKS = 0;
+
+          // Track daily SKS for incentive calculation
+          const dailySKS = {};
+
+          absensiData.forEach(absensi => {
+            if (absensi.statusKehadiran === 'HADIR') {
+              const tipeKelas = absensi.kelasProgram.tipeKelas;
+              const honorPerSKS = HONOR_RATES[tipeKelas];
+
+              // Add to base salary
+              gajiPokok += absensi.sks * honorPerSKS;
+              totalSKS += absensi.sks;
+
+              // Track daily SKS for incentive
+              if (!dailySKS[absensi.tanggal]) {
+                dailySKS[absensi.tanggal] = 0;
+              }
+              dailySKS[absensi.tanggal] += absensi.sks;
+
+              // Add attendance incentive if applicable
+              if (absensi.insentifKehadiran) {
+                totalInsentif += Number(absensi.insentifKehadiran);
+              }
+            }
+
+            // Calculate penalties
+            if (absensi.potonganTerlambat) {
+              totalPotongan += Number(absensi.potonganTerlambat);
+            }
+            if (absensi.potonganTanpaKabar) {
+              totalPotongan += Number(absensi.potonganTanpaKabar);
+            }
+            if (absensi.potonganTanpaSuratIzin) {
+              totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+            }
+          });
+
+          // Calculate attendance incentive (Rp 10,000 per day with minimum 2 SKS)
+          Object.entries(dailySKS).forEach(([date, sks]) => {
+            if (sks >= 2) {
+              totalInsentif += 10000;
+            }
+          });
+
+          const totalGaji = gajiPokok + totalInsentif - totalPotongan;
 
           const payroll = await prisma.payroll.create({
             data: {
@@ -167,9 +291,9 @@ class PayrollCronService {
               bulan,
               tahun: Number(tahun),
               gajiPokok,
-              insentif: 0,
-              potongan: 0,
-              totalGaji: gajiPokok,
+              insentif: totalInsentif,
+              potongan: totalPotongan,
+              totalGaji,
               status: 'DRAFT',
               tanggalKalkulasi: new Date()
             }
@@ -181,6 +305,8 @@ class PayrollCronService {
             payrollId: payroll.id,
             totalSKS,
             gajiPokok,
+            insentif: totalInsentif,
+            potongan: totalPotongan,
             totalGaji: payroll.totalGaji
           });
         } catch (error) {

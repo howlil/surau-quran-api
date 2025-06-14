@@ -431,6 +431,183 @@ class AbsensiService {
         if (!filename) return null;
         return `${baseUrl}/uploads/documents/surat_izin/${filename}`;
     }
+
+    async createAbsensiSiswa(guruId, data) {
+        try {
+            const { kelasProgramId, tanggal, absensi } = data;
+
+            // Verify that the teacher is assigned to this class
+            const kelasProgram = await prisma.kelasProgram.findFirst({
+                where: {
+                    id: kelasProgramId,
+                    guruId
+                },
+                include: {
+                    programSiswa: {
+                        where: {
+                            status: 'AKTIF'
+                        },
+                        select: {
+                            siswaId: true
+                        }
+                    }
+                }
+            });
+
+            if (!kelasProgram) {
+                throw new NotFoundError('Kelas program tidak ditemukan atau guru tidak berwenang');
+            }
+
+            // Get all active students in this class
+            const activeSiswaIds = kelasProgram.programSiswa.map(ps => ps.siswaId);
+
+            // Verify all students in the attendance list are active in this class
+            const invalidSiswaIds = absensi
+                .map(a => a.siswaId)
+                .filter(id => !activeSiswaIds.includes(id));
+
+            if (invalidSiswaIds.length > 0) {
+                throw new BadRequestError(`Siswa dengan ID ${invalidSiswaIds.join(', ')} tidak terdaftar dalam kelas ini`);
+            }
+
+            // Check if attendance records already exist for this date and class
+            const existingAbsensi = await prisma.absensiSiswa.findMany({
+                where: {
+                    kelasProgramId,
+                    tanggal,
+                    siswaId: {
+                        in: absensi.map(a => a.siswaId)
+                    }
+                }
+            });
+
+            if (existingAbsensi.length > 0) {
+                throw new BadRequestError('Absensi untuk tanggal ini sudah ada');
+            }
+
+            // Create attendance records
+            const createdAbsensi = await prisma.$transaction(
+                absensi.map(record =>
+                    prisma.absensiSiswa.create({
+                        data: {
+                            kelasProgramId,
+                            siswaId: record.siswaId,
+                            tanggal,
+                            statusKehadiran: record.statusKehadiran
+                        },
+                        include: {
+                            siswa: {
+                                select: {
+                                    namaMurid: true,
+                                    nis: true
+                                }
+                            }
+                        }
+                    })
+                )
+            );
+
+            // Format response
+            const formattedResponse = createdAbsensi.map(record => ({
+                id: record.id,
+                tanggal: record.tanggal,
+                siswaId: record.siswaId,
+                namaSiswa: record.siswa.namaMurid,
+                nisSiswa: record.siswa.nis,
+                statusKehadiran: record.statusKehadiran
+            }));
+
+            logger.info(`Created attendance records for class ${kelasProgramId} on ${tanggal}`);
+            return formattedResponse;
+        } catch (error) {
+            logger.error('Error creating student attendance records:', error);
+            throw error;
+        }
+    }
+
+    async getSiswaByKelasProgram(guruId, data) {
+        try {
+            const { kelasProgramId, tanggal } = data;
+
+            const kelasProgram = await prisma.kelasProgram.findFirst({
+                where: {
+                    id: kelasProgramId,
+                    guruId
+                },
+                include: {
+                    programSiswa: {
+                        where: {
+                            status: 'AKTIF'
+                        },
+                        include: {
+                            siswa: {
+                                select: {
+                                    id: true,
+                                    namaMurid: true,
+                                    nis: true
+                                }
+                            }
+                        }
+                    },
+                    program: {
+                        select: {
+                            namaProgram: true
+                        }
+                    },
+                    jamMengajar: {
+                        select: {
+                            jamMulai: true,
+                            jamSelesai: true
+                        }
+                    }
+                }
+            });
+
+            if (!kelasProgram) {
+                throw new NotFoundError('Kelas program tidak ditemukan atau guru tidak berwenang');
+            }
+
+            // Get existing attendance records for this date
+            const existingAbsensi = await prisma.absensiSiswa.findMany({
+                where: {
+                    kelasProgramId,
+                    tanggal
+                },
+                select: {
+                    siswaId: true,
+                    statusKehadiran: true
+                }
+            });
+
+            // Create a map of existing attendance records
+            const absensiMap = new Map(
+                existingAbsensi.map(record => [record.siswaId, record.statusKehadiran])
+            );
+
+            // Format response with student data and attendance status
+            const formattedResponse = {
+                kelasProgramId,
+                namaProgram: kelasProgram.program.namaProgram,
+                jamMengajar: {
+                    jamMulai: kelasProgram.jamMengajar.jamMulai,
+                    jamSelesai: kelasProgram.jamMengajar.jamSelesai
+                },
+                tanggal,
+                siswa: kelasProgram.programSiswa.map(ps => ({
+                    siswaId: ps.siswa.id,
+                    namaSiswa: ps.siswa.namaMurid,
+                    nisSiswa: ps.siswa.nis,
+                    statusKehadiran: absensiMap.get(ps.siswa.id) || null
+                }))
+            };
+
+            logger.info(`Retrieved students for class ${kelasProgramId} on ${tanggal}`);
+            return formattedResponse;
+        } catch (error) {
+            logger.error('Error getting students by kelas program:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = new AbsensiService();

@@ -45,4 +45,20 @@ router.get('/v1/guru/absensi/siswa',
     absensiController.getAbsensiSiswaForGuru
 );
 
+router.post('/v1/absensi/:kelasId/students',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateBody(absensiValidation.createAbsensiSiswa()),
+    absensiController.createAbsensiSiswa
+);
+
+
+router.get(
+    '/v1/absensi/students',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateQuery(absensiValidation.getSiswaByKelasProgram()),
+    absensiController.getSiswaByKelasProgram
+);
+
 module.exports = router; 

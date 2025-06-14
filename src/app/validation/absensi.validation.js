@@ -88,6 +88,58 @@ class AbsensiValidation {
         });
     }
 
+    createAbsensiSiswa() {
+        return Joi.object({
+            kelasProgramId: Joi.string().guid({ version: 'uuidv4' }).required()
+                .messages({
+                    'string.guid': 'ID kelas program harus berupa UUID yang valid',
+                    'any.required': 'ID kelas program wajib diisi'
+                }),
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .required()
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'any.required': 'Tanggal wajib diisi'
+                }),
+            absensi: Joi.array().items(
+                Joi.object({
+                    siswaId: Joi.string().guid({ version: 'uuidv4' }).required()
+                        .messages({
+                            'string.guid': 'ID siswa harus berupa UUID yang valid',
+                            'any.required': 'ID siswa wajib diisi'
+                        }),
+                    statusKehadiran: Joi.string().valid('HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT').required()
+                        .messages({
+                            'any.required': 'Status kehadiran wajib diisi',
+                            'any.only': 'Status kehadiran tidak valid'
+                        })
+                })
+            ).min(1).required()
+                .messages({
+                    'array.min': 'Minimal harus ada satu data absensi',
+                    'any.required': 'Data absensi wajib diisi'
+                })
+        });
+    }
+
+    getSiswaByKelasProgram() {
+        return Joi.object({
+            kelasProgramId: Joi.string().guid({ version: 'uuidv4' }).required()
+                .messages({
+                    'string.guid': 'ID kelas program harus berupa UUID yang valid',
+                    'any.required': 'ID kelas program wajib diisi'
+                }),
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .required()
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'any.required': 'Tanggal wajib diisi'
+                })
+        });
+    }
+
 }
 
 module.exports = new AbsensiValidation(); 

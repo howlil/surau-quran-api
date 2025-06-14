@@ -7,7 +7,13 @@ class AbsensiCronService {
             const today = new Date();
             const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const currentDay = days[today.getDay()];
-            const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            // Format date to DD-MM-YYYY
+            const formattedDate = today.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).split('/').reverse().join('-');
 
             const kelasPrograms = await prisma.kelasProgram.findMany({
                 where: {

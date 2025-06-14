@@ -5,6 +5,7 @@ const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { NotFoundError } = require('../../lib/http/error.handler.htttp');
 const { prisma } = require('../../lib/config/prisma.config');
 const FileUtils = require('../../lib/utils/file.utils');
+const { logger } = require('../../lib/config/logger.config');
 
 class AbsensiController {
     getAbsensiSiswaForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
@@ -69,6 +70,40 @@ class AbsensiController {
 
         const result = await absensiService.updateAbsensiSiswa(siswaId, guru.id, { value: req.body });
         return Http.Response.success(res, 'Berhasil mengupdate absensi siswa');
+    });
+
+    createAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+        const userId = req.user.id;
+        const data = HttpRequest.getBodyParams(req);
+
+        // Get guru ID from authenticated user
+        const guru = await prisma.guru.findUnique({
+            where: { userId }
+        });
+
+        if (!guru) {
+            throw new NotFoundError('Profil guru tidak ditemukan');
+        }
+
+        const result = await absensiService.createAbsensiSiswa(guru.id, data);
+        return Http.Response.success(res, result, 'Data absensi siswa berhasil dibuat');
+    });
+
+    getSiswaByKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
+        const userId = req.user.id;
+        const data = HttpRequest.getQueryParams(req, ['kelasProgramId', 'tanggal']);
+
+        // Get teacher profile
+        const guru = await prisma.guru.findUnique({
+            where: { userId }
+        });
+
+        if (!guru) {
+            throw new NotFoundError('Profil guru tidak ditemukan');
+        }
+
+        const result = await absensiService.getSiswaByKelasProgram(guru.id, data);
+        return Http.Response.success(res, result, 'Data siswa berhasil diambil');
     });
 }
 

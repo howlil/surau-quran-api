@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const { logger } = require('./logger.config');
 const PayrollCronService = require('../../app/service/payroll-cron.service');
 const AbsensiCronService = require('../../app/service/absensi-cron.service');
+const SppCronService = require('../../app/service/spp-cron.service');
 
 class CronJobs {
   static init() {
@@ -9,6 +10,7 @@ class CronJobs {
 
     this.schedulePayrollGeneration();
     this.scheduleDailyAbsensiGuru();
+    this.scheduleMonthlySppCreation();
 
     logger.info('All cron jobs have been scheduled');
   }
@@ -45,18 +47,24 @@ class CronJobs {
     logger.info('Daily guru attendance creation cron job scheduled for every day at 00:01');
   }
 
-  static async runManualPayrollGeneration(bulan, tahun) {
-    logger.info(`Running manual SPP generation for ${bulan} ${tahun}...`);
+  static scheduleMonthlySppCreation() {
+    // Run at 00:02 every day to check for SPP creation
+    cron.schedule('2 0 * * *', async () => {
+      logger.info('Running scheduled monthly SPP creation...');
+      try {
+        const result = await SppCronService.createMonthlySpp();
+        logger.info('Scheduled monthly SPP creation completed:', result);
+      } catch (error) {
+        logger.error('Scheduled monthly SPP creation failed:', error);
+      }
+    }, {
+      timezone: 'Asia/Jakarta'
+    });
 
-    try {
-      const result = await PayrollCronService.runManualPayrollGeneration(bulan, tahun);
-      logger.info('Manual payroll generation completed:', result);
-      return result;
-    } catch (error) {
-      logger.error('Manual payroll generation failed:', error);
-      throw error;
-    }
+    logger.info('Monthly SPP creation cron job scheduled for every day at 00:02');
   }
+
+ 
 }
 
 module.exports = CronJobs;
