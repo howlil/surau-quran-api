@@ -199,8 +199,7 @@ class SppService {
                 ]
             });
 
-
-            const formattedData = result.data.map(spp => ({
+            const data = result.data.map(spp => ({
                 id: spp.id,
                 program: spp.programSiswa.program.namaProgram,
                 bulan: spp.bulan,
@@ -216,8 +215,8 @@ class SppService {
             }));
 
             return {
-                formattedData,
-                pagination: result.meta
+                data,
+                pagination: result.pagination
             };
         } catch (error) {
             logger.error('Error getting SPP data for student:', error);
