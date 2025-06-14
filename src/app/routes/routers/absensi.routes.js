@@ -23,7 +23,7 @@ router.get('/v1/absensi/guru',
     absensiController.getAbsensiGuruByDate
 );
 
-router.put('/v1/absensi/guru/:id',
+router.patch('/v1/absensi/guru/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
     uploadSuratIzinMiddleware,

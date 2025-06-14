@@ -304,6 +304,8 @@ class PaymentService {
             });
 
             // Send welcome email with credentials - but don't let email failure block the transaction
+
+
             try {
               await EmailUtils.sendWelcomeEmail({
                 email: user.email,

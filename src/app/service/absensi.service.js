@@ -93,6 +93,7 @@ class AbsensiService {
                 });
             });
 
+            const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
             // Convert the map to an array
             const result = Array.from(kelasMap.values())[0]; // Return single object since we're filtering by kelasId
             const transformedResult = {
@@ -221,9 +222,14 @@ class AbsensiService {
             // Format data
             const absensiData = {
                 statusKehadiran: data.statusKehadiran,
-                jamMasuk: data.jamMasuk || null,
-                jamKeluar: data.jamKeluar || null,
-                ...(data.keterangan && { keterangan: data.keterangan }),
+                ...(data.statusKehadiran === 'HADIR' && {
+                    ...(data.jamMasuk && { jamMasuk: data.jamMasuk }),
+                    ...(data.jamKeluar && { jamKeluar: data.jamKeluar })
+                }),
+                ...(data.statusKehadiran !== 'HADIR' && {
+                    jamMasuk: null,
+                    jamKeluar: null
+                }),
                 ...(data.suratIzin && { suratIzin: data.suratIzin })
             };
 
@@ -265,7 +271,7 @@ class AbsensiService {
                 jamKeluar: updated.jamKeluar,
                 sks: updated.sks,
                 statusKehadiran: updated.statusKehadiran,
-                keterangan: data.keterangan || this.getKehadiranDescription(updated.statusKehadiran),
+                keterangan: this.getKehadiranDescription(updated.statusKehadiran),
                 suratIzin: updated.suratIzin
             };
 

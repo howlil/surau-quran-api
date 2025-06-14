@@ -2,10 +2,9 @@ const absensiService = require('../service/absensi.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
-const { FileUtils } = require('../../lib/utils/file.utils');
 const { NotFoundError } = require('../../lib/http/error.handler.htttp');
 const { prisma } = require('../../lib/config/prisma.config');
-
+const FileUtils = require('../../lib/utils/file.utils');
 
 class AbsensiController {
     getAbsensiSiswaForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
@@ -48,8 +47,13 @@ class AbsensiController {
         }
 
         const result = await absensiService.updateAbsensiGuru(id, data);
-        const transformedResult = FileUtils.transformAbsensiGuruFiles(result, baseUrl);
-        return Http.Response.success(res, transformedResult, 'Data absensi guru berhasil diperbarui');
+
+        // Transform the suratIzin URL if it exists
+        if (result.suratIzin) {
+            result.suratIzin = FileUtils.getSuratIzinUrl(baseUrl, result.suratIzin);
+        }
+
+        return Http.Response.success(res, result, 'Data absensi guru berhasil diperbarui');
     });
 
     updateAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {

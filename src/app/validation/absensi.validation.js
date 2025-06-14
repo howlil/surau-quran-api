@@ -32,21 +32,35 @@ class AbsensiValidation {
                     'any.required': 'Status kehadiran wajib diisi',
                     'any.only': 'Status kehadiran tidak valid'
                 }),
-            jamMasuk: Joi.string()
-                .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .allow(null, '')
-                .optional()
-                .messages({
-                    'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
-                }),
-            jamKeluar: Joi.string()
-                .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                .allow(null, '')
-                .optional()
-                .messages({
-                    'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
-                }),
-            keterangan: Joi.string().optional()
+            jamMasuk: Joi.when('statusKehadiran', {
+                is: Joi.valid('HADIR'),
+                then: Joi.string()
+                    .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+                    .allow(null, '')
+                    .optional()
+                    .messages({
+                        'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
+                    }),
+                otherwise: Joi.forbidden()
+                    .messages({
+                        'any.unknown': 'Jam masuk hanya diperlukan untuk status HADIR'
+                    })
+            }),
+            jamKeluar: Joi.when('statusKehadiran', {
+                is: Joi.valid('HADIR'),
+                then: Joi.string()
+                    .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+                    .allow(null, '')
+                    .optional()
+                    .messages({
+                        'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
+                    }),
+                otherwise: Joi.forbidden()
+                    .messages({
+                        'any.unknown': 'Jam keluar hanya diperlukan untuk status HADIR'
+                    })
+            }),
+            keterangan: Joi.string().allow(null, '').optional()
                 .messages({
                     'string.base': 'Keterangan harus berupa teks'
                 }),
