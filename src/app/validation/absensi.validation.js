@@ -34,15 +34,15 @@ class AbsensiValidation {
                 }),
             jamMasuk: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+                .allow(null, '')
                 .optional()
-                .allow(null)
                 .messages({
                     'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
                 }),
             jamKeluar: Joi.string()
                 .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+                .allow(null, '')
                 .optional()
-                .allow(null)
                 .messages({
                     'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
                 }),

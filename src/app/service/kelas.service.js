@@ -220,17 +220,10 @@ class KelasService {
                         where: {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
-                            programId: updatedKelasProgram.programId,
-                            // isVerified: true
+                            programId: updatedKelasProgram.programId
                         },
                         include: {
-                            siswa: true,
-                            JadwalProgramSiswa: {
-                                where: {
-                                    hari: updatedKelasProgram.hari,
-                                    jamMengajarId: updatedKelasProgram.jamMengajarId
-                                }
-                            }
+                            siswa: true
                         }
                     });
 
@@ -238,8 +231,7 @@ class KelasService {
                         count: programSiswaList.length,
                         students: programSiswaList.map(ps => ({
                             siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            jadwal: ps.JadwalProgramSiswa
+                            namaSiswa: ps.siswa.namaMurid
                         }))
                     });
 
@@ -248,7 +240,8 @@ class KelasService {
                         const updatedPs = await tx.programSiswa.update({
                             where: { id: ps.id },
                             data: {
-                                kelasProgramId: kelasProgramId
+                                kelasProgramId: kelasProgramId,
+                                isVerified: true
                             }
                         });
 
@@ -260,10 +253,45 @@ class KelasService {
                     }
                 }
 
+                // Get updated kelas program with all relations
+                const finalKelasProgram = await tx.kelasProgram.findUnique({
+                    where: { id: kelasProgramId },
+                    include: {
+                        program: true,
+                        jamMengajar: true,
+                        guru: true,
+                        programSiswa: {
+                            where: { status: 'AKTIF' },
+                            include: {
+                                siswa: true
+                            }
+                        }
+                    }
+                });
+
                 return {
                     kelasProgramId,
                     updateData,
-                    siswaDitambah
+                    siswaDitambah,
+                    kelasProgram: {
+                        id: finalKelasProgram.id,
+                        namaProgram: finalKelasProgram.program?.namaProgram,
+                        hari: finalKelasProgram.hari,
+                        jamMengajar: finalKelasProgram.jamMengajar ? {
+                            jamMulai: finalKelasProgram.jamMengajar.jamMulai,
+                            jamSelesai: finalKelasProgram.jamMengajar.jamSelesai
+                        } : null,
+                        guru: finalKelasProgram.guru ? {
+                            id: finalKelasProgram.guru.id,
+                            nama: finalKelasProgram.guru.nama,
+                            nip: finalKelasProgram.guru.nip
+                        } : null,
+                        siswa: finalKelasProgram.programSiswa.map(ps => ({
+                            id: ps.siswa.id,
+                            nama: ps.siswa.namaMurid,
+                            nis: ps.siswa.nis
+                        }))
+                    }
                 };
             });
         } catch (err) {
@@ -309,26 +337,11 @@ class KelasService {
                     const eligibleProgramSiswa = await tx.programSiswa.findMany({
                         where: {
                             siswaId: { in: siswaIds },
-                            status: 'AKTIF',
                             programId,
-                            // isVerified: true,
-                            // JadwalProgramSiswa: {
-                            //     some: {
-                            //         AND: [
-                            //             { hari },
-                            //             { jamMengajarId }
-                            //         ]
-                            //     }
-                            // }
+                            status: 'AKTIF'
                         },
                         include: {
-                            siswa: true,
-                            JadwalProgramSiswa: {
-                                where: {
-                                    hari,
-                                    jamMengajarId
-                                }
-                            }
+                            siswa: true
                         }
                     });
 
@@ -336,17 +349,17 @@ class KelasService {
                         count: eligibleProgramSiswa.length,
                         students: eligibleProgramSiswa.map(ps => ({
                             siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            jadwal: ps.JadwalProgramSiswa
+                            namaSiswa: ps.siswa.namaMurid
                         }))
                     });
 
                     // Update each programSiswa record
                     for (const ps of eligibleProgramSiswa) {
-                        await tx.programSiswa.update({
+                        const updatedPs = await tx.programSiswa.update({
                             where: { id: ps.id },
                             data: {
-                                kelasProgramId: kelasProgram.id
+                                kelasProgramId: kelasProgram.id,
+                                isVerified: true
                             }
                         });
 
@@ -360,7 +373,8 @@ class KelasService {
 
                 logger.info(`Created kelas program with ID: ${kelasProgram.id}`);
 
-                const schema = {
+                return {
+                    id: kelasProgram.id,
                     kelasId: kelasProgram.kelasId,
                     programId: kelasProgram.programId,
                     hari: kelasProgram.hari,
@@ -368,9 +382,7 @@ class KelasService {
                     guruId: kelasProgram.guruId,
                     tipeKelas: kelasProgram.tipeKelas,
                     siswaYangDitambahkan: processedSiswa
-                }
-
-                return schema;
+                };
             });
         } catch (error) {
             logger.error('Error creating kelas program:', error);
@@ -385,7 +397,6 @@ class KelasService {
                     programId,
                     status: 'AKTIF',
                     kelasProgramId: null,
-                    // isVerified: false
                 },
                 include: {
                     siswa: {
