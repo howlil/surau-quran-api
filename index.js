@@ -74,8 +74,8 @@ class Application {
 
   async start() {
     try {
-
       await this.connectDatabase();
+      this.setupCronJobs();
 
       this.server = this.app.listen(this.port, () => {
         logger.info(`Server running on port ${this.port}`);

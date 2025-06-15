@@ -403,6 +403,18 @@ model XenditDisbursement {
   payrollDisbursement PayrollDisbursement @relation(fields: [payrollDisbursementId], references: [id])
 }
 
+model PayrollBatchDisbursement {
+  id              String   @id @default(uuid())
+  xenditBatchId   String   @unique
+  reference       String
+  status          String
+  totalAmount     Decimal  @db.Decimal(10, 2)
+  totalCount      Int
+  payrollIds      Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 enum HARI {
   SENIN
   SELASA

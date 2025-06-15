@@ -6,65 +6,109 @@ const SppCronService = require('../../app/service/spp-cron.service');
 
 class CronJobs {
   static init() {
-    logger.info('Initializing cron jobs...');
+    logger.info('=== CRONJOB INITIALIZATION STARTED ===');
+    logger.info('Environment:', process.env.NODE_ENV || 'development');
+    logger.info('Timezone:', 'Asia/Jakarta');
 
     this.schedulePayrollGeneration();
     this.scheduleDailyAbsensiGuru();
     this.scheduleMonthlySppCreation();
 
-    logger.info('All cron jobs have been scheduled');
+    logger.info('=== CRONJOB INITIALIZATION COMPLETED ===');
   }
 
   static schedulePayrollGeneration() {
-    cron.schedule('0 0 25 * *', async () => {
-      logger.info('Running scheduled monthly payroll generation...');
+    const schedule = '0 0 25 * *';
+    logger.info('Setting up Payroll Generation Cron Job:');
+    logger.info('- Schedule:', schedule);
+    logger.info('- Description: Generate monthly payroll on 25th of every month at 00:00');
+
+    cron.schedule(schedule, async () => {
+      const startTime = new Date();
+      logger.info('=== PAYROLL GENERATION CRON STARTED ===');
+      logger.info('Start Time:', startTime.toISOString());
+
       try {
-        await PayrollCronService.generateMonthlyPayroll();
-        logger.info('Scheduled monthly payroll generation completed successfully');
+        const result = await PayrollCronService.generateMonthlyPayroll();
+        const endTime = new Date();
+        const duration = (endTime - startTime) / 1000;
+
+        logger.info('Payroll Generation Result:', result);
+        logger.info('End Time:', endTime.toISOString());
+        logger.info('Duration:', `${duration} seconds`);
+        logger.info('=== PAYROLL GENERATION CRON COMPLETED ===');
       } catch (error) {
-        logger.error('Scheduled monthly payroll generation failed:', error);
+        logger.error('=== PAYROLL GENERATION CRON FAILED ===');
+        logger.error('Error:', error.message);
+        logger.error('Stack:', error.stack);
+        logger.error('Failed at:', new Date().toISOString());
       }
     }, {
       timezone: 'Asia/Jakarta'
     });
-
-    logger.info('Payroll generation cron job scheduled for 25th of every month at 00:00');
   }
 
   static scheduleDailyAbsensiGuru() {
-    cron.schedule('1 0 * * *', async () => {
-      logger.info('Running scheduled daily guru attendance creation...');
+    const schedule = '1 * * * *';
+    logger.info('Setting up Daily Guru Attendance Cron Job:');
+    logger.info('- Schedule:', schedule);
+    logger.info('- Description: Create daily attendance records every minute');
+
+    cron.schedule(schedule, async () => {
+      const startTime = new Date();
+      logger.info('=== DAILY GURU ATTENDANCE CRON STARTED ===');
+      logger.info('Start Time:', startTime.toISOString());
+
       try {
         const result = await AbsensiCronService.createDailyAbsensiGuru();
-        logger.info('Scheduled daily guru attendance creation completed:', result);
+        const endTime = new Date();
+        const duration = (endTime - startTime) / 1000;
+
+        logger.info('Attendance Creation Result:', result);
+        logger.info('End Time:', endTime.toISOString());
+        logger.info('Duration:', `${duration} seconds`);
+        logger.info('=== DAILY GURU ATTENDANCE CRON COMPLETED ===');
       } catch (error) {
-        logger.error('Scheduled daily guru attendance creation failed:', error);
+        logger.error('=== DAILY GURU ATTENDANCE CRON FAILED ===');
+        logger.error('Error:', error.message);
+        logger.error('Stack:', error.stack);
+        logger.error('Failed at:', new Date().toISOString());
       }
     }, {
       timezone: 'Asia/Jakarta'
     });
-
-    logger.info('Daily guru attendance creation cron job scheduled for every day at 00:01');
   }
 
   static scheduleMonthlySppCreation() {
-    // Run at 00:02 every day to check for SPP creation
-    cron.schedule('2 0 * * *', async () => {
-      logger.info('Running scheduled monthly SPP creation...');
+    const schedule = '2 0 * * *';
+    logger.info('Setting up Monthly SPP Creation Cron Job:');
+    logger.info('- Schedule:', schedule);
+    logger.info('- Description: Create monthly SPP records every day at 00:02');
+
+    cron.schedule(schedule, async () => {
+      const startTime = new Date();
+      logger.info('=== MONTHLY SPP CREATION CRON STARTED ===');
+      logger.info('Start Time:', startTime.toISOString());
+
       try {
         const result = await SppCronService.createMonthlySpp();
-        logger.info('Scheduled monthly SPP creation completed:', result);
+        const endTime = new Date();
+        const duration = (endTime - startTime) / 1000;
+
+        logger.info('SPP Creation Result:', result);
+        logger.info('End Time:', endTime.toISOString());
+        logger.info('Duration:', `${duration} seconds`);
+        logger.info('=== MONTHLY SPP CREATION CRON COMPLETED ===');
       } catch (error) {
-        logger.error('Scheduled monthly SPP creation failed:', error);
+        logger.error('=== MONTHLY SPP CREATION CRON FAILED ===');
+        logger.error('Error:', error.message);
+        logger.error('Stack:', error.stack);
+        logger.error('Failed at:', new Date().toISOString());
       }
     }, {
       timezone: 'Asia/Jakarta'
     });
-
-    logger.info('Monthly SPP creation cron job scheduled for every day at 00:02');
   }
-
- 
 }
 
 module.exports = CronJobs;

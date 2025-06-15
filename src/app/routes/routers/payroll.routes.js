@@ -20,12 +20,24 @@ router.get(
   payrollController.getAllPayrollsForAdmin
 );
 
-
 router.get(
   '/v1/guru/payroll',
   authMiddleware.authenticate,
   authMiddleware.authorize(['GURU']),
   payrollController.getAllPayrollsForGuru
+);
+
+router.post(
+  '/v1/payroll/batch',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateBody(payrollValidation.batchPayrollDisbursement()),
+  payrollController.batchPayrollDisbursement
+);
+
+router.post(
+  '/v1/payroll/callback',
+  payrollController.handleDisbursementCallback
 );
 
 module.exports = router;

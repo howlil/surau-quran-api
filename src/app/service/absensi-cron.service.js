@@ -1,86 +1,99 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const { prisma } = require('../../generated/prisma');
 const { logger } = require('../../lib/config/logger.config');
 
 class AbsensiCronService {
     static async createDailyAbsensiGuru() {
-        try {
-            const today = new Date();
-            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            const currentDay = days[today.getDay()];
+        const today = new Date();
+        const formattedDate = today.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }).split('/').reverse().join('-');
 
-            // Format date to DD-MM-YYYY
-            const formattedDate = today.toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            }).split('/').reverse().join('-');
+        // Get current day in Indonesian
+        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const currentDay = days[today.getDay()];
 
-            const kelasPrograms = await prisma.kelasProgram.findMany({
+        // Map Indonesian day names to Prisma enum values
+        const dayMapping = {
+            'Senin': 'SENIN',
+            'Selasa': 'SELASA',
+            'Rabu': 'RABU',
+            'Kamis': 'KAMIS',
+            'Jumat': 'JUMAT',
+            'Sabtu': 'SABTU'
+        };
+
+        const prismaDay = dayMapping[currentDay];
+        if (!prismaDay) {
+            logger.warn('No classes scheduled for today (Sunday)');
+            return { message: 'No classes scheduled for today (Sunday)' };
+        }
+
+        logger.info(`Creating attendance records for ${currentDay} (${formattedDate})`);
+
+        const kelasPrograms = await prisma.kelasProgram.findMany({
+            where: {
+                hari: prismaDay
+            },
+            include: {
+                guru: true
+            }
+        });
+
+        if (!kelasPrograms.length) {
+            logger.warn(`No classes found for ${currentDay}`);
+            return { message: `No classes found for ${currentDay}` };
+        }
+
+        logger.info(`Found ${kelasPrograms.length} classes for ${currentDay}`);
+
+        const absensiRecords = [];
+
+        for (const kelasProgram of kelasPrograms) {
+            if (!kelasProgram.guru) {
+                logger.warn(`No teacher assigned to class ${kelasProgram.id}`);
+                continue;
+            }
+
+            // Check if attendance record already exists
+            const existingAbsensi = await prisma.absensiGuru.findFirst({
                 where: {
-                    hari: currentDay
-                },
-                include: {
-                    guru: true
+                    kelasProgramId: kelasProgram.id,
+                    tanggal: formattedDate
                 }
             });
 
-            if (kelasPrograms.length === 0) {
-                logger.info(`No classes scheduled for ${currentDay}`);
-                return { message: `No classes scheduled for ${currentDay}` };
+            if (existingAbsensi) {
+                logger.info(`Attendance record already exists for class ${kelasProgram.id} on ${formattedDate}`);
+                continue;
             }
 
-            // Create attendance records for each class
-            const createdRecords = await Promise.all(
-                kelasPrograms.map(async (kelasProgram) => {
-                    // Check if attendance record already exists
-                    const existingRecord = await prisma.absensiGuru.findFirst({
-                        where: {
-                            tanggal: formattedDate,
-                            guruId: kelasProgram.guruId,
-                            kelasProgramId: kelasProgram.id
-                        }
-                    });
+            const absensi = await prisma.absensiGuru.create({
+                data: {
+                    kelasProgramId: kelasProgram.id,
+                    guruId: kelasProgram.guruId,
+                    tanggal: formattedDate,
+                    statusKehadiran: 'TIDAK_HADIR',
+                    sks: 0
+                }
+            });
 
-                    if (existingRecord) {
-                        logger.info(`Attendance record already exists for guru ${kelasProgram.guru.nama} on ${formattedDate}`);
-                        return null;
-                    }
+            absensiRecords.push({
+                id: absensi.id,
+                kelasProgramId: absensi.kelasProgramId,
+                guruId: absensi.guruId,
+                tanggal: absensi.tanggal,
+                statusKehadiran: absensi.statusKehadiran
+            });
 
-                    // Create new attendance record
-                    const absensiRecord = await prisma.absensiGuru.create({
-                        data: {
-                            tanggal: formattedDate,
-                            statusKehadiran: 'TIDAK_HADIR',
-                            jamMasuk: null,
-                            jamKeluar: null,
-                            sks: kelasProgram.sks || 0,
-                            guruId: kelasProgram.guruId,
-                            kelasProgramId: kelasProgram.id
-                        },
-                        include: {
-                            guru: {
-                                select: {
-                                    nama: true
-                                }
-                            }
-                        }
-                    });
-
-                    logger.info(`Created attendance record for guru ${absensiRecord.guru.nama} on ${formattedDate}`);
-                    return absensiRecord;
-                })
-            );
-
-            const successfulRecords = createdRecords.filter(record => record !== null);
-
-            return {
-                message: `Created ${successfulRecords.length} attendance records for ${currentDay}`,
-                records: successfulRecords
-            };
-        } catch (error) {
-            logger.error('Error creating daily guru attendance:', error);
-            throw error;
+            logger.info(`Created attendance record for teacher ${kelasProgram.guru.nama} in class ${kelasProgram.id}`);
         }
+
+        return {
+            message: `Created ${absensiRecords.length} attendance records for ${currentDay}`,
+            records: absensiRecords
+        };
     }
 }
 
