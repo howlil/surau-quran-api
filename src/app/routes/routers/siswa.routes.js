@@ -16,6 +16,7 @@ router.get(
   '/v1/siswa/me',
   authMiddleware.authenticate,
   authMiddleware.authorize(['SISWA']),
+  validationMiddleware.validateQuery(siswaValidation.getProfileQuery()),
   siswaController.getProfile
 );
 

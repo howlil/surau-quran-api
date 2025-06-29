@@ -1,5 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class SppCronService {
     static async createMonthlySpp() {
@@ -10,11 +12,7 @@ class SppCronService {
             const currentYear = today.getFullYear();
 
             // Format date to DD-MM-YYYY
-            const formattedDate = today.toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            }).split('/').reverse().join('-');
+            const formattedDate = moment().format(DATE_FORMATS.DEFAULT);
 
             const programSiswa = await prisma.programSiswa.findMany({
                 where: {

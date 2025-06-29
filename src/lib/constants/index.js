@@ -18,7 +18,7 @@ const VALIDATION = {
 };
 
 const SECURITY = {
-  
+
   CORS: {
     ALLOWED_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     ALLOWED_HEADERS: ['Content-Type', 'Authorization'],
@@ -36,7 +36,7 @@ const PAGINATION = {
 const DATE_FORMATS = {
   DEFAULT: 'DD-MM-YYYY',
   TIME: 'HH:mm',
-  MONTH_YEAR: 'MM YYYY'
+  MONTH_YEAR: 'MM-YYYY'
 };
 
 module.exports = {

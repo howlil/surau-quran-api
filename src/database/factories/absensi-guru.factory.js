@@ -7,7 +7,12 @@ class AbsensiGuruFactory {
 
         const randomTimeOffset = Math.random() * (currentDate.getTime() - threeMonthsAgo.getTime());
         const randomDate = new Date(threeMonthsAgo.getTime() + randomTimeOffset - (index * 24 * 60 * 60 * 1000));
-        const tanggal = randomDate.toISOString().split('T')[0];
+
+        // Format tanggal menggunakan format DD-MM-YYYY sesuai DATE_FORMATS.DEFAULT
+        const day = randomDate.getDate().toString().padStart(2, '0');
+        const month = (randomDate.getMonth() + 1).toString().padStart(2, '0');
+        const year = randomDate.getFullYear();
+        const tanggal = `${day}-${month}-${year}`;
 
         // Random jam masuk between 10:00 and 20:45 as per rules
         const startHour = Math.floor(Math.random() * 11) + 10; // 10:00 to 20:00

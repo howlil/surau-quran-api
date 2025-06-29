@@ -2,7 +2,8 @@ const cron = require('node-cron');
 const { logger } = require('./logger.config');
 const PayrollCronService = require('../../app/service/payroll-cron.service');
 const AbsensiCronService = require('../../app/service/absensi-cron.service');
-const SppCronService = require('../../app/service/spp-cron.service');
+// SPP Cron Service disabled - SPP now generated automatically during registration
+// const SppCronService = require('../../app/service/spp-cron.service');
 
 class CronJobs {
   static init() {
@@ -12,7 +13,8 @@ class CronJobs {
 
     this.schedulePayrollGeneration();
     this.scheduleDailyAbsensiGuru();
-    this.scheduleMonthlySppCreation();
+    // SPP cronjob disabled - SPP now generated automatically during student registration
+    // this.scheduleMonthlySppCreation();
 
     logger.info('=== CRONJOB INITIALIZATION COMPLETED ===');
   }
@@ -79,36 +81,7 @@ class CronJobs {
     });
   }
 
-  static scheduleMonthlySppCreation() {
-    const schedule = '2 0 * * *';
-    logger.info('Setting up Monthly SPP Creation Cron Job:');
-    logger.info('- Schedule:', schedule);
-    logger.info('- Description: Create monthly SPP records every day at 00:02');
 
-    cron.schedule(schedule, async () => {
-      const startTime = new Date();
-      logger.info('=== MONTHLY SPP CREATION CRON STARTED ===');
-      logger.info('Start Time:', startTime.toISOString());
-
-      try {
-        const result = await SppCronService.createMonthlySpp();
-        const endTime = new Date();
-        const duration = (endTime - startTime) / 1000;
-
-        logger.info('SPP Creation Result:', result);
-        logger.info('End Time:', endTime.toISOString());
-        logger.info('Duration:', `${duration} seconds`);
-        logger.info('=== MONTHLY SPP CREATION CRON COMPLETED ===');
-      } catch (error) {
-        logger.error('=== MONTHLY SPP CREATION CRON FAILED ===');
-        logger.error('Error:', error.message);
-        logger.error('Stack:', error.stack);
-        logger.error('Failed at:', new Date().toISOString());
-      }
-    }, {
-      timezone: 'Asia/Jakarta'
-    });
-  }
 }
 
 module.exports = CronJobs;

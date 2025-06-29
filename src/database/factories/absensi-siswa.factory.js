@@ -7,7 +7,12 @@ class AbsensiSiswaFactory {
 
         const randomTimeOffset = Math.random() * (currentDate.getTime() - threeMonthsAgo.getTime());
         const randomDate = new Date(threeMonthsAgo.getTime() + randomTimeOffset - (index * 24 * 60 * 60 * 1000));
-        const tanggal = randomDate.toISOString().split('T')[0];
+
+        // Format tanggal menggunakan format DD-MM-YYYY sesuai DATE_FORMATS.DEFAULT
+        const day = randomDate.getDate().toString().padStart(2, '0');
+        const month = (randomDate.getMonth() + 1).toString().padStart(2, '0');
+        const year = randomDate.getFullYear();
+        const tanggal = `${day}-${month}-${year}`;
 
         const statuses = ['HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT'];
         const statusWeights = [0.7, 0.1, 0.1, 0.1]; // Weighted probabilities

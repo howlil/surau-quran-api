@@ -7,6 +7,8 @@ const PasswordUtils = require('../../lib/utils/password.utils');
 const paymentService = require('./payment.service');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const SppService = require('./spp.service');
+const { DATE_FORMATS } = require('../../lib/constants');
 class SiswaService {
 
   async createPendaftaran(pendaftaranData) {
@@ -25,7 +27,6 @@ class SiswaService {
         namaPenjemput,
         noWhatsapp,
         programId,
-        jadwal,
         kodeVoucher,
         jumlahPembayaran,
         totalBiaya,
@@ -82,10 +83,20 @@ class SiswaService {
           user: {
             email
           }
+        },
+        include: {
+          programSiswa: {
+            where: {
+              status: 'AKTIF'
+            }
+          }
         }
       });
 
       if (existingSiswa) {
+        if (existingSiswa.programSiswa.length > 0) {
+          throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
+        }
         throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa`);
       }
 
@@ -95,19 +106,6 @@ class SiswaService {
 
       if (!program) {
         throw new NotFoundError(`Program dengan ID ${programId} tidak ditemukan`);
-      }
-
-      const validJadwalIds = [];
-      for (const jadwalItem of jadwal) {
-        const jamMengajar = await prisma.jamMengajar.findUnique({
-          where: { id: jadwalItem.jamMengajarId }
-        });
-
-        if (!jamMengajar) {
-          throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
-        }
-
-        validJadwalIds.push(jadwalItem.id);
       }
 
       let voucherId = null;
@@ -171,7 +169,6 @@ class SiswaService {
           namaPenjemput: namaPenjemput || null,
           noWhatsapp: noWhatsapp || null,
           programId,
-          jadwalJson: JSON.stringify(jadwal),
           kodeVoucher: kodeVoucher?.toUpperCase() || null,
           biayaPendaftaran: jumlahPembayaran,
           diskon: actualDiskon,
@@ -308,19 +305,6 @@ class SiswaService {
         }
       });
 
-      // Parse and create jadwal
-      const jadwalArr = JSON.parse(pendaftaranTemp.jadwalJson || '[]');
-      for (const jadwal of jadwalArr) {
-        await prisma.jadwalProgramSiswa.create({
-          data: {
-            programSiswaId: programSiswa.id,
-            hari: jadwal.hari,
-            jamMengajarId: jadwal.jamMengajarId,
-            urutan: jadwal.urutan || 1
-          }
-        });
-      }
-
       // Create pendaftaran record
       await prisma.pendaftaran.create({
         data: {
@@ -330,7 +314,7 @@ class SiswaService {
           diskon: pendaftaranTemp.diskon,
           totalBiaya: pendaftaranTemp.totalBiaya,
           voucher_id: pendaftaranTemp.voucherId,
-          tanggalDaftar: new Date().toISOString().split('T')[0]
+          tanggalDaftar: moment().format(DATE_FORMATS.DEFAULT)
         }
       });
 
@@ -338,6 +322,18 @@ class SiswaService {
       await prisma.pendaftaranTemp.delete({
         where: { id: pendaftaranTemp.id }
       });
+
+      // Generate SPP untuk 5 bulan ke depan
+      try {
+        const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+        const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
+        logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
+      } catch (sppError) {
+        logger.error(`Failed to generate SPP for siswa ${siswa.namaMurid}:`, {
+          error: sppError.message,
+          stack: sppError.stack
+        });
+      }
 
       // Send welcome email with credentials - but don't let email failure block the process
       try {
@@ -390,7 +386,7 @@ class SiswaService {
     }
     if (tanggal) {
       filteredInvoices = filteredInvoices.filter(inv => {
-        const invoiceDate = moment(inv.createdAt).format('DD-MM-YYYY');
+        const invoiceDate = moment(inv.createdAt).format(DATE_FORMATS.DEFAULT);
         return invoiceDate === tanggal;
       });
     }
@@ -494,12 +490,7 @@ class SiswaService {
         const pendaftaranTemp = await prisma.pendaftaranTemp.findUnique({
           where: { pembayaranId }
         });
-        let jadwalArr = [];
-        try {
-          jadwalArr = JSON.parse(pendaftaranTemp?.jadwalJson || '[]');
-        } catch (_) {
-          jadwalArr = [];
-        }
+
         data.student = pendaftaranTemp
           ? {
             id: pendaftaranTemp.id,
@@ -529,11 +520,7 @@ class SiswaService {
             tanggalDaftar: null,
           }
           : null;
-        data.schedule = jadwalArr.map(jadwal => ({
-          hari: jadwal.hari,
-          urutan: jadwal.urutan,
-          jamMengajarId: jadwal.jamMengajarId,
-        }));
+        data.schedule = [];
       }
 
       result.push(data);
@@ -600,6 +587,10 @@ class SiswaService {
             }
           },
           programSiswa: {
+            where: {
+              status: 'AKTIF'
+            },
+            take: 1, // Hanya ambil satu program aktif
             select: {
               status: true,
               program: {
@@ -676,13 +667,12 @@ class SiswaService {
           throw new BadRequestError('Format bulan harus MM-YYYY');
         }
 
-        const startDate = `${year}-${month}-01`;
-        const endDate = moment(startDate).endOf('month').format('YYYY-MM-DD');
-
+        // Use pattern matching for DD-MM-YYYY format in database
         absensiWhere.tanggal = {
-          gte: startDate,
-          lte: endDate
+          contains: `-${month}-${year}`
         };
+
+        logger.info(`Filtering absensi for month ${bulan}: pattern "-${month}-${year}"`);
       }
 
       // Get the total count of attendance records matching the filter
@@ -730,21 +720,26 @@ class SiswaService {
 
       // Format the jadwal (schedule) data
       const jadwal = [];
-      siswa.programSiswa.forEach(ps => {
-        ps.JadwalProgramSiswa.forEach(j => {
+      let currentProgram = null;
+
+      // Get the active program (assuming one program per student)
+      const activeProgramSiswa = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
+
+      if (activeProgramSiswa) {
+        currentProgram = {
+          namaProgram: activeProgramSiswa.program.namaProgram,
+          status: activeProgramSiswa.status
+        };
+
+        // Get jadwal for the active program
+        activeProgramSiswa.JadwalProgramSiswa.forEach(j => {
           jadwal.push({
             hari: j.hari,
             urutan: j.urutan,
             jam: `${j.jamMengajar.jamMulai} - ${j.jamMengajar.jamSelesai}`
           });
         });
-      });
-
-      // Format the program data
-      const programs = siswa.programSiswa.map(ps => ({
-        namaProgram: ps.program.namaProgram,
-        status: ps.status
-      }));
+      }
 
       // Format the attendance data
       const absensiFormatted = absensi.map(a => ({
@@ -759,7 +754,7 @@ class SiswaService {
       const result = {
         namaSiswa: siswa.namaMurid,
         nis: siswa.nis,
-        program: programs,
+        program: currentProgram, // Single object instead of array
         jadwal: jadwal,
         absensi: {
           data: absensiFormatted,
@@ -767,9 +762,7 @@ class SiswaService {
             page: parseInt(page),
             limit: parseInt(limit),
             totalItems: totalAbsensi,
-            totalPages: totalPages,
-            hasNextPage: page < totalPages,
-            hasPrevPage: page > 1
+            totalPages: totalPages
           }
         },
         countAbsensi: {
@@ -883,22 +876,29 @@ class SiswaService {
 
         // Proses program dan jadwal jika programId disediakan
         if (programId) {
-          let programSiswaInstance = siswa.programSiswa.find(ps => ps.programId === programId);
+          // Find the current active program for this student
+          const currentProgramSiswa = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
 
-          if (programSiswaInstance) {
-            // Update program yang ada
+          if (currentProgramSiswa) {
+            // Update the existing program
             await tx.programSiswa.update({
-              where: { id: programSiswaInstance.id },
-              data: { status: programStatus }
+              where: { id: currentProgramSiswa.id },
+              data: {
+                programId: programId,
+                status: programStatus || 'AKTIF'
+              }
             });
+
+            programSiswaInstance = currentProgramSiswa;
+            programSiswaInstance.programId = programId; // Update for subsequent use
           } else {
-            // If no existing programSiswa for this programId, create a new one
+            // If no active program exists, create a new one (edge case)
             programSiswaInstance = await tx.programSiswa.create({
               data: {
                 siswaId: siswa.id,
                 programId: programId,
-                status: programStatus || 'AKTIF', // Default to AKTIF if not provided
-                isVerified: true, // Assuming new program assignments are verified
+                status: programStatus || 'AKTIF',
+                isVerified: true,
               }
             });
           }
@@ -1056,21 +1056,27 @@ class SiswaService {
 
   async updateStatusSiswa(programId, siswaId, status) {
     try {
-      const programSiswa = await prisma.programSiswa.findFirst({
+      // Find the active program for this student
+      const activeProgramSiswa = await prisma.programSiswa.findFirst({
         where: {
-          programId,
-          siswaId
+          siswaId,
+          status: 'AKTIF'
         }
       });
 
-      if (!programSiswa) {
-        throw new NotFoundError(`Program siswa dengan ID ${siswaId} tidak ditemukan untuk program ID ${programId}`);
+      if (!activeProgramSiswa) {
+        throw new NotFoundError(`Siswa dengan ID ${siswaId} tidak memiliki program aktif`);
       }
 
-      const oldStatus = programSiswa.status;
+      // Validate that the programId matches the active program (optional check)
+      if (programId && activeProgramSiswa.programId !== programId) {
+        throw new BadRequestError(`Program ID ${programId} tidak sesuai dengan program aktif siswa`);
+      }
+
+      const oldStatus = activeProgramSiswa.status;
 
       const updatedProgramSiswa = await prisma.programSiswa.update({
-        where: { id: programSiswa.id },
+        where: { id: activeProgramSiswa.id },
         data: { status }
       });
 
@@ -1080,14 +1086,14 @@ class SiswaService {
           programSiswaId: updatedProgramSiswa.id,
           statusLama: oldStatus,
           statusBaru: status,
-          tanggalPerubahan: new Date().toISOString().split('T')[0],
+          tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
           keterangan: `Status diubah menjadi ${status}`
         }
       });
 
       return updatedProgramSiswa;
     } catch (error) {
-      logger.error(`Error updating status for siswa ID ${siswaId} in program ID ${programId}:`, error);
+      logger.error(`Error updating status for siswa ID ${siswaId}:`, error);
       throw error;
     }
   }

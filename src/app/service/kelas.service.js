@@ -99,6 +99,7 @@ class KelasService {
                 select: {
                     id: true,
                     namaKelas: true,
+                    ipAddressHikvision: true,
                 },
                 orderBy: {
                     createdAt: 'desc'
@@ -135,6 +136,7 @@ class KelasService {
             const result = kelasList.map(kelas => ({
                 kelasId: kelas.id,
                 namaKelas: kelas.namaKelas,
+                ipAddressHikvision: kelas.ipAddressHikvision,
                 program: kelas.kelasProgram.map(kp => ({
                     kelasProgramId: kp.id,
                     programId: kp.programId,

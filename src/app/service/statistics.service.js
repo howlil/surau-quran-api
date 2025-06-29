@@ -1,14 +1,16 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class StatisticsService {
     async getStudentCounts(filters = {}) {
         try {
             const { startDate, endDate } = filters;
 
-            // Parse dates if provided
-            const parsedStartDate = startDate ? startDate : null;
-            const parsedEndDate = endDate ? endDate : null;
+            // Parse dates if provided (convert DD-MM-YYYY to YYYY-MM-DD for database)
+            const parsedStartDate = startDate ? moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : null;
+            const parsedEndDate = endDate ? moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : null;
 
             // Get total students count
             const totalStudents = await prisma.siswa.count({
@@ -75,9 +77,9 @@ class StatisticsService {
         try {
             const { startDate, endDate, groupBy = 'month' } = filters;
 
-            // Parse dates if provided
-            const parsedStartDate = startDate || this.getDefaultStartDate(groupBy);
-            const parsedEndDate = endDate || new Date().toISOString().split('T')[0];
+            // Parse dates if provided (convert DD-MM-YYYY to YYYY-MM-DD for database)
+            const parsedStartDate = startDate ? moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : this.getDefaultStartDate(groupBy);
+            const parsedEndDate = endDate ? moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
 
             // Get income data (from pendaftaran and SPP payments)
             const pendaftaranPayments = await prisma.pembayaran.findMany({
@@ -320,14 +322,11 @@ class StatisticsService {
     }
 
     getDefaultStartDate(groupBy) {
-        const now = new Date();
         if (groupBy === 'year') {
-            return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-                .toISOString().split('T')[0];
+            return moment().subtract(1, 'year').format('YYYY-MM-DD');
         } else {
             // Default to 6 months for monthly grouping
-            return new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-                .toISOString().split('T')[0];
+            return moment().subtract(6, 'months').format('YYYY-MM-DD');
         }
     }
 

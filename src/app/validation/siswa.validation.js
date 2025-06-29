@@ -70,37 +70,6 @@ class SiswaValidation {
           'string.guid': 'Program ID harus berupa UUID yang valid',
           'any.required': 'Program ID wajib diisi'
         }),
-      jadwal: Joi.array().items(
-        Joi.object({
-          id: Joi.string().guid({ version: 'uuidv4' }).optional()
-            .messages({
-              'string.guid': 'Jadwal ID harus berupa UUID yang valid'
-            }),
-          hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').optional()
-            .messages({
-              'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU'
-            }),
-          jamMengajarId: Joi.string().guid({ version: 'uuidv4' }).optional()
-            .messages({
-              'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid'
-            }),
-          urutan: Joi.number().integer().valid(1, 2).optional()
-            .messages({
-              'number.base': 'Urutan harus berupa angka',
-              'number.integer': 'Urutan harus berupa bilangan bulat',
-              'any.only': 'Urutan harus 1 atau 2'
-            }),
-          isDeleted: Joi.boolean().optional()
-        }).or('hari', 'jamMengajarId', 'id', 'isDeleted')
-          .messages({
-            'object.missing': 'Jadwal harus memiliki setidaknya salah satu: id, hari, jamMengajarId, urutan, atau isDeleted'
-          })
-      ).min(1).max(2).required()
-        .messages({
-          'array.min': 'Jadwal harus memilih minimal 1 pilihan',
-          'array.max': 'Jadwal maksimal 2 pilihan',
-          'any.required': 'Jadwal wajib diisi'
-        }),
       kodeVoucher: Joi.string().uppercase().min(3).max(50).optional()
         .messages({
           'string.min': 'Kode voucher minimal 3 karakter',
@@ -126,14 +95,11 @@ class SiswaValidation {
     });
   }
 
-
-
   static updateStatusSiswa() {
     return ValidatorFactory.create({
-      programId: Joi.string().guid({ version: 'uuidv4' }).required()
+      programId: Joi.string().guid({ version: 'uuidv4' }).optional()
         .messages({
-          'string.guid': 'Program ID harus berupa UUID yang valid',
-          'any.required': 'Program ID wajib diisi'
+          'string.guid': 'Program ID harus berupa UUID yang valid'
         }),
       status: Joi.string().valid('AKTIF', 'TIDAK_AKTIF', 'CUTI').required()
         .messages({
@@ -160,9 +126,9 @@ class SiswaValidation {
         .messages({
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN'
         }),
-      tanggalLahir: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional()
+      tanggalLahir: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
         .messages({
-          'string.pattern.base': 'Format tanggal lahir harus YYYY-MM-DD (contoh: 2000-12-31)'
+          'string.pattern.base': 'Format tanggal lahir harus DD-MM-YYYY (contoh: 31-12-2000)'
         }),
       noWhatsapp: Joi.string().pattern(/^(\+62|62|0)[0-9]{9,12}$/).max(20).optional()
         .messages({
@@ -215,7 +181,7 @@ class SiswaValidation {
         .messages({
           'any.only': 'Status harus salah satu dari: AKTIF, TIDAK_AKTIF, CUTI'
         }),
-      // Schedule array for the program - with identification for updates
+      // Schedule array for the current program - with identification for updates
       jadwal: Joi.array().items(
         Joi.object({
           id: Joi.string().guid({ version: 'uuidv4' }).optional()
@@ -244,6 +210,28 @@ class SiswaValidation {
       ).max(2).optional()
         .messages({
           'array.max': 'Jadwal maksimal 2 pilihan'
+        })
+    });
+  }
+
+  static getProfileQuery() {
+    return ValidatorFactory.create({
+      bulan: Joi.string().pattern(/^\d{2}-\d{4}$/).optional()
+        .messages({
+          'string.pattern.base': 'Format bulan harus MM-YYYY (contoh: 07-2025)'
+        }),
+      page: Joi.number().integer().min(1).default(1)
+        .messages({
+          'number.base': 'Page harus berupa angka',
+          'number.integer': 'Page harus berupa bilangan bulat',
+          'number.min': 'Page minimal 1'
+        }),
+      limit: Joi.number().integer().min(1).max(100).default(10)
+        .messages({
+          'number.base': 'Limit harus berupa angka',
+          'number.integer': 'Limit harus berupa bilangan bulat',
+          'number.min': 'Limit minimal 1',
+          'number.max': 'Limit maksimal 100'
         })
     });
   }

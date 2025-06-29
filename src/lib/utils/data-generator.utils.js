@@ -115,6 +115,28 @@ class DataGeneratorUtils {
 
     return password.split('').sort(() => Math.random() - 0.5).join('');
   }
+
+ 
+  static generateStudentPassword(namaPanggilan, tanggalLahir) {
+    if (!namaPanggilan || !tanggalLahir) {
+      throw new Error('Nama panggilan dan tanggal lahir harus diisi');
+    }
+
+    // Convert to Date object if it's a string
+    const birthDate = new Date(tanggalLahir);
+
+    // Validate date
+    if (isNaN(birthDate.getTime())) {
+      throw new Error('Format tanggal lahir tidak valid');
+    }
+
+    // Get day of birth (DD format)
+    const day = birthDate.getDate().toString().padStart(2, '0');
+
+    const cleanNickname = namaPanggilan.toLowerCase().replace(/\s+/g, '');
+
+    return `${cleanNickname}${day}`;
+  }
 }
 
 module.exports = DataGeneratorUtils;

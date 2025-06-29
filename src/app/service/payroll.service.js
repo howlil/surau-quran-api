@@ -4,6 +4,8 @@ const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http')
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const axios = require('axios');
+const FormatUtils = require('../../lib/utils/format.utils');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class PayrollService {
 
@@ -101,7 +103,7 @@ class PayrollService {
           tahun: payroll.tahun,
           status: payroll.status,
           paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format('DD-MM-YYYY') : null,
+          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
           gajiBersih: totalMengajar + totalInsentif - totalPotongan,
           detail: {
             mengajar: {
@@ -226,8 +228,7 @@ class PayrollService {
       const updateData = {};
 
       if (tanggalKalkulasi !== undefined) {
-        const [day, month, year] = tanggalKalkulasi.split('-').map(num => parseInt(num));
-        updateData.tanggalKalkulasi = new Date(year, month - 1, day);
+        updateData.tanggalKalkulasi = FormatUtils.parseDate(tanggalKalkulasi);
       }
       if (bulan !== undefined) {
         updateData.bulan = bulan;
@@ -507,7 +508,7 @@ class PayrollService {
           tahun: payroll.tahun,
           status: payroll.status,
           paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format('DD-MM-YYYY') : null,
+          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
           gajiBersih: totalMengajar + totalInsentif - totalPotongan,
           detail: {
             mengajar: {
@@ -653,7 +654,7 @@ class PayrollService {
           data: {
             payrollId,
             amount: disbursement.amount,
-            tanggalProses: moment().format('YYYY-MM-DD'),
+            tanggalProses: moment().format(DATE_FORMATS.DEFAULT),
             xenditDisbursement: {
               create: {
                 xenditDisbursementId: disbursement.id,

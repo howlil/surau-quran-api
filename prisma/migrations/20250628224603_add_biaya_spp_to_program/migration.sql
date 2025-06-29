@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `program` ADD COLUMN `biayaSpp` DECIMAL(10, 2) NOT NULL DEFAULT 300000.00;

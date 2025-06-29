@@ -2,6 +2,8 @@
 const cron = require('node-cron');
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class PayrollCronService {
   static init() {
@@ -24,9 +26,8 @@ class PayrollCronService {
 
   static async generateMonthlyPayroll() {
     try {
-      const currentDate = new Date();
-      const bulan = currentDate.toLocaleString('id-ID', { month: 'long' });
-      const tahun = currentDate.getFullYear();
+      const bulan = moment().format('MMMM');
+      const tahun = moment().year();
       const periode = `${bulan} ${tahun}`;
 
       const gurus = await prisma.guru.findMany({
@@ -55,7 +56,7 @@ class PayrollCronService {
             where: {
               guruId: guru.id,
               tanggal: {
-                contains: `${tahun}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+                contains: `-${moment().format('MM')}-${tahun}`
               }
             },
             include: {
@@ -135,7 +136,7 @@ class PayrollCronService {
               potongan: totalPotongan,
               totalGaji,
               status: 'DRAFT',
-              tanggalKalkulasi: new Date()
+              tanggalKalkulasi: moment().toDate()
             }
           });
 
@@ -295,7 +296,7 @@ class PayrollCronService {
               potongan: totalPotongan,
               totalGaji,
               status: 'DRAFT',
-              tanggalKalkulasi: new Date()
+              tanggalKalkulasi: moment().toDate()
             }
           });
 

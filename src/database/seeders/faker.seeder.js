@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const prismaClient = new PrismaClient();
 
-const TOTAL_RECORDS = 30;
+const TOTAL_RECORDS = 60; // Increased for more comprehensive data
 const DEFAULT_PASSWORD = '@Test123';
 
 // Updated shift times to match working hours (10:00 - 20:45)
@@ -419,14 +419,15 @@ class FakerSeeder {
                 }
             }
 
-            // Randomly select 60% of students to have kelas program assigned
+            // Randomly select 65% of students to have kelas program assigned
+            // 35% will be unverified (belum masuk kelas program)
             const shuffledSiswas = [...this.users.siswas].sort(() => Math.random() - 0.5);
-            const siswaWithKelasCount = Math.floor(this.users.siswas.length * 0.6);
+            const siswaWithKelasCount = Math.floor(this.users.siswas.length * 0.65);
             const siswaWithKelas = shuffledSiswas.slice(0, siswaWithKelasCount);
             const siswaWithoutKelas = shuffledSiswas.slice(siswaWithKelasCount);
 
-            console.log(`Assigning ${siswaWithKelas.length} students to kelas program`);
-            console.log(`Leaving ${siswaWithoutKelas.length} students without kelas program`);
+            console.log(`Assigning ${siswaWithKelas.length} students to kelas program (verified)`);
+            console.log(`Leaving ${siswaWithoutKelas.length} students without kelas program (unverified)`);
 
             // Create programSiswa for students WITH kelas program
             for (const siswa of siswaWithKelas) {

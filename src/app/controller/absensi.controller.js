@@ -5,7 +5,6 @@ const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { NotFoundError } = require('../../lib/http/error.handler.htttp');
 const { prisma } = require('../../lib/config/prisma.config');
 const FileUtils = require('../../lib/utils/file.utils');
-const { logger } = require('../../lib/config/logger.config');
 
 class AbsensiController {
     getAbsensiSiswaForAdmin = ErrorHandler.asyncHandler(async (req, res) => {

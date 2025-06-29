@@ -5,11 +5,12 @@ const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
 const crypto = require('crypto');
+const moment = require('moment');
 
 class AuthService {
     async #generateResetToken(userId) {
         const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+        const expiresAt = moment().add(30, 'minutes').toDate(); // 30 minutes
 
         try {
             await prisma.$transaction([
@@ -58,7 +59,7 @@ class AuthService {
             logger.info(`Found user with ID: ${user.id} for password reset request`);
 
             const resetToken = await this.#generateResetToken(user.id);
-            const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+            const resetTokenExpiry = moment().add(24, 'hours').toDate(); // 24 hours
 
             logger.info(`Generated reset token for user ID: ${user.id}, token expires at: ${resetTokenExpiry}`);
 
@@ -106,7 +107,7 @@ class AuthService {
                 where: {
                     token,
                     expiresAt: {
-                        gt: new Date()
+                        gt: moment().toDate()
                     }
                 },
                 include: {

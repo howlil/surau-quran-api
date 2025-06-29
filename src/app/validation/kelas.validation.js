@@ -8,16 +8,23 @@ class KelasValidation {
         .messages({
           'string.empty': 'Nama kelas tidak boleh kosong',
           'any.required': 'Nama kelas wajib diisi'
+        }),
+      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional()
+        .messages({
+          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid (IPv4 atau IPv6)'
         })
     });
   }
 
   static update() {
     return ValidatorFactory.create({
-      namaKelas: Joi.string().required()
+      namaKelas: Joi.string().optional()
         .messages({
-          'string.empty': 'Nama kelas tidak boleh kosong',
-          'any.required': 'Nama kelas wajib diisi'
+          'string.empty': 'Nama kelas tidak boleh kosong'
+        }),
+      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional()
+        .messages({
+          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid (IPv4 atau IPv6)'
         })
     });
   }

@@ -1,18 +1,15 @@
-const { prisma } = require('../../generated/prisma');
+const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class AbsensiCronService {
     static async createDailyAbsensiGuru() {
-        const today = new Date();
-        const formattedDate = today.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        }).split('/').reverse().join('-');
+        const formattedDate = moment().format(DATE_FORMATS.DEFAULT);
 
         // Get current day in Indonesian
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-        const currentDay = days[today.getDay()];
+        const currentDay = days[moment().day()];
 
         // Map Indonesian day names to Prisma enum values
         const dayMapping = {

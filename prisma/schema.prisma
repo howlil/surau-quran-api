@@ -24,6 +24,7 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
+  rfid      String?   @unique
   role      Role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,7 +71,7 @@ model Siswa {
   // Relations
   user         User           @relation(fields: [userId], references: [id])
   pendaftaran  Pendaftaran? // Siswa hanya memiliki satu pendaftaran
-  programSiswa ProgramSiswa[] // Tapi bisa memiliki banyak program
+  programSiswa ProgramSiswa[] // Siswa hanya memiliki satu program aktif, history program lama tetap ada
   AbsensiSiswa AbsensiSiswa[]
 }
 
@@ -113,10 +114,11 @@ model Guru {
 }
 
 model Kelas {
-  id        String   @id @default(uuid())
-  namaKelas String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  namaKelas          String
+  ipAddressHikvision String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relations
   kelasProgram KelasProgram[]
@@ -125,6 +127,7 @@ model Kelas {
 model Program {
   id          String   @id @default(uuid())
   namaProgram String
+  biayaSpp    Decimal  @db.Decimal(10, 2) @default(300000.00)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -534,7 +537,6 @@ model PendaftaranTemp {
   namaPenjemput    String?
   noWhatsapp       String?
   programId        String
-  jadwalJson       String   @db.Text
   kodeVoucher      String?
   biayaPendaftaran Decimal  @db.Decimal(10, 2)
   diskon           Decimal  @db.Decimal(10, 2)

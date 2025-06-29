@@ -3,6 +3,8 @@ const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class SppService {
     async getSppForAdmin(filters = {}) {
@@ -367,6 +369,168 @@ class SppService {
             biaya: Number(periode.jumlahTagihan),
             total: Number(periode.jumlahTagihan)
         };
+    }
+
+    /**
+     * Generate 5 bulan SPP ke depan setelah pendaftaran
+     * @param {string} programSiswaId - ID dari ProgramSiswa
+     * @param {Date|string} tanggalDaftar - Tanggal pendaftaran
+     * @returns {Promise<Array>} Array of created SPP records
+     */
+    static async generateFiveMonthsAhead(programSiswaId, tanggalDaftar = new Date()) {
+        try {
+            logger.info(`Generating 5 months SPP for programSiswa: ${programSiswaId}`);
+
+            // Get program siswa details including program info
+            const programSiswa = await prisma.programSiswa.findUnique({
+                where: { id: programSiswaId },
+                include: {
+                    program: {
+                        select: {
+                            biayaSpp: true,
+                            namaProgram: true
+                        }
+                    },
+                    siswa: {
+                        select: {
+                            namaMurid: true
+                        }
+                    }
+                }
+            });
+
+            if (!programSiswa) {
+                logger.error(`ProgramSiswa not found: ${programSiswaId}`);
+                throw new Error('Program siswa tidak ditemukan');
+            }
+
+            const registrationDate = moment(tanggalDaftar, DATE_FORMATS.DEFAULT);
+            const biayaSpp = Number(programSiswa.program.biayaSpp);
+            const createdSppRecords = [];
+
+            // Generate SPP untuk 5 bulan ke depan
+            for (let i = 1; i <= 5; i++) {
+                const sppMonth = registrationDate.clone().add(i, 'months');
+                const bulan = SppService.getMonthName(sppMonth.month() + 1);
+                const tahun = sppMonth.year();
+                const tanggalTagihan = sppMonth.format(DATE_FORMATS.DEFAULT);
+
+                // Check if SPP already exists for this month
+                const existingSpp = await prisma.periodeSpp.findFirst({
+                    where: {
+                        programSiswaId,
+                        bulan,
+                        tahun
+                    }
+                });
+
+                if (existingSpp) {
+                    logger.info(`SPP already exists for ${programSiswa.siswa.namaMurid} - ${bulan} ${tahun}`);
+                    continue;
+                }
+
+                // Create SPP record
+                const sppRecord = await prisma.periodeSpp.create({
+                    data: {
+                        programSiswaId,
+                        bulan,
+                        tahun,
+                        tanggalTagihan,
+                        jumlahTagihan: biayaSpp,
+                        diskon: 0,
+                        totalTagihan: biayaSpp
+                    }
+                });
+
+                createdSppRecords.push(sppRecord);
+                logger.info(`Created SPP for ${programSiswa.siswa.namaMurid} - ${bulan} ${tahun}: Rp ${biayaSpp.toLocaleString('id-ID')}`);
+            }
+
+            logger.info(`Successfully generated ${createdSppRecords.length} SPP records for ${programSiswa.siswa.namaMurid}`);
+            return createdSppRecords;
+
+        } catch (error) {
+            logger.error('Error generating SPP 5 months ahead:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get month name in Indonesian
+     * @param {number} month - Month number (1-12)
+     * @returns {string} Month name in Indonesian
+     */
+    static getMonthName(month) {
+        const months = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        return months[month - 1];
+    }
+
+    /**
+     * Generate single SPP for specific month
+     * @param {string} programSiswaId 
+     * @param {number} monthOffset - Offset dari bulan sekarang (1 = bulan depan)
+     * @returns {Promise<Object>} Created SPP record
+     */
+    static async generateSingleSpp(programSiswaId, monthOffset = 1) {
+        try {
+            const programSiswa = await prisma.programSiswa.findUnique({
+                where: { id: programSiswaId },
+                include: {
+                    program: {
+                        select: {
+                            biayaSpp: true
+                        }
+                    }
+                }
+            });
+
+            if (!programSiswa) {
+                throw new Error('Program siswa tidak ditemukan');
+            }
+
+            const targetMonth = moment().add(monthOffset, 'months');
+            const bulan = SppService.getMonthName(targetMonth.month() + 1);
+            const tahun = targetMonth.year();
+            const tanggalTagihan = targetMonth.format(DATE_FORMATS.DEFAULT);
+            const biayaSpp = Number(programSiswa.program.biayaSpp);
+
+            // Check if SPP already exists
+            const existingSpp = await prisma.periodeSpp.findFirst({
+                where: {
+                    programSiswaId,
+                    bulan,
+                    tahun
+                }
+            });
+
+            if (existingSpp) {
+                logger.info(`SPP already exists for ${bulan} ${tahun}`);
+                return existingSpp;
+            }
+
+            // Create SPP record
+            const sppRecord = await prisma.periodeSpp.create({
+                data: {
+                    programSiswaId,
+                    bulan,
+                    tahun,
+                    tanggalTagihan,
+                    jumlahTagihan: biayaSpp,
+                    diskon: 0,
+                    totalTagihan: biayaSpp
+                }
+            });
+
+            logger.info(`Created single SPP for ${bulan} ${tahun}: Rp ${biayaSpp.toLocaleString('id-ID')}`);
+            return sppRecord;
+
+        } catch (error) {
+            logger.error('Error generating single SPP:', error);
+            throw error;
+        }
     }
 }
 

@@ -8,6 +8,9 @@ const siswaService = require('./siswa.service');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const SppService = require('./spp.service');
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
 
 class PaymentService {
 
@@ -45,7 +48,7 @@ class PaymentService {
           metodePembayaran: 'VIRTUAL_ACCOUNT',
           jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
           statusPembayaran: 'PENDING',
-          tanggalPembayaran: new Date().toISOString().split('T')[0]
+          tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
         }
       });
 
@@ -56,7 +59,7 @@ class PaymentService {
           xenditExternalId: xenditInvoice.externalId,
           xenditPaymentUrl: xenditInvoice.invoiceUrl,
           xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-          xenditExpireDate: xenditInvoice.expiryDate.toISOString().split('T')[0],
+          xenditExpireDate: moment(xenditInvoice.expiryDate).format(DATE_FORMATS.DEFAULT),
           xenditStatus: xenditInvoice.status
         }
       });
@@ -111,7 +114,7 @@ class PaymentService {
             metodePembayaran: 'VIRTUAL_ACCOUNT',
             jumlahTagihan: Number(payment.finalAmount),
             statusPembayaran: 'PENDING',
-            tanggalPembayaran: new Date().toISOString().split('T')[0]
+            tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
           }
         });
 
@@ -122,7 +125,7 @@ class PaymentService {
             xenditExternalId: xenditInvoice.externalId,
             xenditPaymentUrl: xenditInvoice.invoiceUrl,
             xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-            xenditExpireDate: xenditInvoice.expiryDate.toISOString().split('T')[0],
+            xenditExpireDate: moment(xenditInvoice.expiryDate).format(DATE_FORMATS.DEFAULT),
             xenditStatus: xenditInvoice.status
           }
         });
@@ -201,8 +204,8 @@ class PaymentService {
             metodePembayaran: processedData.paymentMethod,
             statusPembayaran: processedData.status === 'PAID' ? 'PAID' : 'PENDING',
             tanggalPembayaran: processedData.paidAt ?
-              new Date(processedData.paidAt).toISOString().split('T')[0] :
-              new Date().toISOString().split('T')[0]
+              moment(processedData.paidAt).format(DATE_FORMATS.DEFAULT) :
+              moment().format(DATE_FORMATS.DEFAULT)
           }
         });
 
@@ -230,8 +233,11 @@ class PaymentService {
               throw new NotFoundError(`PendaftaranTemp not found for payment ID: ${xenditPayment.pembayaranId}`);
             }
 
-            // Generate a secure password for the new user
-            const generatedPassword = DataGeneratorUtils.generatePassword();
+            // Generate password with format: namapanggilan + tanggal lahir (DD)
+            const generatedPassword = DataGeneratorUtils.generateStudentPassword(
+              pendaftaranTemp.namaPanggilan,
+              pendaftaranTemp.tanggalLahir
+            );
             const hashedPassword = await PasswordUtils.hash(generatedPassword);
 
             // Create user
@@ -272,19 +278,6 @@ class PaymentService {
               }
             });
 
-            // Parse and create jadwal
-            const jadwalArr = JSON.parse(pendaftaranTemp.jadwalJson || '[]');
-            for (const jadwal of jadwalArr) {
-              await tx.jadwalProgramSiswa.create({
-                data: {
-                  programSiswaId: programSiswa.id,
-                  hari: jadwal.hari,
-                  jamMengajarId: jadwal.jamMengajarId,
-                  urutan: jadwal.urutan || 1
-                }
-              });
-            }
-
             // Create pendaftaran record
             await tx.pendaftaran.create({
               data: {
@@ -294,7 +287,7 @@ class PaymentService {
                 diskon: pendaftaranTemp.diskon,
                 totalBiaya: pendaftaranTemp.totalBiaya,
                 voucher_id: pendaftaranTemp.voucherId,
-                tanggalDaftar: new Date().toISOString().split('T')[0]
+                tanggalDaftar: moment().format(DATE_FORMATS.DEFAULT)
               }
             });
 
@@ -303,9 +296,20 @@ class PaymentService {
               where: { id: pendaftaranTemp.id }
             });
 
+            // Generate SPP untuk 5 bulan ke depan
+            try {
+              const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+              const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
+              logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
+            } catch (sppError) {
+              logger.error(`Failed to generate SPP for siswa ${siswa.namaMurid}:`, {
+                error: sppError.message,
+                stack: sppError.stack
+              });
+              // Don't throw error here, just log it - registration should still complete
+            }
+
             // Send welcome email with credentials - but don't let email failure block the transaction
-
-
             try {
               await EmailUtils.sendWelcomeEmail({
                 email: user.email,
