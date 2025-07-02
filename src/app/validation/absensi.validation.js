@@ -6,9 +6,10 @@ class AbsensiValidation {
         return Joi.object({
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
-                .optional()
+                .required()
                 .messages({
-                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'any.required': 'Parameter tanggal wajib diisi'
                 }),
         });
     }
@@ -27,55 +28,60 @@ class AbsensiValidation {
 
     updateAbsensiGuru() {
         return Joi.object({
-            statusKehadiran: Joi.string().valid('HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT').required()
+            statusKehadiran: Joi.string()
+                .valid('HADIR', 'TIDAK_HADIR', 'IZIN', 'SAKIT')
+                .optional()
                 .messages({
-                    'any.required': 'Status kehadiran wajib diisi',
-                    'any.only': 'Status kehadiran tidak valid'
+                    'any.only': 'Status kehadiran harus salah satu dari: HADIR, TIDAK_HADIR, IZIN, SAKIT'
                 }),
-            jamMasuk: Joi.when('statusKehadiran', {
-                is: Joi.valid('HADIR'),
-                then: Joi.string()
-                    .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                    .allow(null, '')
-                    .optional()
-                    .messages({
-                        'string.pattern.base': 'Format jam masuk harus HH:MM (24 jam)'
-                    }),
-                otherwise: Joi.forbidden()
-                    .messages({
-                        'any.unknown': 'Jam masuk hanya diperlukan untuk status HADIR'
-                    })
-            }),
-            jamKeluar: Joi.when('statusKehadiran', {
-                is: Joi.valid('HADIR'),
-                then: Joi.string()
-                    .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-                    .allow(null, '')
-                    .optional()
-                    .messages({
-                        'string.pattern.base': 'Format jam keluar harus HH:MM (24 jam)'
-                    }),
-                otherwise: Joi.forbidden()
-                    .messages({
-                        'any.unknown': 'Jam keluar hanya diperlukan untuk status HADIR'
-                    })
-            }),
-            keterangan: Joi.string().allow(null, '').optional()
+            waktuMasuk: Joi.string()
+                .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+                .allow(null, '')
+                .optional()
+                .messages({
+                    'string.pattern.base': 'Format waktu masuk harus HH:MM (24 jam)'
+                }),
+            keterangan: Joi.string()
+                .allow(null, '')
+                .optional()
                 .messages({
                     'string.base': 'Keterangan harus berupa teks'
                 }),
-            suratIzin: Joi.when('statusKehadiran', {
-                is: Joi.valid('IZIN', 'SAKIT'),
-                then: Joi.string().required(),
-                otherwise: Joi.forbidden()
-                    .messages({
-                        'any.unknown': 'Surat izin tidak diperlukan untuk status HADIR atau TIDAK_HADIR'
-                    })
-            })
+            suratIzin: Joi.any()
+                .optional()
                 .messages({
-                    'any.required': 'Surat izin wajib diisi untuk status IZIN atau SAKIT'
-                }),
-        });
+                    'any.base': 'Surat izin harus berupa file'
+                })
+        })
+            .custom((value, helpers) => {
+                const { statusKehadiran, keterangan, waktuMasuk } = value;
+
+                // Jika status IZIN atau SAKIT, wajib ada keterangan
+                if (statusKehadiran === 'IZIN' || statusKehadiran === 'SAKIT') {
+                    if (!keterangan || keterangan.trim() === '') {
+                        return helpers.error('custom.izinSakitKeterangan');
+                    }
+                    // waktuMasuk harus null untuk IZIN/SAKIT
+                    if (waktuMasuk && waktuMasuk.trim() !== '') {
+                        return helpers.error('custom.izinSakitWaktuMasuk');
+                    }
+                }
+
+                // Jika status TIDAK_HADIR, semua field tambahan harus null
+                if (statusKehadiran === 'TIDAK_HADIR') {
+                    if ((waktuMasuk && waktuMasuk.trim() !== '') ||
+                        (keterangan && keterangan.trim() !== '')) {
+                        return helpers.error('custom.tidakHadirFields');
+                    }
+                }
+
+                return value;
+            }, 'Update Absensi Guru Validation')
+            .messages({
+                'custom.izinSakitKeterangan': 'Keterangan wajib diisi untuk status IZIN atau SAKIT',
+                'custom.izinSakitWaktuMasuk': 'Waktu masuk harus kosong untuk status IZIN atau SAKIT',
+                'custom.tidakHadirFields': 'Waktu masuk dan keterangan harus kosong untuk status TIDAK_HADIR'
+            });
     }
 
     updateAbsensiSiswa() {

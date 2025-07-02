@@ -134,6 +134,25 @@ class AuthValidation {
         })
     });
   }
+
+  static changePassword() {
+    return ValidatorFactory.create({
+      oldPassword: Joi.string()
+        .required()
+        .messages({
+          'any.required': 'Password lama harus diisi'
+        }),
+      newPassword: Joi.string()
+        .min(6)
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        .required()
+        .messages({
+          'string.min': 'Password baru minimal 6 karakter',
+          'string.pattern.base': 'Password baru harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+          'any.required': 'Password baru harus diisi'
+        })
+    });
+  }
 }
 
 module.exports = AuthValidation;

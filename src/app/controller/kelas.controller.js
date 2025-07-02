@@ -52,6 +52,14 @@ class KelasController {
         const result = await kelasService.deleteKelasProgram(kelasProgramId);
         return Http.Response.success(res, 'Kelas program berhasil dihapus');
     });
+
+    getCCTV = ErrorHandler.asyncHandler(async (req, res) => {
+        const userId = req.user.id; // User ID siswa dari authentication
+        const { kelasId } = HttpRequest.getQueryParams(req, ['kelasId']);
+
+        const result = await kelasService.getCCTVByKelasId(userId, kelasId);
+        return Http.Response.success(res, result, 'CCTV IP berhasil diambil');
+    });
 }
 
 module.exports = new KelasController();

@@ -1,8 +1,11 @@
 const { PrismaClient } = require('../../generated/prisma');
-const { faker } = require('@faker-js/faker/locale/id_ID');
+const { faker } = require('@faker-js/faker');
 const moment = require('moment');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
+
+// Import Finance Factory
+const FinanceFactory = require('../factories/finance.factory');
 
 const prismaClient = new PrismaClient();
 
@@ -78,7 +81,10 @@ class FakerSeeder {
             gurus: [],
             siswas: [],
             programs: [],
-            kelas: []
+            kelas: [],
+            finance: [],
+            testimoni: [],
+            galeri: []
         };
     }
 
@@ -750,7 +756,6 @@ class FakerSeeder {
                             payrollId: payrollForMonth.id, // Link to the corresponding payroll
                             tanggal: attendanceDate.format('DD-MM-YYYY'),
                             jamMasuk: this.generateTime(),
-                            jamKeluar: this.generateTime(),
                             sks,
                             suratIzin,
                             statusKehadiran,
@@ -824,12 +829,182 @@ class FakerSeeder {
         }
     }
 
+    async createFinanceData() {
+        console.log('Creating finance data...');
+        try {
+            // Create automatic finance records from SPP payments
+            for (const pembayaran of this.data.pembayaran) {
+                if (pembayaran.tipePembayaran === 'SPP' && pembayaran.statusPembayaran === 'PAID') {
+                    // Find the related period and student
+                    const periodeSpp = await prismaClient.periodeSpp.findFirst({
+                        where: { pembayaranId: pembayaran.id },
+                        include: {
+                            programSiswa: {
+                                include: {
+                                    siswa: true
+                                }
+                            }
+                        }
+                    });
+
+                    if (periodeSpp) {
+                        const financeData = FinanceFactory.createSppIncome(
+                            periodeSpp.programSiswa.siswa.namaMurid,
+                            pembayaran.jumlahTagihan
+                        );
+
+                        // Use the same date as the payment
+                        financeData.tanggal = pembayaran.tanggalPembayaran;
+
+                        const finance = await prismaClient.finance.create({
+                            data: {
+                                ...financeData,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            }
+                        });
+                        this.data.finance.push(finance);
+                    }
+                }
+
+                if (pembayaran.tipePembayaran === 'PENDAFTARAN' && pembayaran.statusPembayaran === 'PAID') {
+                    // Find the related pendaftaran and student
+                    const pendaftaran = await prismaClient.pendaftaran.findFirst({
+                        where: { pembayaranId: pembayaran.id },
+                        include: {
+                            siswa: true
+                        }
+                    });
+
+                    if (pendaftaran) {
+                        const financeData = FinanceFactory.createEnrollmentIncome(
+                            pendaftaran.siswa.namaMurid,
+                            pembayaran.jumlahTagihan
+                        );
+
+                        // Use the same date as the payment
+                        financeData.tanggal = pembayaran.tanggalPembayaran;
+
+                        const finance = await prismaClient.finance.create({
+                            data: {
+                                ...financeData,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            }
+                        });
+                        this.data.finance.push(finance);
+                    }
+                }
+            }
+
+            // Create automatic finance records from payroll
+            for (const payroll of this.data.payroll) {
+                if (payroll.status === 'SELESAI') {
+                    // Find the guru name
+                    const guru = this.users.gurus.find(g => g.guru.id === payroll.guruId);
+                    if (guru) {
+                        const financeData = FinanceFactory.createPayrollExpense(
+                            guru.guru.nama,
+                            payroll.totalGaji
+                        );
+
+                        const finance = await prismaClient.finance.create({
+                            data: {
+                                ...financeData,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            }
+                        });
+                        this.data.finance.push(finance);
+                    }
+                }
+            }
+
+            // Create additional random finance records
+            for (let i = 0; i < 200; i++) {
+                const financeData = FinanceFactory.create();
+                const finance = await prismaClient.finance.create({
+                    data: {
+                        ...financeData,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.finance.push(finance);
+            }
+
+            console.log(`Finance data created: ${this.data.finance.length} records`);
+        } catch (error) {
+            console.error('Error creating finance data:', error);
+            throw error;
+        }
+    }
+
+    async createTestimoniAndGaleri() {
+        console.log('Creating testimoni and galeri data...');
+        try {
+            // Create Testimoni data
+            for (let i = 0; i < 20; i++) {
+                const testimoni = await prismaClient.testimoni.create({
+                    data: {
+                        nama: faker.person.fullName(),
+                        posisi: faker.helpers.arrayElement([
+                            'Orang Tua Siswa',
+                            'Alumni',
+                            'Siswa Aktif',
+                            'Guru',
+                            'Pengurus Masjid',
+                            'Tokoh Masyarakat'
+                        ]),
+                        isi: faker.lorem.paragraphs(2, '\n\n'),
+                        fotoUrl: `testimoni_${i + 1}.jpg`,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.testimoni.push(testimoni);
+            }
+
+            // Create Galeri data
+            for (let i = 0; i < 30; i++) {
+                const galeri = await prismaClient.galeri.create({
+                    data: {
+                        judulFoto: faker.helpers.arrayElement([
+                            'Kegiatan Tahfidz',
+                            'Pembelajaran Tahsin',
+                            'Wisuda Huffadz',
+                            'Kegiatan Ramadhan',
+                            'Outing Class',
+                            'Kompetisi Qiroah',
+                            'Pelatihan Guru',
+                            'Kegiatan Sosial',
+                            'Pembelajaran Online',
+                            'Fasilitas Surau'
+                        ]) + ` ${i + 1}`,
+                        coverGaleri: `galeri_${i + 1}.jpg`,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.galeri.push(galeri);
+            }
+
+            console.log(`Testimoni created: ${this.data.testimoni.length} records`);
+            console.log(`Galeri created: ${this.data.galeri.length} records`);
+        } catch (error) {
+            console.error('Error creating testimoni and galeri data:', error);
+            throw error;
+        }
+    }
+
     async seed() {
         try {
             console.log('Starting database seeding...');
             await this.createUsers();
             await this.createMasterData();
             await this.createTransactionalData();
+            await this.createFinanceData();
+            await this.createTestimoniAndGaleri();
             console.log('Database seeding completed successfully!');
         } catch (error) {
             console.error('Error seeding database:', error);

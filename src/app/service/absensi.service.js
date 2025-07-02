@@ -117,83 +117,104 @@ class AbsensiService {
         try {
             const { tanggal } = filters;
 
-            const where = {};
-            if (tanggal) {
-                where.tanggal = tanggal;
-            }
-
             const absensiRecords = await prisma.absensiGuru.findMany({
-                where,
+                where: {
+                    tanggal
+                },
                 include: {
                     guru: {
                         select: {
+                            id: true,
                             nama: true,
                             nip: true
+                        }
+                    },
+                    kelasProgram: {
+                        include: {
+                            kelas: {
+                                select: {
+                                    namaKelas: true
+                                }
+                            },
+                            program: {
+                                select: {
+                                    namaProgram: true
+                                }
+                            },
+                            jamMengajar: {
+                                select: {
+                                    id: true,
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            }
                         }
                     }
                 },
                 orderBy: [
-                    { tanggal: 'asc' },
+                    { guru: { nama: 'asc' } },
                     { jamMasuk: 'asc' }
                 ]
             });
 
-            // Group attendance records by date
-            const groupedByDate = {};
+            // Group absensi by guru
+            const groupedByGuru = {};
 
             absensiRecords.forEach(record => {
-                if (!groupedByDate[record.tanggal]) {
-                    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                    const dateParts = record.tanggal.split('-');
-                    const date = new Date(
-                        parseInt(dateParts[0]), // Year
-                        parseInt(dateParts[1]) - 1, // Month (0-indexed)
-                        parseInt(dateParts[2]) // Day
-                    );
-                    const dayOfWeek = days[date.getDay()];
+                const guruId = record.guruId;
 
-                    groupedByDate[record.tanggal] = {
-                        tanggal: record.tanggal,
-                        hari: dayOfWeek,
+                if (!groupedByGuru[guruId]) {
+                    groupedByGuru[guruId] = {
+                        guruId: record.guru.id,
+                        namaGuru: record.guru.nama,
+                        nip: record.guru.nip,
+                        sksHariIni: 0,
                         absensi: []
                     };
                 }
 
-                // Format each attendance record
-                const absensiData = {
+                // Hitung total SKS hari ini untuk guru
+                if (record.statusKehadiran === 'HADIR') {
+                    groupedByGuru[guruId].sksHariIni += record.sks;
+                }
+
+                // Format surat izin URL jika ada
+                let suratIzinUrl = null;
+                if (record.suratIzin) {
+                    suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${record.suratIzin}`;
+                }
+
+                // Add absensi detail
+                groupedByGuru[guruId].absensi.push({
                     absensiGuruId: record.id,
-                    namaGuru: record.guru.nama,
-                    NIP: record.guru.nip,
-                    waktuMasuk: record.jamMasuk,
-                    waktuKeluar: record.jamKeluar,
-                    sks: record.sks,
+                    kelasProgramId: record.kelasProgramId,
+                    namaKelas: record.kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
+                    namaProgram: record.kelasProgram.program.namaProgram,
+                    jamMengajar: {
+                        jamMengajarId: record.kelasProgram.jamMengajar.id,
+                        jamMulai: record.kelasProgram.jamMengajar.jamMulai,
+                        jamSelesai: record.kelasProgram.jamMengajar.jamSelesai
+                    },
                     statusKehadiran: record.statusKehadiran,
-                    keterangan: this.getKehadiranDescription(record.statusKehadiran),
-                    suratIzin: record.suratIzin || null
-                };
-
-                groupedByDate[record.tanggal].absensi.push(absensiData);
+                    waktuMasuk: record.jamMasuk,
+                    keterangan: record.keterangan,
+                    suratIzin: suratIzinUrl
+                });
             });
 
-            // Convert to array and sort by date (newest first)
-            const result = Object.values(groupedByDate).sort((a, b) => {
-                return new Date(b.tanggal) - new Date(a.tanggal);
-            });
+            // Convert to array format
+            const result = Object.values(groupedByGuru);
 
-            const transformedResult = result.map(item => ({
-                ...item,
-                absensi: item.absensi.map(abs => ({
-                    ...abs,
-                    suratIzin: abs.suratIzin ? FileUtils.getSuratIzinUrl(baseUrl, abs.suratIzin) : null
-                }))
-            }));
-
-            return transformedResult;
+            return {
+                tanggal,
+                data: result
+            };
         } catch (error) {
-            logger.error('Error getting grouped guru attendance:', error);
+            logger.error('Error getting absensi guru by date:', error);
             throw error;
         }
     }
+
     getKehadiranDescription(status) {
         switch (status) {
             case 'HADIR':
@@ -219,23 +240,62 @@ class AbsensiService {
                 throw new NotFoundError(`Absensi guru dengan ID ${id} tidak ditemukan`);
             }
 
-            // Format data
-            const absensiData = {
-                statusKehadiran: data.statusKehadiran,
-                ...(data.statusKehadiran === 'HADIR' && {
-                    ...(data.jamMasuk && { jamMasuk: data.jamMasuk }),
-                    ...(data.jamKeluar && { jamKeluar: data.jamKeluar })
-                }),
-                ...(data.statusKehadiran !== 'HADIR' && {
-                    jamMasuk: null,
-                    jamKeluar: null
-                }),
-                ...(data.suratIzin && { suratIzin: data.suratIzin })
-            };
+            // Additional validation for IZIN/SAKIT status
+            if (data.statusKehadiran === 'IZIN' || data.statusKehadiran === 'SAKIT') {
+                if (!data.keterangan || data.keterangan.trim() === '') {
+                    throw new BadRequestError('Keterangan wajib diisi untuk status IZIN atau SAKIT');
+                }
+                if (!data.suratIzin && !absensi.suratIzin) {
+                    throw new BadRequestError('Surat izin wajib diupload untuk status IZIN atau SAKIT');
+                }
+            }
+
+            // Prepare update data based on status kehadiran
+            const updateData = {};
+
+            if (data.statusKehadiran) {
+                updateData.statusKehadiran = data.statusKehadiran;
+
+                // Logic for IZIN or SAKIT
+                if (data.statusKehadiran === 'IZIN' || data.statusKehadiran === 'SAKIT') {
+                    updateData.jamMasuk = null; // waktuMasuk jadi null
+                    updateData.keterangan = data.keterangan || null;
+
+                    // Handle surat izin file upload
+                    if (data.suratIzin) {
+                        updateData.suratIzin = data.suratIzin;
+                    }
+                }
+                // Logic for TIDAK_HADIR
+                else if (data.statusKehadiran === 'TIDAK_HADIR') {
+                    updateData.jamMasuk = null;
+                    updateData.keterangan = null;
+                    updateData.suratIzin = null;
+                }
+                // Logic for HADIR
+                else if (data.statusKehadiran === 'HADIR') {
+                    if (data.waktuMasuk) {
+                        updateData.jamMasuk = data.waktuMasuk;
+                    }
+                    updateData.keterangan = data.keterangan || null;
+                    updateData.suratIzin = null; // Clear surat izin for HADIR
+                }
+            } else {
+                // Update individual fields if no statusKehadiran change
+                if (data.waktuMasuk !== undefined) {
+                    updateData.jamMasuk = data.waktuMasuk;
+                }
+                if (data.keterangan !== undefined) {
+                    updateData.keterangan = data.keterangan;
+                }
+                if (data.suratIzin !== undefined) {
+                    updateData.suratIzin = data.suratIzin;
+                }
+            }
 
             const updated = await prisma.absensiGuru.update({
                 where: { id },
-                data: absensiData,
+                data: updateData,
                 include: {
                     guru: {
                         select: {
@@ -246,39 +306,49 @@ class AbsensiService {
                     },
                     kelasProgram: {
                         include: {
-                            kelas: true,
-                            program: true,
-                            jamMengajar: true
+                            kelas: {
+                                select: {
+                                    namaKelas: true
+                                }
+                            },
+                            program: {
+                                select: {
+                                    namaProgram: true
+                                }
+                            },
+                            jamMengajar: {
+                                select: {
+                                    id: true,
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            }
                         }
                     }
                 }
             });
 
-            // Format the response
-            const formattedResponse = {
-                id: updated.id,
-                tanggal: updated.tanggal,
-                namaGuru: updated.guru.nama,
-                nipGuru: updated.guru.nip,
-                kelasProgram: {
-                    id: updated.kelasProgram.id,
-                    kelas: updated.kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
-                    program: updated.kelasProgram.program.namaProgram,
+            // Format response sesuai requirement
+            const result = {
+                absensiGuruId: updated.id,
+                kelasProgramId: updated.kelasProgramId,
+                namaKelas: updated.kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
+                namaProgram: updated.kelasProgram.program.namaProgram,
+                jamMengajar: {
+                    jamMengajarId: updated.kelasProgram.jamMengajar.id,
                     jamMulai: updated.kelasProgram.jamMengajar.jamMulai,
                     jamSelesai: updated.kelasProgram.jamMengajar.jamSelesai
                 },
-                jamMasuk: updated.jamMasuk,
-                jamKeluar: updated.jamKeluar,
-                sks: updated.sks,
                 statusKehadiran: updated.statusKehadiran,
-                keterangan: this.getKehadiranDescription(updated.statusKehadiran),
+                waktuMasuk: updated.jamMasuk,
+                keterangan: updated.keterangan,
                 suratIzin: updated.suratIzin
             };
 
-            logger.info(`Updated guru attendance with ID: ${id}`);
-            return formattedResponse;
+            logger.info(`Updated absensi guru with ID: ${id}`);
+            return result;
         } catch (error) {
-            logger.error(`Error updating guru attendance with ID ${id}:`, error);
+            logger.error(`Error updating absensi guru with ID ${id}:`, error);
             throw error;
         }
     }

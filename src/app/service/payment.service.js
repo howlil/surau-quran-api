@@ -4,11 +4,11 @@ const { logger } = require('../../lib/config/logger.config');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const { NotFoundError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
-const siswaService = require('./siswa.service');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
 const SppService = require('./spp.service');
+const financeService = require('./finance.service');
 const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
 
@@ -340,6 +340,31 @@ class PaymentService {
         const updatedPayment = await tx.pembayaran.findUnique({
           where: { id: xenditPayment.pembayaranId }
         });
+
+        // Auto-sync to Finance when payment is successful
+        if (processedData.status === 'PAID') {
+          try {
+            if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
+              await financeService.createFromEnrollmentPayment({
+                id: updatedPayment.id,
+                jumlahTagihan: updatedPayment.jumlahTagihan,
+                tanggalPembayaran: updatedPayment.tanggalPembayaran
+              });
+            } else if (updatedPayment.tipePembayaran === 'SPP') {
+              await financeService.createFromSppPayment({
+                id: updatedPayment.id,
+                jumlahTagihan: updatedPayment.jumlahTagihan,
+                tanggalPembayaran: updatedPayment.tanggalPembayaran
+              });
+            }
+          } catch (financeError) {
+            // Log error but don't fail the main payment processing
+            logger.error('Failed to auto-sync payment to finance:', {
+              paymentId: updatedPayment.id,
+              error: financeError.message
+            });
+          }
+        }
 
         logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);
         return updatedPayment;

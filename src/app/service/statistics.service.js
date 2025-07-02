@@ -8,9 +8,25 @@ class StatisticsService {
         try {
             const { startDate, endDate } = filters;
 
-            // Parse dates if provided (convert DD-MM-YYYY to YYYY-MM-DD for database)
-            const parsedStartDate = startDate ? moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : null;
-            const parsedEndDate = endDate ? moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : null;
+            // Build date filter based on user requirement
+            let dateWhere = {};
+            if (startDate) {
+                if (endDate) {
+                    // If both startDate and endDate provided, search in date range
+                    // Convert DD-MM-YYYY to DD-MM-YYYY for direct comparison
+                    dateWhere = {
+                        tanggal: {
+                            gte: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT),
+                            lte: moment(endDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                        }
+                    };
+                } else {
+                    // If only startDate provided, search exactly on that date
+                    dateWhere = {
+                        tanggal: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                    };
+                }
+            }
 
             // Get total students count
             const totalStudents = await prisma.siswa.count({
@@ -19,45 +35,46 @@ class StatisticsService {
                 }
             });
 
-            // Get present students count for the date range
+            // Get present students count for the date filter
             const presentStudents = await prisma.absensiSiswa.count({
                 where: {
                     statusKehadiran: 'HADIR',
-                    ...(parsedStartDate && parsedEndDate && {
-                        tanggal: {
-                            gte: parsedStartDate,
-                            lte: parsedEndDate
-                        }
-                    })
+                    ...dateWhere
                 }
             });
 
-            // Get absent students count for the date range
+            // Get absent students count for the date filter
             const absentStudents = await prisma.absensiSiswa.count({
                 where: {
                     statusKehadiran: 'TIDAK_HADIR',
-                    ...(parsedStartDate && parsedEndDate && {
-                        tanggal: {
-                            gte: parsedStartDate,
-                            lte: parsedEndDate
-                        }
-                    })
+                    ...dateWhere
                 }
             });
 
             // Get total programs count
             const totalPrograms = await prisma.program.count();
 
-            // Get new students count for the date range (based on registration date)
-            const newStudents = await prisma.pendaftaran.count({
-                where: {
-                    ...(parsedStartDate && parsedEndDate && {
+            // Build date filter for registration date
+            let regDateWhere = {};
+            if (startDate) {
+                if (endDate) {
+                    // Convert DD-MM-YYYY to DD-MM-YYYY for pendaftaran date comparison
+                    regDateWhere = {
                         tanggalDaftar: {
-                            gte: parsedStartDate,
-                            lte: parsedEndDate
+                            gte: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT),
+                            lte: moment(endDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
                         }
-                    })
+                    };
+                } else {
+                    regDateWhere = {
+                        tanggalDaftar: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                    };
                 }
+            }
+
+            // Get new students count for the date filter (based on registration date)
+            const newStudents = await prisma.pendaftaran.count({
+                where: regDateWhere
             });
 
             return {
@@ -77,19 +94,47 @@ class StatisticsService {
         try {
             const { startDate, endDate, groupBy = 'month' } = filters;
 
-            // Parse dates if provided (convert DD-MM-YYYY to YYYY-MM-DD for database)
-            const parsedStartDate = startDate ? moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : this.getDefaultStartDate(groupBy);
-            const parsedEndDate = endDate ? moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
+            // Build date filter based on user requirement
+            let dateFilter = {};
+            if (startDate) {
+                if (endDate) {
+                    // If both startDate and endDate provided, search in date range
+                    // Convert DD-MM-YYYY to YYYY-MM-DD for database comparison
+                    const parsedStartDate = moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
+                    const parsedEndDate = moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
+
+                    dateFilter = {
+                        tanggalPembayaran: {
+                            gte: parsedStartDate,
+                            lte: parsedEndDate
+                        }
+                    };
+                } else {
+                    // If only startDate provided, search exactly on that date
+                    const parsedStartDate = moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
+                    dateFilter = {
+                        tanggalPembayaran: parsedStartDate
+                    };
+                }
+            } else {
+                // If no date filter provided, use default range for better visualization
+                const parsedStartDate = this.getDefaultStartDate(groupBy);
+                const parsedEndDate = moment().format('YYYY-MM-DD');
+
+                dateFilter = {
+                    tanggalPembayaran: {
+                        gte: parsedStartDate,
+                        lte: parsedEndDate
+                    }
+                };
+            }
 
             // Get income data (from pendaftaran and SPP payments)
             const pendaftaranPayments = await prisma.pembayaran.findMany({
                 where: {
                     tipePembayaran: 'PENDAFTARAN',
                     statusPembayaran: 'PAID',
-                    tanggalPembayaran: {
-                        gte: parsedStartDate,
-                        lte: parsedEndDate
-                    }
+                    ...dateFilter
                 },
                 select: {
                     jumlahTagihan: true,
@@ -101,10 +146,7 @@ class StatisticsService {
                 where: {
                     tipePembayaran: 'SPP',
                     statusPembayaran: 'PAID',
-                    tanggalPembayaran: {
-                        gte: parsedStartDate,
-                        lte: parsedEndDate
-                    }
+                    ...dateFilter
                 },
                 select: {
                     jumlahTagihan: true,
@@ -112,15 +154,74 @@ class StatisticsService {
                 }
             });
 
-            // Get payroll data
-            const startYear = new Date(parsedStartDate).getFullYear();
-            const startMonth = new Date(parsedStartDate).getMonth() + 1;
-            const endYear = new Date(parsedEndDate).getFullYear();
-            const endMonth = new Date(parsedEndDate).getMonth() + 1;
+            // Build payroll date filter for month/year based system
+            let payrollFilter = {};
+            if (startDate) {
+                if (endDate) {
+                    // Date range filtering for payroll
+                    const startYear = moment(startDate, DATE_FORMATS.DEFAULT).year();
+                    const startMonth = moment(startDate, DATE_FORMATS.DEFAULT).month() + 1;
+                    const endYear = moment(endDate, DATE_FORMATS.DEFAULT).year();
+                    const endMonth = moment(endDate, DATE_FORMATS.DEFAULT).month() + 1;
 
-            const payrollData = await prisma.payroll.findMany({
-                where: {
-                    status: 'SELESAI',
+                    payrollFilter = {
+                        OR: [
+                            {
+                                // Same year
+                                AND: [
+                                    { tahun: startYear },
+                                    { tahun: endYear },
+                                    {
+                                        bulan: {
+                                            gte: startMonth.toString().padStart(2, '0'),
+                                            lte: endMonth.toString().padStart(2, '0')
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                // Different years
+                                OR: [
+                                    {
+                                        AND: [
+                                            { tahun: startYear },
+                                            { bulan: { gte: startMonth.toString().padStart(2, '0') } }
+                                        ]
+                                    },
+                                    {
+                                        AND: [
+                                            { tahun: endYear },
+                                            { bulan: { lte: endMonth.toString().padStart(2, '0') } }
+                                        ]
+                                    },
+                                    {
+                                        AND: [
+                                            { tahun: { gt: startYear } },
+                                            { tahun: { lt: endYear } }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    };
+                } else {
+                    // Single date filtering for payroll
+                    const year = moment(startDate, DATE_FORMATS.DEFAULT).year();
+                    const month = moment(startDate, DATE_FORMATS.DEFAULT).month() + 1;
+
+                    payrollFilter = {
+                        tahun: year,
+                        bulan: month.toString().padStart(2, '0')
+                    };
+                }
+            } else {
+                // Default range for payroll
+                const startYear = moment().subtract(6, 'months').year();
+                const startMonth = moment().subtract(6, 'months').month() + 1;
+                const endYear = moment().year();
+                const endMonth = moment().month() + 1;
+
+                payrollFilter = {
                     OR: [
                         {
                             // Same year
@@ -159,6 +260,14 @@ class StatisticsService {
                             ]
                         }
                     ]
+                };
+            }
+
+            // Get payroll data
+            const payrollData = await prisma.payroll.findMany({
+                where: {
+                    status: 'SELESAI',
+                    ...payrollFilter
                 },
                 select: {
                     totalGaji: true,

@@ -19,11 +19,6 @@ class AbsensiGuruFactory {
         const startMinute = Math.floor(Math.random() * 46); // 0 to 45 minutes
         const jamMasuk = `${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`;
 
-        // Teaching duration 1.5 hours (1 SKS) as per rules
-        const endHour = startHour + 1;
-        const endMinute = startMinute + 30;
-        const jamKeluar = `${String(endHour).padStart(2, '0')}:${String(endMinute >= 60 ? endMinute - 60 : endMinute).padStart(2, '0')}`;
-
         // SKS (1 SKS = 1.5 hours)
         const sks = Math.floor(Math.random() * 3) + 1; // 1-3 SKS
 
@@ -68,7 +63,6 @@ class AbsensiGuruFactory {
             payrollId,
             tanggal,
             jamMasuk,
-            jamKeluar,
             sks,
             suratIzin,
             statusKehadiran,

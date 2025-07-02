@@ -122,6 +122,25 @@ class ProgramService {
 
   }
 
+  async getAllPublic() {
+    try {
+      const programList = await prisma.program.findMany({
+        select: {
+          id: true,
+          namaProgram: true,
+          deskripsi: true,
+          cover: true
+        },
+        orderBy: { namaProgram: 'asc' }
+      });
+
+      return programList;
+    } catch (error) {
+      logger.error('Error getting all public programs:', error);
+      throw error;
+    }
+  }
+
   async getProgramStudents(programId) {
     try {
       // 1.      
@@ -131,7 +150,7 @@ class ProgramService {
           kelasProgramId: null,
           status: 'AKTIF',
           programId: programId,
-          isVerified: false,          
+          isVerified: false,
         },
         include: {
           siswa: true

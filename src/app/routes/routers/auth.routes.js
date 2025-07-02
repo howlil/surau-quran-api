@@ -50,4 +50,10 @@ router.post('/v1/reset-password',
   authController.resetPassword
 );
 
+router.patch('/v1/change-password',
+  authMiddleware.authenticate,
+  validationMiddleware.validateBody(authValidation.changePassword()),
+  authController.changePassword
+);
+
 module.exports = router;

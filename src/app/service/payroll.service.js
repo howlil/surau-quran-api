@@ -2,6 +2,7 @@ const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const financeService = require('./finance.service');
 const moment = require('moment');
 const axios = require('axios');
 const FormatUtils = require('../../lib/utils/format.utils');
@@ -467,7 +468,6 @@ class PayrollService {
               id: true,
               tanggal: true,
               jamMasuk: true,
-              jamKeluar: true,
               statusKehadiran: true,
               sks: true,
               terlambat: true,
@@ -676,10 +676,36 @@ class PayrollService {
           payrollStatus = 'GAGAL';
         }
 
-        await prisma.payroll.update({
+        const updatedPayroll = await prisma.payroll.update({
           where: { id: payrollId },
-          data: { status: payrollStatus }
+          data: { status: payrollStatus },
+          include: {
+            guru: {
+              select: {
+                nama: true
+              }
+            }
+          }
         });
+
+        // Auto-sync to Finance when disbursement is successful
+        if (disbursement.status === 'COMPLETED') {
+          try {
+            await financeService.createFromPayrollDisbursement({
+              id: updatedPayroll.id,
+              totalGaji: updatedPayroll.totalGaji,
+              bulan: updatedPayroll.bulan,
+              tahun: updatedPayroll.tahun,
+              guru: updatedPayroll.guru
+            });
+          } catch (financeError) {
+            // Log error but don't fail the main disbursement processing
+            logger.error('Failed to auto-sync payroll to finance:', {
+              payrollId: updatedPayroll.id,
+              error: financeError.message
+            });
+          }
+        }
       }
 
       logger.info(`Successfully processed disbursement callback for batch ID: ${id}`);

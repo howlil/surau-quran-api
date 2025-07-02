@@ -127,6 +127,8 @@ model Kelas {
 model Program {
   id          String   @id @default(uuid())
   namaProgram String
+  deskripsi   String?
+  cover       String?
   biayaSpp    Decimal  @db.Decimal(10, 2) @default(300000.00)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -134,6 +136,36 @@ model Program {
   // Relations
   kelasProgram KelasProgram[]
   programSiswa ProgramSiswa[]
+}
+
+model Testimoni {
+  id        String   @id @default(uuid())
+  nama      String
+  posisi    String
+  isi       String   @db.Text
+  fotoUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Galeri {
+  id           String   @id @default(uuid())
+  judulFoto    String
+  coverGaleri  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Finance {
+  id          String          @id @default(uuid())
+  tanggal     String
+  deskripsi   String
+  type        FinanceType
+  category    FinanceCategory
+  total       Decimal         @db.Decimal(12, 2)
+  evidence    String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model JamMengajar {
@@ -265,9 +297,9 @@ model AbsensiGuru {
   guruId                 String
   tanggal                String
   jamMasuk               String?
-  jamKeluar              String?
   sks                    Int
   suratIzin              String?
+  keterangan             String?
   statusKehadiran        StatusKehadiran
   // Add these fields for tracking lateness and penalties
   terlambat              Boolean         @default(false)
@@ -520,6 +552,28 @@ enum XenditDisbursementStatus {
   PENDING
   COMPLETED
   FAILED
+}
+
+enum FinanceType {
+  INCOME
+  EXPENSE
+}
+
+enum FinanceCategory {
+  // Income categories
+  SPP
+  ENROLLMENT
+  DONATION
+  OTHER_INCOME
+  
+  // Expense categories  
+  PAYROLL_SALARY
+  OPERATIONAL
+  UTILITIES
+  MAINTENANCE
+  MARKETING
+  SUPPLIES
+  OTHER_EXPENSE
 }
 
 model PendaftaranTemp {

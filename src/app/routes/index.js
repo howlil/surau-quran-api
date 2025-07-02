@@ -12,7 +12,11 @@ const statisticsRoutes = require('./routers/statistics.routes');
 const sppRoutes = require('./routers/spp.routes');
 const paymentRoutes = require('./routers/payment.routes');
 const payrollRoutes = require('./routers/payroll.routes');
+const testimoniRoutes = require('./routers/testimoni.routes');
+const galeriRoutes = require('./routers/galeri.routes');
+const financeRoutes = require('./routers/finance.routes');
 
+// API Routes
 router.use(authRoutes);
 router.use(kelasRoutes);
 router.use(programRoutes);
@@ -25,5 +29,8 @@ router.use(statisticsRoutes);
 router.use(sppRoutes);
 router.use(paymentRoutes);
 router.use(payrollRoutes);
+router.use(testimoniRoutes);
+router.use(galeriRoutes);
+router.use(financeRoutes);
 
 module.exports = router;

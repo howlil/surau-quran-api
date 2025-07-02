@@ -52,6 +52,66 @@ class FileUtils {
 
         return absensiList.map(absensi => this.transformAbsensiGuruFiles(absensi, baseUrl));
     }
+
+    static transformProgramFiles(program, baseUrl) {
+        if (!program) return null;
+
+        return {
+            ...program,
+            cover: this.getImageUrl(baseUrl, program.cover)
+        };
+    }
+
+    static transformProgramListFiles(programs, baseUrl) {
+        if (!Array.isArray(programs)) return [];
+
+        return programs.map(program => this.transformProgramFiles(program, baseUrl));
+    }
+
+    static transformTestimoniFiles(testimoni, baseUrl) {
+        if (!testimoni) return null;
+
+        return {
+            ...testimoni,
+            fotoUrl: this.getImageUrl(baseUrl, testimoni.fotoUrl)
+        };
+    }
+
+    static transformTestimoniListFiles(testimoniList, baseUrl) {
+        if (!Array.isArray(testimoniList)) return [];
+
+        return testimoniList.map(testimoni => this.transformTestimoniFiles(testimoni, baseUrl));
+    }
+
+    static transformGaleriFiles(galeri, baseUrl) {
+        if (!galeri) return null;
+
+        return {
+            ...galeri,
+            coverGaleri: this.getImageUrl(baseUrl, galeri.coverGaleri)
+        };
+    }
+
+    static transformGaleriListFiles(galeriList, baseUrl) {
+        if (!Array.isArray(galeriList)) return [];
+
+        return galeriList.map(galeri => this.transformGaleriFiles(galeri, baseUrl));
+    }
+
+    static transformFinanceFiles(finance, baseUrl) {
+        if (!finance) return null;
+
+        return {
+            ...finance,
+            evidence: this.getDocumentUrl(baseUrl, finance.evidence, 'evidence')
+        };
+    }
+
+    static transformFinanceListFiles(financeList, baseUrl) {
+        if (!Array.isArray(financeList)) return [];
+
+        return financeList.map(finance => this.transformFinanceFiles(finance, baseUrl));
+    }
 }
 
 module.exports = FileUtils; 

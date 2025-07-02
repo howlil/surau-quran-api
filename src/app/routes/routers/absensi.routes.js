@@ -4,9 +4,7 @@ const absensiController = require('../../controller/absensi.controller');
 const authMiddleware = require('../../middleware/auth.middleware');
 const validationMiddleware = require('../../middleware/validation.middleware');
 const absensiValidation = require('../../validation/absensi.validation');
-const {
-    uploadSuratIzinMiddleware,
-} = require('../../middleware/upload.middleware');
+const uploadMiddleware = require('../../middleware/upload.middleware');
 
 
 router.get('/v1/absensi/siswa/:kelasId',
@@ -26,7 +24,7 @@ router.get('/v1/absensi/guru',
 router.patch('/v1/absensi/guru/:id',
     authMiddleware.authenticate,
     authMiddleware.authorize(['ADMIN']),
-    uploadSuratIzinMiddleware,
+    uploadMiddleware.uploadSuratIzinMiddleware,
     validationMiddleware.validateBody(absensiValidation.updateAbsensiGuru()),
     absensiController.updateAbsensiGuru
 );

@@ -9,9 +9,10 @@ class KelasValidation {
           'string.empty': 'Nama kelas tidak boleh kosong',
           'any.required': 'Nama kelas wajib diisi'
         }),
-      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional()
+      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'optional' }).optional()
         .messages({
-          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid (IPv4 atau IPv6)'
+          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid. Contoh: 192.168.1.100 atau 2001:db8::1',
+          'string.base': 'IP Address Hikvision harus berupa teks'
         })
     });
   }
@@ -22,9 +23,10 @@ class KelasValidation {
         .messages({
           'string.empty': 'Nama kelas tidak boleh kosong'
         }),
-      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional()
+      ipAddressHikvision: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'optional' }).optional()
         .messages({
-          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid (IPv4 atau IPv6)'
+          'string.ip': 'IP Address Hikvision harus berupa alamat IP yang valid. Contoh: 192.168.1.100 atau 2001:db8::1',
+          'string.base': 'IP Address Hikvision harus berupa teks'
         })
     });
   }
@@ -98,6 +100,16 @@ class KelasValidation {
           'number.max': 'Limit maksimal 100'
         }),
 
+    });
+  }
+
+  static getCCTVQuery() {
+    return ValidatorFactory.create({
+      kelasId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Kelas ID harus berupa UUID yang valid',
+          'any.required': 'Kelas ID wajib diisi'
+        })
     });
   }
 }

@@ -62,4 +62,12 @@ router.delete(
     kelasController.deleteKelasProgram
 );
 
+// Route untuk CCTV - hanya untuk SISWA
+router.get('/v1/cctv',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['SISWA']),
+    validationMiddleware.validateQuery(kelasValidation.getCCTVQuery()),
+    kelasController.getCCTV
+);
+
 module.exports = router;

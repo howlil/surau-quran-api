@@ -34,7 +34,7 @@
     "xendit-node": "^6.4.0"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.8.0",
+    "@faker-js/faker": "^9.9.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.8.2"
   }

@@ -165,6 +165,68 @@ class AuthService {
         }
     }
 
+    async changePassword(userId, oldPassword, newPassword) {
+        try {
+            logger.info(`Starting password change process for user ID: ${userId}`);
+
+            // Ambil data user
+            const user = await prisma.user.findUnique({
+                where: { id: userId }
+            });
+
+            if (!user) {
+                logger.warn(`Password change requested for non-existent user ID: ${userId}`);
+                throw new NotFoundError('User tidak ditemukan');
+            }
+
+            // Verifikasi password lama
+            const isValidOldPassword = await PasswordUtils.verify(oldPassword, user.password);
+
+            if (!isValidOldPassword) {
+                logger.warn(`Invalid old password provided for user ID: ${userId}`);
+                throw new UnauthorizedError('Password lama tidak valid');
+            }
+
+            // Hash password baru
+            const hashedNewPassword = await PasswordUtils.hash(newPassword);
+            logger.info(`Generated hashed new password for user ID: ${userId}`);
+
+            // Update password
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    password: hashedNewPassword
+                }
+            });
+
+            logger.info(`Successfully changed password for user ID: ${userId}`);
+
+            // Kirim notifikasi email (optional, tidak akan throw error jika gagal)
+            try {
+                await EmailUtils.sendPasswordChangedEmail({
+                    email: user.email
+                });
+                logger.info(`Successfully sent password changed notification to: ${user.email}`);
+            } catch (emailError) {
+                logger.warn('Failed to send password changed notification:', {
+                    error: emailError.message,
+                    userId: user.id,
+                    email: user.email
+                });
+                // Don't throw error here as password was already changed
+            }
+
+            return { message: 'Password berhasil diubah' };
+        } catch (error) {
+            logger.error('Error in changePassword:', {
+                error: error.message,
+                stack: error.stack,
+                userId
+            });
+            throw error;
+        }
+    }
+
     async login(email, password) {
         if (!email || !password) {
             throw new BadRequestError('Email dan password harus diisi');
