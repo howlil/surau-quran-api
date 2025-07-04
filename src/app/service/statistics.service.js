@@ -484,6 +484,102 @@ class StatisticsService {
 
         return result;
     }
+
+    async getTodaySchedule() {
+        try {
+            // Get today's date
+            const today = moment().format(DATE_FORMATS.DEFAULT);
+
+            // Get current day name in Indonesian format
+            const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+            const todayDayName = dayNames[moment().day()];
+
+            // Get total registered students count
+            const jumlahSiswa = await prisma.siswa.count({
+                where: {
+                    isRegistered: true
+                }
+            });
+
+            // Get students present today
+            const siswaHadir = await prisma.absensiSiswa.count({
+                where: {
+                    statusKehadiran: 'HADIR',
+                    tanggal: today
+                }
+            });
+
+            // Get all kelasProgram for today
+            const kelasPrograms = await prisma.kelasProgram.findMany({
+                where: {
+                    hari: todayDayName
+                },
+                include: {
+                    kelas: {
+                        select: {
+                            namaKelas: true
+                        }
+                    },
+                    program: {
+                        select: {
+                            namaProgram: true
+                        }
+                    },
+                    jamMengajar: {
+                        select: {
+                            id: true,
+                            jamMulai: true,
+                            jamSelesai: true
+                        }
+                    }
+                },
+                orderBy: {
+                    jamMengajar: {
+                        jamMulai: 'asc'
+                    }
+                }
+            });
+
+            // Group by jamMengajar
+            const schedulesMap = new Map();
+
+            kelasPrograms.forEach(kp => {
+                const jamMengajarId = kp.jamMengajar.id;
+
+                if (!schedulesMap.has(jamMengajarId)) {
+                    schedulesMap.set(jamMengajarId, {
+                        jamMengajarId: jamMengajarId,
+                        jamMulai: kp.jamMengajar.jamMulai,
+                        jamSelesai: kp.jamMengajar.jamSelesai,
+                        kelasProgram: []
+                    });
+                }
+
+                schedulesMap.get(jamMengajarId).kelasProgram.push({
+                    kelasProgramId: kp.id,
+                    namaKelas: kp.kelas?.namaKelas || 'Tidak Ada Kelas',
+                    namaProgram: kp.program.namaProgram
+                });
+            });
+
+            // Convert map to array
+            const schedules = Array.from(schedulesMap.values());
+
+            const result = {
+                tanggal: today,
+                jumlahSiswa,
+                siswaHadir,
+                schedules
+            };
+
+            logger.info(`Retrieved today's schedule for ${today} (${todayDayName}) with ${schedules.length} time slots`);
+            return result;
+
+        } catch (error) {
+            logger.error('Error getting today schedule:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = new StatisticsService(); 

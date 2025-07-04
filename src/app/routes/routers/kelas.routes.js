@@ -66,7 +66,6 @@ router.delete(
 router.get('/v1/cctv',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SISWA']),
-    validationMiddleware.validateQuery(kelasValidation.getCCTVQuery()),
     kelasController.getCCTV
 );
 

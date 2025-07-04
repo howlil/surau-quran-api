@@ -20,7 +20,7 @@ class PayrollController {
 
   getAllPayrollsForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
-      'page', 'limit', 'bulan',
+      'page', 'limit', 'monthYear'
     ]);
     const result = await payrollService.getAllPayrollsForAdmin(filters);
     return Http.Response.success(res, result, 'Data payroll berhasil diambil');
@@ -29,7 +29,7 @@ class PayrollController {
 
   getAllPayrollsForGuru = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
-      'page', 'limit', 'bulan'
+      'page', 'limit', 'monthYear'
     ]);
 
     // Get guru ID from authenticated user

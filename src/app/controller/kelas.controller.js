@@ -55,9 +55,8 @@ class KelasController {
 
     getCCTV = ErrorHandler.asyncHandler(async (req, res) => {
         const userId = req.user.id; // User ID siswa dari authentication
-        const { kelasId } = HttpRequest.getQueryParams(req, ['kelasId']);
 
-        const result = await kelasService.getCCTVByKelasId(userId, kelasId);
+        const result = await kelasService.getCCTVByUserId(userId);
         return Http.Response.success(res, result, 'CCTV IP berhasil diambil');
     });
 }

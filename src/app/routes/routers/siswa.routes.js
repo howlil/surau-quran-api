@@ -9,6 +9,7 @@ router.get(
   '/v1/siswa',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN', 'GURU']),
+  validationMiddleware.validateQuery(siswaValidation.getAllSiswa()),
   siswaController.getAll
 );
 
@@ -48,6 +49,12 @@ router.get(
   authMiddleware.authorize(['ADMIN']),
   siswaController.getPendaftaranInvoice
 )
+
+router.get(
+  '/v1/jadwal/siswa',
+  validationMiddleware.validateQuery(siswaValidation.getJadwalSiswa()),
+  siswaController.getJadwalSiswa
+);
 
 
 module.exports = router;

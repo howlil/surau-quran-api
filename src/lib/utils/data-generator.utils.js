@@ -1,12 +1,8 @@
-/**
- * Utility functions for generating various types of data
- */
+const moment = require('moment');
+const { DATE_FORMATS } = require('../constants');
+
 class DataGeneratorUtils {
-  /**
-   * Generate a secure random password
-   * @param {number} length - Length of the password (default: 8)
-   * @returns {string} - Generated password
-   */
+
   static generatePassword(length = 8) {
     const lowerChars = 'abcdefghijklmnopqrstuvwxyz';
     const upperChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -33,22 +29,13 @@ class DataGeneratorUtils {
     return password;
   }
 
-  /**
-   * Generate a student ID based on year and a sequence number
-   * @param {number} sequenceNumber - Sequence number for the student
-   * @returns {string} - Generated student ID
-   */
   static generateStudentId(sequenceNumber) {
     const year = new Date().getFullYear().toString().slice(-2);
     const sequence = sequenceNumber.toString().padStart(4, '0');
     return `SQ${year}${sequence}`;
   }
 
-  /**
-   * Generate a NIS (Nomor Induk Siswa) based on year and a unique number
-   * @param {Array} existingNISNumbers - Array of existing NIS numbers to avoid duplicates
-   * @returns {string} - Generated NIS
-   */
+
   static generateNIS(existingNISNumbers = []) {
     const currentYear = new Date().getFullYear();
     const yearCode = currentYear.toString().slice(-2);
@@ -116,22 +103,47 @@ class DataGeneratorUtils {
     return password.split('').sort(() => Math.random() - 0.5).join('');
   }
 
- 
   static generateStudentPassword(namaPanggilan, tanggalLahir) {
-    if (!namaPanggilan || !tanggalLahir) {
-      throw new Error('Nama panggilan dan tanggal lahir harus diisi');
+    if (!namaPanggilan) {
+      throw new Error('Nama panggilan harus diisi');
     }
 
-    // Convert to Date object if it's a string
-    const birthDate = new Date(tanggalLahir);
+    let day = '01'; // Default fallback day
 
-    // Validate date
-    if (isNaN(birthDate.getTime())) {
-      throw new Error('Format tanggal lahir tidak valid');
+    // If tanggalLahir is provided, try to parse it
+    if (tanggalLahir) {
+      // Try multiple date formats
+      const formats = [
+        DATE_FORMATS.DEFAULT,  // DD-MM-YYYY
+        'YYYY-MM-DD',          // ISO format
+        'MM-DD-YYYY',          // US format
+        'DD/MM/YYYY',          // Alternative format
+        'YYYY/MM/DD'           // Alternative ISO format
+      ];
+
+      let birthDate = null;
+      let usedFormat = null;
+
+      // Try each format until one works
+      for (const format of formats) {
+        const testDate = moment(tanggalLahir, format, true);
+        if (testDate.isValid()) {
+          birthDate = testDate;
+          usedFormat = format;
+          break;
+        }
+      }
+
+      // If we successfully parsed the date, use the actual day
+      if (birthDate) {
+        day = birthDate.date().toString().padStart(2, '0');
+        console.log(`Successfully parsed date "${tanggalLahir}" using format "${usedFormat}" -> day: ${day}`);
+      } else {
+        console.warn(`Failed to parse birth date "${tanggalLahir}", using fallback day: ${day}`);
+      }
+    } else {
+      console.warn(`Birth date not provided, using fallback day: ${day}`);
     }
-
-    // Get day of birth (DD format)
-    const day = birthDate.getDate().toString().padStart(2, '0');
 
     const cleanNickname = namaPanggilan.toLowerCase().replace(/\s+/g, '');
 

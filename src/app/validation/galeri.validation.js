@@ -9,9 +9,9 @@ class GaleriValidation {
                     'string.empty': 'Judul foto tidak boleh kosong',
                     'any.required': 'Judul foto wajib diisi'
                 }),
-            coverGaleri: Joi.any().required()
+            coverGaleri: Joi.any().optional()
                 .messages({
-                    'any.required': 'Cover galeri wajib diisi'
+                    'string.empty': 'Cover galeri tidak boleh kosong'
                 })
         });
     }

@@ -2,15 +2,21 @@ const galeriService = require('../service/galeri.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const { BadRequestError } = require('../../lib/http/errors.http');
 const FileUtils = require('../../lib/utils/file.utils');
 
 class GaleriController {
     create = ErrorHandler.asyncHandler(async (req, res) => {
         const data = HttpRequest.getBodyParams(req);
 
+        // Check if coverGaleri file is uploaded
+        if (!req.file || req.file.fieldname !== 'coverGaleri') {
+            throw new BadRequestError('Cover galeri wajib diisi');
+        }
+
         // Handle coverGaleri file upload
         if (req.file && req.file.fieldname === 'coverGaleri') {
-            data.coverGaleri = req.file.path;
+            data.coverGaleri = req.file.filename; // Use filename instead of path
         }
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
@@ -37,15 +43,13 @@ class GaleriController {
         return Http.Response.success(res, mappedResult, 'Data galeri berhasil diambil');
     });
 
-
-
     update = ErrorHandler.asyncHandler(async (req, res) => {
         const { id } = HttpRequest.getUrlParams(req);
         const data = HttpRequest.getBodyParams(req);
 
         // Handle coverGaleri file upload
         if (req.file && req.file.fieldname === 'coverGaleri') {
-            data.coverGaleri = req.file.path;
+            data.coverGaleri = req.file.filename; // Use filename instead of path
         }
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;

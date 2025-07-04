@@ -28,4 +28,9 @@ router.get(
     statisticsController.getStudentDistribution
 );
 
+router.get(
+    '/v1/schedules/today',
+    statisticsController.getTodaySchedule
+);
+
 module.exports = router; 

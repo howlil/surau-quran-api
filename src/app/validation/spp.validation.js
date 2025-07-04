@@ -17,10 +17,9 @@ class SppValidation {
                 .messages({
                     'any.only': 'Status pembayaran tidak valid'
                 }),
-            bulan: Joi.string().min(1).max(2).optional()
+            bulan: Joi.string().pattern(/^(0[1-9]|1[0-2])-\d{4}$/).optional()
                 .messages({
-                    'string.min': 'Bulan harus diisi dengan angka 1-12',
-                    'string.max': 'Bulan harus diisi dengan angka 1-12'
+                    'string.pattern.base': 'Format bulan harus MM-YYYY (contoh: 01-2025, 12-2024)'
                 }),
             namaSiswa: Joi.string().min(1).optional()
                 .messages({

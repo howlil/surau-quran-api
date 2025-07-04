@@ -30,7 +30,7 @@ class FinanceController {
     });
 
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['startDate', 'endDate', 'type']);
+        const filters = HttpRequest.getQueryParams(req, ['startDate', 'endDate', 'type', 'page', 'limit']);
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
         const result = await financeService.getAll(filters);

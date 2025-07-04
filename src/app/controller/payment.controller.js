@@ -6,7 +6,7 @@ const sppService = require('../service/spp.service');
 const Http = require('../../lib/http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { xenditConfig } = require('../../lib/config/xendit.config');
-const {  BadRequestError } = require('../../lib/http/errors.http');
+const { BadRequestError } = require('../../lib/http/errors.http');
 
 class PaymentController {
 
@@ -48,7 +48,7 @@ class PaymentController {
                             error: error.message,
                             stack: error.stack
                         });
-                   
+
                         return Http.Response.success(res, {
                             success: true,
                             payment: result,

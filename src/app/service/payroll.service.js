@@ -36,6 +36,8 @@ class PayrollService {
       const { page = 1, limit = 10, monthYear } = filters;
       const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
 
+      logger.info(`Payroll filter - monthYear: ${monthYear}, parsed bulan: ${bulan}, tahun: ${tahun}`);
+
       const where = {
         bulan,
         tahun
@@ -56,8 +58,7 @@ class PayrollService {
           absensiGuru: {
             where: {
               tanggal: {
-                endsWith: `-${tahun}`,
-                contains: `-${bulan}-`
+                contains: `-${bulan}-${tahun}`
               }
             },
             select: {
@@ -88,6 +89,8 @@ class PayrollService {
         },
         orderBy: { createdAt: 'desc' }
       });
+
+      logger.info(`Found ${result.data.length} payroll records with filter`);
 
       const formattedData = result.data.map((payroll, index) => {
         const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
@@ -141,7 +144,7 @@ class PayrollService {
 
       return {
         data: formattedData,
-        pagination: result.meta
+        pagination: result.pagination
       };
     } catch (error) {
       logger.error('Error getting all payrolls for admin:', error);
@@ -322,8 +325,7 @@ class PayrollService {
           absensiGuru: {
             where: {
               tanggal: {
-                endsWith: `-${payroll.tahun}`,
-                contains: `-${bulan || payroll.bulan}-`
+                contains: `-${bulan || payroll.bulan}-${payroll.tahun}`
               }
             },
             select: {
@@ -460,8 +462,7 @@ class PayrollService {
           absensiGuru: {
             where: {
               tanggal: {
-                endsWith: `-${tahun}`,
-                contains: `-${bulan}-`
+                contains: `-${bulan}-${tahun}`
               }
             },
             select: {

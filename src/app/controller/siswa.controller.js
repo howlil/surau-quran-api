@@ -8,7 +8,7 @@ class SiswaController {
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, [
-      'page', 'limit'
+      'nama', 'programId', 'page', 'limit'
     ]);
     const result = await siswaService.getAll(filters);
     return Http.Response.success(res, result);
@@ -63,6 +63,12 @@ class SiswaController {
         statusBaru: result.status
       }
     });
+  });
+
+  getJadwalSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+    const { rfid } = HttpRequest.getQueryParams(req, ['rfid']);
+    const result = await siswaService.getJadwalSiswa(rfid);
+    return Http.Response.success(res, result);
   });
 }
 

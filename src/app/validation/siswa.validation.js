@@ -24,10 +24,11 @@ class SiswaValidation {
           'any.only': 'Jenis kelamin harus LAKI_LAKI atau PEREMPUAN',
           'any.required': 'Jenis kelamin wajib diisi'
         }),
-      alamat: Joi.string().min(5).max(500).optional()
+      alamat: Joi.string().min(10).max(500).required()
         .messages({
-          'string.min': 'Alamat minimal 5 karakter',
-          'string.max': 'Alamat maksimal 500 karakter'
+          'string.min': 'Alamat minimal 10 karakter',
+          'string.max': 'Alamat maksimal 500 karakter',
+          'any.required': 'Alamat wajib diisi'
         }),
       strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
         .messages({
@@ -60,10 +61,11 @@ class SiswaValidation {
           'string.min': 'Nama penjemput minimal 2 karakter',
           'string.max': 'Nama penjemput maksimal 191 karakter'
         }),
-      noWhatsapp: Joi.string().min(10).max(15).optional()
+      noWhatsapp: Joi.string().pattern(/^(\+62|62|0)[0-9]{9,12}$/).max(20).required()
         .messages({
-          'string.min': 'Nomor WhatsApp minimal 10 karakter',
-          'string.max': 'Nomor WhatsApp maksimal 15 karakter'
+          'string.pattern.base': 'Format nomor WhatsApp tidak valid (contoh: 081234567890)',
+          'string.max': 'Nomor WhatsApp maksimal 20 karakter',
+          'any.required': 'Nomor WhatsApp wajib diisi'
         }),
       programId: Joi.string().guid({ version: 'uuidv4' }).required()
         .messages({
@@ -232,6 +234,43 @@ class SiswaValidation {
           'number.integer': 'Limit harus berupa bilangan bulat',
           'number.min': 'Limit minimal 1',
           'number.max': 'Limit maksimal 100'
+        })
+    });
+  }
+
+  static getAllSiswa() {
+    return ValidatorFactory.create({
+      nama: Joi.string().min(1).max(191).optional()
+        .messages({
+          'string.min': 'Nama minimal 1 karakter',
+          'string.max': 'Nama maksimal 191 karakter'
+        }),
+      programId: Joi.string().guid({ version: 'uuidv4' }).optional()
+        .messages({
+          'string.guid': 'Program ID harus berupa UUID yang valid'
+        }),
+      page: Joi.number().integer().min(1).default(1)
+        .messages({
+          'number.base': 'Page harus berupa angka',
+          'number.integer': 'Page harus berupa bilangan bulat',
+          'number.min': 'Page minimal 1'
+        }),
+      limit: Joi.number().integer().min(1).max(100).default(10)
+        .messages({
+          'number.base': 'Limit harus berupa angka',
+          'number.integer': 'Limit harus berupa bilangan bulat',
+          'number.min': 'Limit minimal 1',
+          'number.max': 'Limit maksimal 100'
+        })
+    });
+  }
+
+  static getJadwalSiswa() {
+    return ValidatorFactory.create({
+      rfid: Joi.string().min(1).max(191).required()
+        .messages({
+          'string.min': 'RFID minimal 1 karakter',
+          'string.max': 'RFID maksimal 191 karakter'
         })
     });
   }

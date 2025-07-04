@@ -133,9 +133,9 @@ const uploadImageMiddleware = (req, res, next) => {
     uploadImage(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 5MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 5MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
@@ -147,9 +147,9 @@ const uploadSuratIzinMiddleware = (req, res, next) => {
     uploadSuratIzin(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 10MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
@@ -183,9 +183,9 @@ const uploadSuratKontrakMiddleware = (req, res, next) => {
     uploadSuratKontrak(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 10MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
@@ -216,9 +216,9 @@ const uploadCoverMiddleware = (req, res, next) => {
     uploadCover(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 5MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 5MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
@@ -231,9 +231,9 @@ const uploadFotoUrlMiddleware = (req, res, next) => {
     uploadFotoUrl(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 5MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 5MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
@@ -255,12 +255,24 @@ const uploadCoverGaleriMiddleware = (req, res, next) => {
     uploadCoverGaleri(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 5MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 5MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+                return next(new BadRequestError('Unexpected field. Expected field name: coverGaleri'));
+            }
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }
+
+        // Log untuk debugging
+        console.log('Upload success:', {
+            hasFile: !!req.file,
+            fieldname: req.file?.fieldname,
+            filename: req.file?.filename,
+            body: req.body
+        });
+
         next();
     });
 };
@@ -279,9 +291,9 @@ const uploadEvidenceMiddleware = (req, res, next) => {
     uploadEvidence(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new Http.Exception.BadRequest('File size too large. Maximum size is 10MB.'));
+                return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
             }
-            return next(new Http.Exception.BadRequest(err.message));
+            return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
         }

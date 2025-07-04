@@ -2,6 +2,28 @@ const Joi = require('joi');
 const ValidatorFactory = require('./factory.validation');
 
 class PayrollValidation {
+    static getAllPayrollsForAdmin() {
+        return ValidatorFactory.create({
+            page: Joi.number().integer().min(1).default(1).optional(),
+            limit: Joi.number().integer().min(1).max(100).default(10).optional(),
+            monthYear: Joi.string().pattern(/^(0[1-9]|1[0-2])-\d{4}$/).optional()
+                .messages({
+                    'string.pattern.base': 'Format monthYear harus MM-YYYY (contoh: 06-2025)'
+                })
+        });
+    }
+
+    static getAllPayrollsForGuru() {
+        return ValidatorFactory.create({
+            page: Joi.number().integer().min(1).default(1).optional(),
+            limit: Joi.number().integer().min(1).max(100).default(10).optional(),
+            monthYear: Joi.string().pattern(/^(0[1-9]|1[0-2])-\d{4}$/).optional()
+                .messages({
+                    'string.pattern.base': 'Format monthYear harus MM-YYYY (contoh: 06-2025)'
+                })
+        });
+    }
+
     static updatePayroll() {
         return ValidatorFactory.create({
             tanggalKalkulasi: Joi.string().pattern(/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$/).optional()

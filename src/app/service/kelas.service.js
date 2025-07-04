@@ -505,7 +505,7 @@ class KelasService {
         }
     }
 
-    async getCCTVByKelasId(siswaUserId, kelasId) {
+    async getCCTVByUserId(siswaUserId) {
         try {
             // 1. Cari siswa berdasarkan user ID
             const siswa = await prisma.siswa.findUnique({
@@ -516,11 +516,12 @@ class KelasService {
                 throw new NotFoundError('Profil siswa tidak ditemukan');
             }
 
-            // 2. Cari program yang diikuti siswa yang masih aktif
+            // 2. Cari program siswa yang masih aktif dan ter-enroll di kelas program
             const programSiswa = await prisma.programSiswa.findMany({
                 where: {
                     siswaId: siswa.id,
-                    status: 'AKTIF'
+                    status: 'AKTIF',
+                    kelasProgramId: { not: null } // Hanya yang sudah ter-enroll di kelas
                 },
                 include: {
                     program: {
@@ -533,16 +534,18 @@ class KelasService {
             });
 
             if (programSiswa.length === 0) {
-                throw new NotFoundError('Siswa tidak terdaftar dalam program apapun');
+                throw new NotFoundError('Siswa tidak terdaftar dalam kelas program apapun');
             }
 
-            const programIds = programSiswa.map(ps => ps.programId);
+            const kelasProgramIds = programSiswa.map(ps => ps.kelasProgramId);
 
-            // 3. Cari kelas program yang sesuai dengan kelasId dan program yang diikuti siswa
-            const kelasProgram = await prisma.kelasProgram.findFirst({
+            // 3. Cari semua kelas program yang berkaitan dengan siswa dan memiliki CCTV
+            const kelasPrograms = await prisma.kelasProgram.findMany({
                 where: {
-                    kelasId: kelasId,
-                    programId: { in: programIds }
+                    id: { in: kelasProgramIds },
+                    kelas: {
+                        ipAddressHikvision: { not: null } // Hanya kelas yang memiliki CCTV
+                    }
                 },
                 include: {
                     kelas: {
@@ -554,41 +557,51 @@ class KelasService {
                     },
                     program: {
                         select: {
+                            id: true,
                             namaProgram: true
                         }
+                    },
+                    jamMengajar: {
+                        select: {
+                            jamMulai: true,
+                            jamSelesai: true
+                        }
                     }
-                }
+                },
+                orderBy: [
+                    { kelas: { namaKelas: 'asc' } },
+                    { program: { namaProgram: 'asc' } }
+                ]
             });
 
-            if (!kelasProgram) {
-                throw new NotFoundError('Siswa tidak memiliki akses ke CCTV kelas ini');
+            if (kelasPrograms.length === 0) {
+                throw new NotFoundError('Tidak ada kelas dengan CCTV yang dapat diakses siswa ini');
             }
 
-            // 4. Validasi bahwa siswa benar-benar ter-enroll di kelas program ini
-            const enrolledProgramSiswa = await prisma.programSiswa.findFirst({
-                where: {
-                    siswaId: siswa.id,
-                    programId: kelasProgram.programId,
-                    status: 'AKTIF'
-                }
-            });
+            // 4. Format response dengan informasi lengkap
+            const cctvList = kelasPrograms.map(kp => ({
+                kelasId: kp.kelas.id,
+                namaKelas: kp.kelas.namaKelas,
+                programId: kp.program.id,
+                namaProgram: kp.program.namaProgram,
+                hari: kp.hari,
+                jamMengajar: {
+                    jamMulai: kp.jamMengajar.jamMulai,
+                    jamSelesai: kp.jamMengajar.jamSelesai
+                },
+                cctvIP: kp.kelas.ipAddressHikvision
+            }));
 
-            if (!enrolledProgramSiswa) {
-                throw new NotFoundError('Siswa tidak ter-enroll dalam program di kelas ini');
-            }
-
-            // 5. Return IP address CCTV
-            if (!kelasProgram.kelas.ipAddressHikvision) {
-                throw new NotFoundError('CCTV tidak tersedia untuk kelas ini');
-            }
-
-            logger.info(`CCTV access granted for siswa ID: ${siswa.id} to kelas ID: ${kelasId}`);
+            logger.info(`CCTV access granted for siswa ID: ${siswa.id}, found ${cctvList.length} accessible CCTV(s)`);
 
             return {
-                cctvIP: kelasProgram.kelas.ipAddressHikvision
+                siswaId: siswa.id,
+                namaSiswa: siswa.namaMurid,
+                totalCCTV: cctvList.length,
+                cctvList
             };
         } catch (error) {
-            logger.error(`Error getting CCTV for siswa user ID ${siswaUserId} and kelas ID ${kelasId}:`, error);
+            logger.error(`Error getting CCTV for siswa user ID ${siswaUserId}:`, error);
             throw error;
         }
     }

@@ -11,11 +11,11 @@ class AuthValidation {
         }),
       password: Joi.string()
         .min(6)
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
+        // .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]/)
         .required()
         .messages({
           'string.min': 'Password minimal 6 karakter',
-          'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
+          // 'string.pattern.base': 'Password harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus',
           'any.required': 'Password wajib diisi'
         })
     });

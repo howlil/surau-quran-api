@@ -23,6 +23,19 @@ class AbsensiValidation {
                     'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
                     'any.required': 'Parameter tanggal wajib diisi'
                 }),
+            page: Joi.number().integer().min(1).default(1)
+                .messages({
+                    'number.base': 'Page harus berupa angka',
+                    'number.integer': 'Page harus berupa bilangan bulat',
+                    'number.min': 'Page minimal 1'
+                }),
+            limit: Joi.number().integer().min(1).max(100).default(10)
+                .messages({
+                    'number.base': 'Limit harus berupa angka',
+                    'number.integer': 'Limit harus berupa bilangan bulat',
+                    'number.min': 'Limit minimal 1',
+                    'number.max': 'Limit maksimal 100'
+                })
         });
     }
 

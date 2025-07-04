@@ -13,7 +13,6 @@ router.post(
     authMiddleware.authorize(['ADMIN']),
     uploadCoverMiddleware,
     (req, res, next) => {
-        // Validate that file was uploaded
         if (!req.file) {
             return res.status(400).json({
                 success: false,

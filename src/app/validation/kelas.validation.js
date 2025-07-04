@@ -103,15 +103,6 @@ class KelasValidation {
     });
   }
 
-  static getCCTVQuery() {
-    return ValidatorFactory.create({
-      kelasId: Joi.string().guid({ version: 'uuidv4' }).required()
-        .messages({
-          'string.guid': 'Kelas ID harus berupa UUID yang valid',
-          'any.required': 'Kelas ID wajib diisi'
-        })
-    });
-  }
 }
 
 module.exports = KelasValidation;

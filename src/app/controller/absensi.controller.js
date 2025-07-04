@@ -31,7 +31,7 @@ class AbsensiController {
     });
 
     getAbsensiGuruByDate = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['tanggal']);
+        const filters = HttpRequest.getQueryParams(req, ['tanggal', 'page', 'limit']);
         const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
         const result = await absensiService.getAbsensiGuruByDate(filters, baseUrl);
         return Http.Response.success(res, result, 'Data absensi guru berhasil diambil');

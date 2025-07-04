@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, handlePrismaError } = require('../../lib/http/error.handler.http');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 
 class FinanceService {
@@ -27,40 +28,76 @@ class FinanceService {
 
     async getAll(filters = {}) {
         try {
-            const { startDate, endDate, type } = filters;
+            const { startDate, endDate, type, page = 1, limit = 10 } = filters;
 
-            // Build where clause
-            const where = {
-                type: type
-            };
+            // Build where clause for database query
+            const where = {};
 
-            // Add date filter based on user requirement
-            if (startDate) {
-                if (endDate) {
-                    // If both startDate and endDate provided, search in date range
-                    where.tanggal = {
-                        gte: moment(startDate, 'DD-MM-YYYY').format('DD-MM-YYYY'),
-                        lte: moment(endDate, 'DD-MM-YYYY').format('DD-MM-YYYY')
-                    };
-                } else {
-                    // If only startDate provided, search exactly on that date
-                    where.tanggal = moment(startDate, 'DD-MM-YYYY').format('DD-MM-YYYY');
-                }
+            // Add type filter only if provided
+            if (type) {
+                where.type = type;
             }
 
-            // Get filtered records
-            const financeRecords = await prisma.finance.findMany({
-                where,
-                orderBy: {
-                    tanggal: 'desc'
+            let filteredData = [];
+            let totalRecords = 0;
+
+            if (startDate) {
+                if (endDate) {
+                    // Filter rentang tanggal: startDate sampai endDate
+                    const startDateFormatted = moment(startDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    const endDateFormatted = moment(endDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+
+                    // Get all records untuk filter manual
+                    const allRecords = await prisma.finance.findMany({
+                        where: type ? { type: type } : {},
+                        orderBy: { tanggal: 'desc' }
+                    });
+
+                    // Filter records by date range
+                    filteredData = allRecords.filter(record => {
+                        const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                        return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
+                    });
+
+                    totalRecords = filteredData.length;
+
+                    // Apply pagination manually
+                    const startIndex = (page - 1) * limit;
+                    const endIndex = startIndex + parseInt(limit);
+                    filteredData = filteredData.slice(startIndex, endIndex);
+                } else {
+                    // Filter tanggal exact: hanya pada startDate
+                    where.tanggal = startDate;
+
+                    // Use PrismaUtils.paginate for exact date
+                    const result = await PrismaUtils.paginate(prisma.finance, {
+                        page,
+                        limit,
+                        where,
+                        orderBy: { tanggal: 'desc' }
+                    });
+
+                    filteredData = result.data;
+                    totalRecords = result.pagination.total;
                 }
-            });
+            } else {
+                // No date filter, use normal pagination
+                const result = await PrismaUtils.paginate(prisma.finance, {
+                    page,
+                    limit,
+                    where,
+                    orderBy: { tanggal: 'desc' }
+                });
+
+                filteredData = result.data;
+                totalRecords = result.pagination.total;
+            }
 
             // Calculate totals for filtered data
             const totals = await this.calculateTotals(startDate, endDate);
 
             // Format response
-            const dataTable = financeRecords.map(record => ({
+            const dataTable = filteredData.map(record => ({
                 id: record.id,
                 tanggal: record.tanggal,
                 deskripsi: record.deskripsi,
@@ -70,11 +107,20 @@ class FinanceService {
                 evidence: record.evidence
             }));
 
+            // Calculate pagination info
+            const totalPages = Math.ceil(totalRecords / limit);
+
             return {
                 income: totals.income,
                 expense: totals.expense,
                 revenue: totals.revenue,
-                dataTable
+                dataTable,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total: totalRecords,
+                    totalPages
+                }
             };
         } catch (error) {
             logger.error('Error getting finance records:', error);
@@ -84,53 +130,78 @@ class FinanceService {
 
     async calculateTotals(startDate, endDate) {
         try {
-            // Build date filter based on user requirement
-            const where = {};
+            if (startDate && endDate) {
+                // Convert DD-MM-YYYY to YYYY-MM-DD for proper date comparison
+                const startDateFormatted = moment(startDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                const endDateFormatted = moment(endDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
 
-            if (startDate) {
-                if (endDate) {
-                    // If both startDate and endDate provided, search in date range
-                    where.tanggal = {
-                        gte: moment(startDate, 'DD-MM-YYYY').format('DD-MM-YYYY'),
-                        lte: moment(endDate, 'DD-MM-YYYY').format('DD-MM-YYYY')
-                    };
-                } else {
+                // Get all records and filter them manually
+                const allIncomeRecords = await prisma.finance.findMany({
+                    where: { type: 'INCOME' }
+                });
+
+                const allExpenseRecords = await prisma.finance.findMany({
+                    where: { type: 'EXPENSE' }
+                });
+
+                // Filter records by date range
+                const filteredIncomeRecords = allIncomeRecords.filter(record => {
+                    const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
+                });
+
+                const filteredExpenseRecords = allExpenseRecords.filter(record => {
+                    const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
+                });
+
+                // Calculate totals manually
+                const income = filteredIncomeRecords.reduce((sum, record) => sum + Number(record.total), 0);
+                const expense = filteredExpenseRecords.reduce((sum, record) => sum + Number(record.total), 0);
+                const revenue = income - expense;
+
+                return {
+                    income,
+                    expense,
+                    revenue
+                };
+            } else {
+                // For exact date or no date filter, use aggregate
+                let whereIncome = { type: 'INCOME' };
+                let whereExpense = { type: 'EXPENSE' };
+
+                if (startDate) {
                     // If only startDate provided, search exactly on that date
-                    where.tanggal = moment(startDate, 'DD-MM-YYYY').format('DD-MM-YYYY');
+                    whereIncome.tanggal = startDate;
+                    whereExpense.tanggal = startDate;
                 }
+
+                // Calculate income total
+                const incomeResult = await prisma.finance.aggregate({
+                    where: whereIncome,
+                    _sum: {
+                        total: true
+                    }
+                });
+
+                // Calculate expense total
+                const expenseResult = await prisma.finance.aggregate({
+                    where: whereExpense,
+                    _sum: {
+                        total: true
+                    }
+                });
+
+                const income = Number(incomeResult._sum.total || 0);
+                const expense = Number(expenseResult._sum.total || 0);
+                const revenue = income - expense;
+
+                return {
+                    income,
+                    expense,
+                    revenue
+                };
             }
-
-            // Calculate income total
-            const incomeResult = await prisma.finance.aggregate({
-                where: {
-                    ...where,
-                    type: 'INCOME'
-                },
-                _sum: {
-                    total: true
-                }
-            });
-
-            // Calculate expense total
-            const expenseResult = await prisma.finance.aggregate({
-                where: {
-                    ...where,
-                    type: 'EXPENSE'
-                },
-                _sum: {
-                    total: true
-                }
-            });
-
-            const income = Number(incomeResult._sum.total || 0);
-            const expense = Number(expenseResult._sum.total || 0);
-            const revenue = income - expense;
-
-            return {
-                income,
-                expense,
-                revenue
-            };
         } catch (error) {
             logger.error('Error calculating finance totals:', error);
             throw handlePrismaError(error);
@@ -223,6 +294,7 @@ class FinanceService {
 
     async createFromEnrollmentPayment(pembayaranData) {
         try {
+            logger.info('Creating finance record from enrollment payment:', pembayaranData);
             const { id, jumlahTagihan, tanggalPembayaran } = pembayaranData;
 
             // Check if finance record already exists for this payment
@@ -233,7 +305,10 @@ class FinanceService {
             });
 
             if (existingRecord) {
-                logger.info(`Finance record already exists for enrollment payment ID: ${id}`);
+                logger.info(`Finance record already exists for enrollment payment ID: ${id}`, {
+                    financeRecordId: existingRecord.id,
+                    amount: existingRecord.total
+                });
                 return existingRecord;
             }
 
@@ -248,10 +323,19 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Auto-created finance record for enrollment payment ID: ${id}, Amount: ${jumlahTagihan}`);
+            logger.info(`Successfully auto-created finance record for enrollment payment:`, {
+                paymentId: id,
+                financeRecordId: financeRecord.id,
+                amount: Number(jumlahTagihan),
+                date: tanggalPembayaran
+            });
             return financeRecord;
         } catch (error) {
-            logger.error(`Error creating finance record from enrollment payment:`, error);
+            logger.error(`Error creating finance record from enrollment payment:`, {
+                paymentData: pembayaranData,
+                error: error.message,
+                stack: error.stack
+            });
             throw error;
         }
     }

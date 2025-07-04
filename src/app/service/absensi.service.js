@@ -2,6 +2,7 @@ const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
 const FileUtils = require('../../lib/utils/file.utils');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class AbsensiService {
 
@@ -115,99 +116,105 @@ class AbsensiService {
 
     async getAbsensiGuruByDate(filters = {}, baseUrl) {
         try {
-            const { tanggal } = filters;
+            const { tanggal, page = 1, limit = 10 } = filters;
 
-            const absensiRecords = await prisma.absensiGuru.findMany({
+            // Use PrismaUtils.paginate for guru with absensi data
+            const result = await PrismaUtils.paginate(prisma.guru, {
+                page,
+                limit,
                 where: {
-                    tanggal
-                },
-                include: {
-                    guru: {
-                        select: {
-                            id: true,
-                            nama: true,
-                            nip: true
-                        }
-                    },
-                    kelasProgram: {
-                        include: {
-                            kelas: {
-                                select: {
-                                    namaKelas: true
-                                }
-                            },
-                            program: {
-                                select: {
-                                    namaProgram: true
-                                }
-                            },
-                            jamMengajar: {
-                                select: {
-                                    id: true,
-                                    jamMulai: true,
-                                    jamSelesai: true
-                                }
-                            }
+                    AbsensiGuru: {
+                        some: {
+                            tanggal
                         }
                     }
                 },
+                include: {
+                    AbsensiGuru: {
+                        where: {
+                            tanggal
+                        },
+                        include: {
+                            kelasProgram: {
+                                include: {
+                                    kelas: {
+                                        select: {
+                                            namaKelas: true
+                                        }
+                                    },
+                                    program: {
+                                        select: {
+                                            namaProgram: true
+                                        }
+                                    },
+                                    jamMengajar: {
+                                        select: {
+                                            id: true,
+                                            jamMulai: true,
+                                            jamSelesai: true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        orderBy: [
+                            { jamMasuk: 'asc' }
+                        ]
+                    }
+                },
                 orderBy: [
-                    { guru: { nama: 'asc' } },
-                    { jamMasuk: 'asc' }
+                    { nama: 'asc' }
                 ]
             });
 
-            // Group absensi by guru
-            const groupedByGuru = {};
-
-            absensiRecords.forEach(record => {
-                const guruId = record.guruId;
-
-                if (!groupedByGuru[guruId]) {
-                    groupedByGuru[guruId] = {
-                        guruId: record.guru.id,
-                        namaGuru: record.guru.nama,
-                        nip: record.guru.nip,
-                        sksHariIni: 0,
-                        absensi: []
-                    };
-                }
-
+            // Transform data to match existing format
+            const transformedData = result.data.map(guru => {
                 // Hitung total SKS hari ini untuk guru
-                if (record.statusKehadiran === 'HADIR') {
-                    groupedByGuru[guruId].sksHariIni += record.sks;
+                let sksHariIni = 0;
+                if (guru.AbsensiGuru) {
+                    sksHariIni = guru.AbsensiGuru
+                        .filter(record => record.statusKehadiran === 'HADIR')
+                        .reduce((sum, record) => sum + record.sks, 0);
                 }
 
-                // Format surat izin URL jika ada
-                let suratIzinUrl = null;
-                if (record.suratIzin) {
-                    suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${record.suratIzin}`;
-                }
+                const absensiData = guru.AbsensiGuru.map(record => {
+                    // Format surat izin URL jika ada
+                    let suratIzinUrl = null;
+                    if (record.suratIzin) {
+                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${record.suratIzin}`;
+                    }
 
-                // Add absensi detail
-                groupedByGuru[guruId].absensi.push({
-                    absensiGuruId: record.id,
-                    kelasProgramId: record.kelasProgramId,
-                    namaKelas: record.kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
-                    namaProgram: record.kelasProgram.program.namaProgram,
-                    jamMengajar: {
-                        jamMengajarId: record.kelasProgram.jamMengajar.id,
-                        jamMulai: record.kelasProgram.jamMengajar.jamMulai,
-                        jamSelesai: record.kelasProgram.jamMengajar.jamSelesai
-                    },
-                    statusKehadiran: record.statusKehadiran,
-                    waktuMasuk: record.jamMasuk,
-                    keterangan: record.keterangan,
-                    suratIzin: suratIzinUrl
+                    return {
+                        absensiGuruId: record.id,
+                        kelasProgramId: record.kelasProgramId,
+                        namaKelas: record.kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
+                        namaProgram: record.kelasProgram.program.namaProgram,
+                        jamMengajar: {
+                            jamMengajarId: record.kelasProgram.jamMengajar.id,
+                            jamMulai: record.kelasProgram.jamMengajar.jamMulai,
+                            jamSelesai: record.kelasProgram.jamMengajar.jamSelesai
+                        },
+                        statusKehadiran: record.statusKehadiran,
+                        waktuMasuk: record.jamMasuk,
+                        keterangan: record.keterangan,
+                        suratIzin: suratIzinUrl
+                    };
                 });
-            });
 
-            // Convert to array format
-            const result = Object.values(groupedByGuru);
+                return {
+                    guruId: guru.id,
+                    fotoProfile: guru.fotoProfile,
+                    namaGuru: guru.nama,
+                    nip: guru.nip,
+                    sksHariIni,
+                    absensi: absensiData
+                };
+            });
 
             return {
                 tanggal,
-                data: result
+                data: transformedData,
+                pagination: result.pagination
             };
         } catch (error) {
             logger.error('Error getting absensi guru by date:', error);

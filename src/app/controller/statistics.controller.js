@@ -23,6 +23,12 @@ class StatisticsController {
         const result = await statisticsService.getStudentDistribution();
         return Http.Response.success(res, result, 'Distribusi siswa berhasil diambil');
     });
+
+    // Get today's schedule with student counts
+    getTodaySchedule = ErrorHandler.asyncHandler(async (req, res) => {
+        const result = await statisticsService.getTodaySchedule();
+        return Http.Response.success(res, result, 'Jadwal hari ini berhasil diambil');
+    });
 }
 
 module.exports = new StatisticsController(); 

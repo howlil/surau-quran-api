@@ -132,11 +132,26 @@ class SiswaService {
 
         if (voucher.tipe === 'NOMINAL') {
           actualDiskon = Number(voucher.nominal);
+
+          // Validasi diskon nominal tidak boleh lebih besar dari biaya pendaftaran
+          if (actualDiskon >= Number(jumlahPembayaran)) {
+            throw new BadRequestError(`Diskon voucher Rp ${actualDiskon.toLocaleString('id-ID')} tidak boleh lebih besar atau sama dengan biaya pendaftaran Rp ${Number(jumlahPembayaran).toLocaleString('id-ID')}`);
+          }
         } else if (voucher.tipe === 'PERSENTASE') {
+          // Validasi persentase maksimal 100%
+          if (Number(voucher.nominal) > 100) {
+            throw new BadRequestError(`Persentase diskon tidak boleh lebih dari 100%`);
+          }
+
           actualDiskon = Number(jumlahPembayaran) * (Number(voucher.nominal) / 100);
         }
 
         calculatedTotal = Number(jumlahPembayaran) - actualDiskon;
+
+        // Validasi total biaya minimal Rp 1.000 (requirement Xendit)
+        if (calculatedTotal < 1000) {
+          throw new BadRequestError(`Total biaya setelah diskon minimal Rp 1.000. Saat ini: Rp ${calculatedTotal.toLocaleString('id-ID')}`);
+        }
       }
 
       // If totalBiaya is provided, validate it matches our calculation
@@ -364,18 +379,6 @@ class SiswaService {
     }
   }
 
-  async #getSppAmount(programId) {
-    const program = await prisma.program.findUnique({
-      where: { id: programId },
-      include: {
-        kelasProgram: true
-      }
-    });
-
-    const defaultSppAmount = 300000;
-
-    return defaultSppAmount;
-  }
 
   async getPendaftaranInvoice(invoices, filters = {}) {
     const { status, tanggal, page = 1, limit = 10 } = filters;
@@ -428,7 +431,6 @@ class SiswaService {
         },
         student: null,
         registration: null,
-        schedule: [],
       };
 
       if ((invoice.status === 'PAID' || invoice.status === 'SETTLED') && pembayaranId) {
@@ -436,11 +438,22 @@ class SiswaService {
         const pendaftaran = await prisma.pendaftaran.findUnique({
           where: { pembayaranId },
           include: {
+            voucher: {
+              select: {
+                kodeVoucher: true
+              }
+            },
             siswa: {
               include: {
+                user: {
+                  select: {
+                    email: true
+                  }
+                },
                 programSiswa: {
-                  include: {
-                    JadwalProgramSiswa: true
+                  select: {
+                    programId: true,
+                    status: true
                   }
                 }
               }
@@ -478,13 +491,6 @@ class SiswaService {
             tanggalDaftar: pendaftaran.tanggalDaftar,
           }
           : null;
-        data.schedule = programAktif
-          ? programAktif.JadwalProgramSiswa.map(jadwal => ({
-            hari: jadwal.hari,
-            urutan: jadwal.urutan,
-            jamMengajarId: jadwal.jamMengajarId,
-          }))
-          : [];
       } else if (pembayaranId) {
         // MASIH di temp table
         const pendaftaranTemp = await prisma.pendaftaranTemp.findUnique({
@@ -520,7 +526,6 @@ class SiswaService {
             tanggalDaftar: null,
           }
           : null;
-        data.schedule = [];
       }
 
       result.push(data);
@@ -538,32 +543,27 @@ class SiswaService {
 
   async getAll(filters = {}) {
     try {
-      const { page = 1, limit = 10, namaProgram, namaMurid, namaPanggilan } = filters;
+      const { nama, programId, page = 1, limit = 10 } = filters;
 
       const where = {};
 
-      if (namaMurid) {
-        where.namaMurid = { equals: namaMurid.trim().replace(/\s+/g, ' '), mode: 'insensitive' };
+      if (nama) {
+        where.OR = [
+          { namaMurid: { contains: nama } },
+          { namaPanggilan: { contains: nama } }
+        ];
       }
 
-      if (namaPanggilan) {
-        where.namaPanggilan = { contains: namaPanggilan, mode: 'insensitive' };
-      }
-
-      if (namaProgram) {
+      if (programId) {
         where.programSiswa = {
           some: {
-            program: {
-              namaProgram: {
-                contains: namaProgram,
-                mode: 'insensitive'
-              }
-            }
+            programId: programId,
+            status: 'AKTIF'
           }
         };
       }
 
-      return await PrismaUtils.paginate(prisma.siswa, {
+      const result = await PrismaUtils.paginate(prisma.siswa, {
         page,
         limit,
         where,
@@ -590,7 +590,7 @@ class SiswaService {
             where: {
               status: 'AKTIF'
             },
-            take: 1, // Hanya ambil satu program aktif
+            take: 1,
             select: {
               status: true,
               program: {
@@ -623,6 +623,17 @@ class SiswaService {
         },
         orderBy: { createdAt: 'desc' }
       });
+
+      // Transform programSiswa dari array menjadi objek tunggal
+      const transformedData = result.data.map(siswa => ({
+        ...siswa,
+        programSiswa: siswa.programSiswa.length > 0 ? siswa.programSiswa[0] : null
+      }));
+
+      return {
+        ...result,
+        data: transformedData
+      };
     } catch (error) {
       logger.error('Error getting all siswa:', error);
       throw error;
@@ -875,12 +886,16 @@ class SiswaService {
         }
 
         // Proses program dan jadwal jika programId disediakan
+        let programSiswaInstance;
         if (programId) {
-          // Find the current active program for this student
-          const currentProgramSiswa = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
+          // Find ALL active programs for this student (to handle multiple active programs)
+          const activeProgramSiswas = siswa.programSiswa.filter(ps => ps.status === 'AKTIF');
 
-          if (currentProgramSiswa) {
-            // Update the existing program
+          if (activeProgramSiswas.length > 0) {
+            // Use the first active program and update it
+            const currentProgramSiswa = activeProgramSiswas[0];
+
+            // Update the existing program (tidak membuat baru)
             await tx.programSiswa.update({
               where: { id: currentProgramSiswa.id },
               data: {
@@ -889,10 +904,28 @@ class SiswaService {
               }
             });
 
+            // Deactivate other active programs if any (ensure only one active program)
+            if (activeProgramSiswas.length > 1) {
+              await tx.programSiswa.updateMany({
+                where: {
+                  siswaId: siswa.id,
+                  status: 'AKTIF',
+                  id: { not: currentProgramSiswa.id }
+                },
+                data: {
+                  status: 'TIDAK_AKTIF'
+                }
+              });
+
+              logger.info(`Deactivated ${activeProgramSiswas.length - 1} other active programs for siswa ${siswa.id}`);
+            }
+
             programSiswaInstance = currentProgramSiswa;
             programSiswaInstance.programId = programId; // Update for subsequent use
+
+            logger.info(`Program siswa diupdate: ${currentProgramSiswa.id} -> Program ID: ${programId}`);
           } else {
-            // If no active program exists, create a new one (edge case)
+            // Only create new if no active program exists (edge case)
             programSiswaInstance = await tx.programSiswa.create({
               data: {
                 siswaId: siswa.id,
@@ -901,6 +934,8 @@ class SiswaService {
                 isVerified: true,
               }
             });
+
+            logger.info(`Program siswa baru dibuat: ${programSiswaInstance.id} -> Program ID: ${programId}`);
           }
 
           const programSiswaId = programSiswaInstance.id;
@@ -1094,6 +1129,168 @@ class SiswaService {
       return updatedProgramSiswa;
     } catch (error) {
       logger.error(`Error updating status for siswa ID ${siswaId}:`, error);
+      throw error;
+    }
+  }
+
+  async getJadwalSiswa(rfid) {
+    try {
+      let siswa;
+
+      if (rfid) {
+        // Cari siswa berdasarkan RFID
+        siswa = await prisma.siswa.findFirst({
+          where: {
+            user: {
+              rfid: rfid
+            }
+          },
+          include: {
+            user: {
+              select: {
+                rfid: true
+              }
+            },
+            programSiswa: {
+              where: {
+                status: 'AKTIF'
+              },
+              include: {
+                program: {
+                  select: {
+                    id: true,
+                    namaProgram: true
+                  }
+                },
+                kelasProgram: {
+                  include: {
+                    kelas: {
+                      select: {
+                        id: true,
+                        namaKelas: true
+                      }
+                    },
+                    program: {
+                      select: {
+                        id: true,
+                        namaProgram: true
+                      }
+                    },
+                    jamMengajar: {
+                      select: {
+                        id: true,
+                        jamMulai: true,
+                        jamSelesai: true
+                      }
+                    }
+                  }
+                },
+                JadwalProgramSiswa: {
+                  include: {
+                    jamMengajar: {
+                      select: {
+                        id: true,
+                        jamMulai: true,
+                        jamSelesai: true
+                      }
+                    }
+                  },
+                  orderBy: {
+                    urutan: 'asc'
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        if (!siswa) {
+          throw new NotFoundError(`Siswa dengan RFID ${rfid} tidak ditemukan`);
+        }
+      } else {
+        throw new BadRequestError('Parameter RFID wajib diisi');
+      }
+
+      // Format response
+      const schedules = [];
+
+      // Process each active program
+      for (const programSiswa of siswa.programSiswa) {
+        // Group jadwal by kelas program
+        const kelasPrograms = new Map();
+
+        // Add from kelasProgram if exists
+        if (programSiswa.kelasProgram) {
+          const kp = programSiswa.kelasProgram;
+          kelasPrograms.set(kp.id, {
+            kelasProgramId: kp.id,
+            namaKelas: kp.kelas?.namaKelas || 'Tidak Ada Kelas',
+            namaProgram: kp.program.namaProgram,
+            jamMengajar: []
+          });
+        }
+
+        // Add from JadwalProgramSiswa
+        for (const jadwal of programSiswa.JadwalProgramSiswa) {
+          // Find or create kelasProgram entry
+          const kelasProgram = await prisma.kelasProgram.findFirst({
+            where: {
+              programId: programSiswa.programId,
+              hari: jadwal.hari,
+              jamMengajarId: jadwal.jamMengajarId
+            },
+            include: {
+              kelas: {
+                select: {
+                  id: true,
+                  namaKelas: true
+                }
+              },
+              program: {
+                select: {
+                  id: true,
+                  namaProgram: true
+                }
+              }
+            }
+          });
+
+          if (kelasProgram) {
+            if (!kelasPrograms.has(kelasProgram.id)) {
+              kelasPrograms.set(kelasProgram.id, {
+                kelasProgramId: kelasProgram.id,
+                namaKelas: kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
+                namaProgram: kelasProgram.program.namaProgram,
+                jamMengajar: []
+              });
+            }
+
+            // Add jam mengajar
+            kelasPrograms.get(kelasProgram.id).jamMengajar.push({
+              jamMengajarId: jadwal.jamMengajar.id,
+              Hari: jadwal.hari,
+              jamMulai: jadwal.jamMengajar.jamMulai,
+              jamSelesai: jadwal.jamMengajar.jamSelesai
+            });
+          }
+        }
+
+        // Add to schedules
+        schedules.push(...Array.from(kelasPrograms.values()));
+      }
+
+      const result = {
+        namaPanggilan: siswa.namaPanggilan || siswa.namaMurid,
+        nis: siswa.nis,
+        strataPendidikan: siswa.strataPendidikan,
+        kelasSekolah: siswa.kelasSekolah,
+        schedules: schedules
+      };
+
+      logger.info(`Retrieved jadwal for siswa with RFID: ${rfid}`);
+      return result;
+    } catch (error) {
+      logger.error(`Error getting jadwal siswa with RFID ${rfid}:`, error);
       throw error;
     }
   }

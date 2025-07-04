@@ -33,12 +33,18 @@ class PaymentService {
           price: Number(totalBiaya)
         }],
         customer: {
-          givenNames: namaMurid,
+          givenNames: namaMurid || 'Calon Siswa',
           email: email,
-          phoneNumber: noWhatsapp,
-          address: alamat
+          phoneNumber: noWhatsapp || '',
+          address: alamat && alamat.trim() !== '' ? alamat.trim() : ''
         }
       };
+
+      // Log customer data untuk debugging pendaftaran
+      logger.info('Creating Xendit pendaftaran invoice with customer data:', {
+        customer: invoiceData.customer,
+        description: invoiceData.description
+      });
 
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
@@ -94,7 +100,13 @@ class PaymentService {
           name: `SPP ${payment.periods}`,
           quantity: 1,
           price: Number(payment.originalAmount)
-        }]
+        }],
+        customer: {
+          givenNames: siswa.nama || 'Siswa',
+          email: siswa.email,
+          phoneNumber: siswa.noWhatsapp || '',
+          address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : ''
+        }
       };
 
       if (payment.discountAmount > 0) {
@@ -104,6 +116,12 @@ class PaymentService {
           price: -Number(payment.discountAmount)
         });
       }
+
+      // Log customer data untuk debugging SPP
+      logger.info('Creating Xendit SPP invoice with customer data:', {
+        customer: invoiceData.customer,
+        description: invoiceData.description
+      });
 
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
@@ -296,18 +314,10 @@ class PaymentService {
               where: { id: pendaftaranTemp.id }
             });
 
-            // Generate SPP untuk 5 bulan ke depan
-            try {
-              const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
-              const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
-              logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
-            } catch (sppError) {
-              logger.error(`Failed to generate SPP for siswa ${siswa.namaMurid}:`, {
-                error: sppError.message,
-                stack: sppError.stack
-              });
-              // Don't throw error here, just log it - registration should still complete
-            }
+            // Generate SPP untuk 5 bulan ke depan - this is critical, failure should fail the transaction
+            const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+            const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar, tx);
+            logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
 
             // Send welcome email with credentials - but don't let email failure block the transaction
             try {
@@ -343,27 +353,50 @@ class PaymentService {
 
         // Auto-sync to Finance when payment is successful
         if (processedData.status === 'PAID') {
+          logger.info('Starting auto-sync to finance for paid payment:', {
+            paymentId: updatedPayment.id,
+            type: updatedPayment.tipePembayaran,
+            amount: updatedPayment.jumlahTagihan
+          });
+
           try {
+            let financeRecord = null;
             if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
-              await financeService.createFromEnrollmentPayment({
+              financeRecord = await financeService.createFromEnrollmentPayment({
                 id: updatedPayment.id,
                 jumlahTagihan: updatedPayment.jumlahTagihan,
                 tanggalPembayaran: updatedPayment.tanggalPembayaran
               });
+              logger.info('Successfully synced enrollment payment to finance:', {
+                paymentId: updatedPayment.id,
+                financeRecordId: financeRecord.id,
+                amount: financeRecord.total
+              });
             } else if (updatedPayment.tipePembayaran === 'SPP') {
-              await financeService.createFromSppPayment({
+              financeRecord = await financeService.createFromSppPayment({
                 id: updatedPayment.id,
                 jumlahTagihan: updatedPayment.jumlahTagihan,
                 tanggalPembayaran: updatedPayment.tanggalPembayaran
+              });
+              logger.info('Successfully synced SPP payment to finance:', {
+                paymentId: updatedPayment.id,
+                financeRecordId: financeRecord.id,
+                amount: financeRecord.total
               });
             }
           } catch (financeError) {
             // Log error but don't fail the main payment processing
             logger.error('Failed to auto-sync payment to finance:', {
               paymentId: updatedPayment.id,
-              error: financeError.message
+              error: financeError.message,
+              stack: financeError.stack
             });
           }
+        } else {
+          logger.info('Skipping finance sync - payment not paid yet:', {
+            paymentId: updatedPayment.id,
+            status: processedData.status
+          });
         }
 
         logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);

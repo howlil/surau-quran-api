@@ -17,6 +17,7 @@ router.get(
   '/v1/payroll',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(payrollValidation.getAllPayrollsForAdmin()),
   payrollController.getAllPayrollsForAdmin
 );
 
@@ -24,6 +25,7 @@ router.get(
   '/v1/guru/payroll',
   authMiddleware.authenticate,
   authMiddleware.authorize(['GURU']),
+  validationMiddleware.validateQuery(payrollValidation.getAllPayrollsForGuru()),
   payrollController.getAllPayrollsForGuru
 );
 

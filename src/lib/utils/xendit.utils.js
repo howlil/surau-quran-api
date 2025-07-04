@@ -17,6 +17,7 @@ class XenditUtils {
         successRedirectUrl,
         failureRedirectUrl,
         items = [],
+        customer,
         paymentMethods = [
           "CREDIT_CARD", "BCA", "BNI", "BRI",
           "MANDIRI", "BSI", "PERMATA",
@@ -72,6 +73,24 @@ class XenditUtils {
       if (paymentMethods && paymentMethods.length > 0) {
         invoiceParams.paymentMethods = paymentMethods;
       }
+
+      // Add customer data if provided
+      if (customer) {
+        invoiceParams.customer = {
+          givenNames: customer.givenNames || '',
+          email: customer.email || payerEmail,
+          mobileNumber: customer.phoneNumber || customer.mobileNumber || '',
+          address: customer.address || ''
+        };
+      }
+
+      // Log invoice params untuk debugging
+      logger.info('Sending invoice params to Xendit:', {
+        externalId: invoiceParams.externalId,
+        amount: invoiceParams.amount,
+        customer: invoiceParams.customer || 'No customer data',
+        description: invoiceParams.description
+      });
 
       let invoice;
 
