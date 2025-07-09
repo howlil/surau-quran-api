@@ -69,4 +69,9 @@ router.get('/v1/cctv',
     kelasController.getCCTV
 );
 
+
+
+
+
+
 module.exports = router;

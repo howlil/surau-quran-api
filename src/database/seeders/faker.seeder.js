@@ -4,9 +4,6 @@ const moment = require('moment');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 
-// Import Finance Factory
-const FinanceFactory = require('../factories/finance.factory');
-
 const prismaClient = new PrismaClient();
 
 const TOTAL_RECORDS = 60; // Increased for more comprehensive data
@@ -36,6 +33,12 @@ const KELAS_NAMES = [
     'Kelas Al-Aqsa',
     'Kelas Al-Hidayah'
 ];
+
+// Additional constants for comprehensive data coverage
+const XENDIT_STATUSES = ['PENDING', 'PAID', 'SETTLED', 'EXPIRED', 'FAILED'];
+const PAYMENT_STATUSES = ['UNPAID', 'PENDING', 'PAID', 'LUNAS', 'SETTLED', 'EXPIRED', 'INACTIVE', 'ACTIVE', 'STOPPED'];
+const PAYROLL_STATUSES = ['DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL'];
+const DISBURSEMENT_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'];
 
 // New constants for class types and rates
 const CLASS_TYPES = {
@@ -72,16 +75,21 @@ class FakerSeeder {
             pembayaran: [],
             xenditPayment: [],
             pendaftaran: [],
+            pendaftaranTemp: [],
             absensiSiswa: [],
             absensiGuru: [],
             payroll: [],
+            payrollDisbursement: [],
+            xenditDisbursement: [],
+            payrollBatchDisbursement: [],
             riwayatStatusSiswa: [],
+            kelasPengganti: [],
+            tokens: [],
+            passwordResetTokens: [],
             users: [],
             admins: [],
             gurus: [],
             siswas: [],
-            programs: [],
-            kelas: [],
             finance: [],
             testimoni: [],
             galeri: []
@@ -488,7 +496,6 @@ class FakerSeeder {
                         programId: kelasProgram.programId,
                         kelasProgramId: kelasProgram.id,
                         status: 'AKTIF',
-                        isVerified: true, // Students with kelas are verified
                         createdAt: faker.date.past(),
                         updatedAt: faker.date.past()
                     }
@@ -578,7 +585,6 @@ class FakerSeeder {
                             programId: oldProgram.id,
                             kelasProgramId: null, // Old program might not have kelas assigned
                             status: 'TIDAK_AKTIF', // Inactive program
-                            isVerified: true,
                             createdAt: faker.date.past({ years: 2 }),
                             updatedAt: faker.date.past({ years: 1 })
                         }
@@ -648,7 +654,6 @@ class FakerSeeder {
                         programId: program.id,
                         kelasProgramId: null, // No kelas assigned yet
                         status: 'AKTIF', // Active status
-                        isVerified: false, // Not verified yet
                         createdAt: faker.date.recent(),
                         updatedAt: faker.date.recent()
                     }
@@ -679,7 +684,6 @@ class FakerSeeder {
                             programId: oldProgram.id,
                             kelasProgramId: null,
                             status: faker.helpers.arrayElement(['TIDAK_AKTIF', 'CUTI']), // Inactive or on leave
-                            isVerified: false,
                             createdAt: faker.date.past({ years: 2 }),
                             updatedAt: faker.date.past({ years: 1 })
                         }
@@ -692,8 +696,8 @@ class FakerSeeder {
             const activeCount = this.data.programSiswa.filter(ps => ps.status === 'AKTIF').length;
             const inactiveCount = this.data.programSiswa.filter(ps => ps.status === 'TIDAK_AKTIF').length;
             const cutiCount = this.data.programSiswa.filter(ps => ps.status === 'CUTI').length;
-            const verifiedCount = this.data.programSiswa.filter(ps => ps.isVerified && ps.status === 'AKTIF').length;
-            const unverifiedCount = this.data.programSiswa.filter(ps => !ps.isVerified && ps.status === 'AKTIF').length;
+            const verifiedCount = this.data.programSiswa.filter(ps => ps.status === 'AKTIF').length;
+            const unverifiedCount = this.data.programSiswa.filter(ps => ps.status === 'AKTIF').length;
 
             console.log(`Total ProgramSiswa created: ${this.data.programSiswa.length}`);
             console.log(`Active programs: ${activeCount} (Verified: ${verifiedCount}, Unverified: ${unverifiedCount})`);
@@ -848,17 +852,14 @@ class FakerSeeder {
                     });
 
                     if (periodeSpp) {
-                        const financeData = FinanceFactory.createSppIncome(
-                            periodeSpp.programSiswa.siswa.namaMurid,
-                            pembayaran.jumlahTagihan
-                        );
-
-                        // Use the same date as the payment
-                        financeData.tanggal = pembayaran.tanggalPembayaran;
-
                         const finance = await prismaClient.finance.create({
                             data: {
-                                ...financeData,
+                                tanggal: pembayaran.tanggalPembayaran,
+                                deskripsi: `Pembayaran SPP - ${periodeSpp.programSiswa.siswa.namaMurid}`,
+                                type: 'INCOME',
+                                category: 'SPP',
+                                total: pembayaran.jumlahTagihan,
+                                evidence: `evidence-${faker.string.alphanumeric(8)}.pdf`,
                                 createdAt: new Date(),
                                 updatedAt: new Date()
                             }
@@ -877,17 +878,14 @@ class FakerSeeder {
                     });
 
                     if (pendaftaran) {
-                        const financeData = FinanceFactory.createEnrollmentIncome(
-                            pendaftaran.siswa.namaMurid,
-                            pembayaran.jumlahTagihan
-                        );
-
-                        // Use the same date as the payment
-                        financeData.tanggal = pembayaran.tanggalPembayaran;
-
                         const finance = await prismaClient.finance.create({
                             data: {
-                                ...financeData,
+                                tanggal: pembayaran.tanggalPembayaran,
+                                deskripsi: `Pendaftaran Siswa - ${pendaftaran.siswa.namaMurid}`,
+                                type: 'INCOME',
+                                category: 'ENROLLMENT',
+                                total: pembayaran.jumlahTagihan,
+                                evidence: `evidence-${faker.string.alphanumeric(8)}.pdf`,
                                 createdAt: new Date(),
                                 updatedAt: new Date()
                             }
@@ -903,14 +901,14 @@ class FakerSeeder {
                     // Find the guru name
                     const guru = this.users.gurus.find(g => g.guru.id === payroll.guruId);
                     if (guru) {
-                        const financeData = FinanceFactory.createPayrollExpense(
-                            guru.guru.nama,
-                            payroll.totalGaji
-                        );
-
                         const finance = await prismaClient.finance.create({
                             data: {
-                                ...financeData,
+                                tanggal: this.generateDate(2024, 2025),
+                                deskripsi: `Gaji Guru - ${guru.guru.nama}`,
+                                type: 'EXPENSE',
+                                category: 'PAYROLL_SALARY',
+                                total: payroll.totalGaji,
+                                evidence: `payroll-${faker.string.alphanumeric(8)}.pdf`,
                                 createdAt: new Date(),
                                 updatedAt: new Date()
                             }
@@ -922,10 +920,36 @@ class FakerSeeder {
 
             // Create additional random finance records
             for (let i = 0; i < 200; i++) {
-                const financeData = FinanceFactory.create();
+                const isIncome = Math.random() > 0.4;
                 const finance = await prismaClient.finance.create({
                     data: {
-                        ...financeData,
+                        tanggal: this.generateDate(2024, 2025),
+                        deskripsi: isIncome
+                            ? faker.helpers.arrayElement([
+                                'Donasi Masjid',
+                                'Sumbangan Orang Tua',
+                                'Penjualan Buku',
+                                'Kegiatan Ekstrakurikuler',
+                                'Workshop Tahfidz'
+                            ])
+                            : faker.helpers.arrayElement([
+                                'Biaya Operasional',
+                                'Pembelian Alat Tulis',
+                                'Biaya Listrik',
+                                'Biaya Internet',
+                                'Pemeliharaan Gedung',
+                                'Biaya Marketing',
+                                'Pembelian Buku',
+                                'Biaya Transportasi'
+                            ]),
+                        type: isIncome ? 'INCOME' : 'EXPENSE',
+                        category: isIncome
+                            ? faker.helpers.arrayElement(['DONATION', 'OTHER_INCOME'])
+                            : faker.helpers.arrayElement(['OPERATIONAL', 'UTILITIES', 'MAINTENANCE', 'MARKETING', 'SUPPLIES', 'OTHER_EXPENSE']),
+                        total: isIncome
+                            ? faker.number.int({ min: 50000, max: 500000 })
+                            : faker.number.int({ min: 100000, max: 1000000 }),
+                        evidence: Math.random() > 0.3 ? `evidence-${faker.string.alphanumeric(8)}.pdf` : null,
                         createdAt: new Date(),
                         updatedAt: new Date()
                     }
@@ -936,6 +960,242 @@ class FakerSeeder {
             console.log(`Finance data created: ${this.data.finance.length} records`);
         } catch (error) {
             console.error('Error creating finance data:', error);
+            throw error;
+        }
+    }
+
+    async createPendaftaranTempData() {
+        console.log('Creating pendaftaran temp data...');
+        try {
+            // Create some pendaftaran temp records (for students who haven't completed payment)
+            for (let i = 0; i < 15; i++) {
+                const program = faker.helpers.arrayElement(this.data.programs);
+                const voucher = Math.random() > 0.7 ? faker.helpers.arrayElement(this.data.vouchers) : null;
+                const biayaPendaftaran = faker.number.int({ min: 100000, max: 250000 });
+
+                let diskon = 0;
+                if (voucher) {
+                    if (voucher.tipe === 'PERSENTASE') {
+                        diskon = Math.min(biayaPendaftaran * (Number(voucher.nominal) / 100), biayaPendaftaran * 0.5);
+                    } else {
+                        diskon = Math.min(Number(voucher.nominal), biayaPendaftaran * 0.5);
+                    }
+                }
+                const totalBiaya = Math.max(biayaPendaftaran - diskon, 0);
+
+                // Create pembayaran for pendaftaran temp
+                const pembayaran = await prismaClient.pembayaran.create({
+                    data: {
+                        tipePembayaran: 'PENDAFTARAN',
+                        metodePembayaran: faker.helpers.arrayElement(['VIRTUAL_ACCOUNT', 'TUNAI', 'BANK_TRANSFER', 'EWALLET']),
+                        jumlahTagihan: totalBiaya,
+                        statusPembayaran: faker.helpers.weightedArrayElement([
+                            { weight: 0.3, value: 'PENDING' },
+                            { weight: 0.2, value: 'UNPAID' },
+                            { weight: 0.3, value: 'EXPIRED' },
+                            { weight: 0.2, value: 'INACTIVE' }
+                        ]),
+                        tanggalPembayaran: this.generateDate(2024, 2025),
+                        createdAt: faker.date.recent(),
+                        updatedAt: faker.date.recent()
+                    }
+                });
+                this.data.pembayaran.push(pembayaran);
+
+                const pendaftaranTemp = await prismaClient.pendaftaranTemp.create({
+                    data: {
+                        namaMurid: faker.person.fullName(),
+                        namaPanggilan: Math.random() > 0.2 ? faker.person.firstName() : null,
+                        tanggalLahir: this.generateDate(2000, 2015),
+                        jenisKelamin: Math.random() > 0.5 ? 'LAKI_LAKI' : 'PEREMPUAN',
+                        alamat: Math.random() > 0.1 ? faker.location.streetAddress() : null,
+                        strataPendidikan: faker.helpers.arrayElement(['SD', 'SMP', 'SMA', 'KULIAH']),
+                        kelasSekolah: Math.random() > 0.1 ? `${faker.number.int({ min: 1, max: 12 })}` : null,
+                        email: `temp.siswa.${i + 1}@surauquran.com`,
+                        namaSekolah: Math.random() > 0.1 ? `${faker.company.name()} School` : null,
+                        namaOrangTua: faker.person.fullName(),
+                        namaPenjemput: Math.random() > 0.3 ? faker.person.fullName() : null,
+                        noWhatsapp: Math.random() > 0.1 ? faker.phone.number('08##########') : null,
+                        programId: program.id,
+                        kodeVoucher: voucher?.kodeVoucher || null,
+                        biayaPendaftaran,
+                        diskon,
+                        totalBiaya,
+                        pembayaranId: pembayaran.id,
+                        voucherId: voucher?.id || null,
+                        createdAt: faker.date.recent(),
+                        updatedAt: faker.date.recent()
+                    }
+                });
+                this.data.pendaftaranTemp.push(pendaftaranTemp);
+            }
+
+            console.log(`PendaftaranTemp created: ${this.data.pendaftaranTemp.length} records`);
+        } catch (error) {
+            console.error('Error creating pendaftaran temp data:', error);
+            throw error;
+        }
+    }
+
+    async createXenditPaymentData() {
+        console.log('Creating Xendit payment data...');
+        try {
+            // Create XenditPayment records for some pembayaran
+            for (const pembayaran of this.data.pembayaran.slice(0, 20)) {
+                const xenditPayment = await prismaClient.xenditPayment.create({
+                    data: {
+                        pembayaranId: pembayaran.id,
+                        xenditInvoiceId: `inv_${faker.string.alphanumeric(16)}`,
+                        xenditExternalId: `ext_${faker.string.alphanumeric(12)}`,
+                        xenditPaymentUrl: `https://checkout.xendit.co/inv/${faker.string.alphanumeric(16)}`,
+                        xenditPaymentChannel: faker.helpers.arrayElement(['VIRTUAL_ACCOUNT', 'EWALLET', 'BANK_TRANSFER']),
+                        xenditExpireDate: moment().add(1, 'day').format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
+                        xenditPaidAt: pembayaran.statusPembayaran === 'PAID' ? moment().format('YYYY-MM-DDTHH:mm:ss.SSSZ') : null,
+                        xenditStatus: pembayaran.statusPembayaran === 'PAID' ? 'PAID' : faker.helpers.arrayElement(XENDIT_STATUSES),
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.xenditPayment.push(xenditPayment);
+            }
+
+            console.log(`XenditPayment created: ${this.data.xenditPayment.length} records`);
+        } catch (error) {
+            console.error('Error creating Xendit payment data:', error);
+            throw error;
+        }
+    }
+
+    async createPayrollDisbursementData() {
+        console.log('Creating payroll disbursement data...');
+        try {
+            // Create PayrollDisbursement for some payroll records
+            for (const payroll of this.data.payroll.slice(0, 15)) {
+                if (payroll.status === 'SELESAI') {
+                    const payrollDisbursement = await prismaClient.payrollDisbursement.create({
+                        data: {
+                            payrollId: payroll.id,
+                            amount: payroll.totalGaji,
+                            tanggalProses: this.generateDate(2024, 2025),
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        }
+                    });
+                    this.data.payrollDisbursement.push(payrollDisbursement);
+
+                    // Create XenditDisbursement for some payroll disbursements
+                    if (Math.random() > 0.5) {
+                        const xenditDisbursement = await prismaClient.xenditDisbursement.create({
+                            data: {
+                                payrollDisbursementId: payrollDisbursement.id,
+                                xenditDisbursementId: `disb_${faker.string.alphanumeric(16)}`,
+                                xenditExternalId: `ext_disb_${faker.string.alphanumeric(12)}`,
+                                xenditAmount: payrollDisbursement.amount,
+                                xenditStatus: faker.helpers.arrayElement(DISBURSEMENT_STATUSES),
+                                xenditCreatedAt: moment().format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
+                                xenditUpdatedAt: Math.random() > 0.5 ? moment().format('YYYY-MM-DDTHH:mm:ss.SSSZ') : null,
+                                rawResponse: JSON.stringify({
+                                    id: `disb_${faker.string.alphanumeric(16)}`,
+                                    amount: payrollDisbursement.amount,
+                                    status: faker.helpers.arrayElement(DISBURSEMENT_STATUSES)
+                                }),
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            }
+                        });
+                        this.data.xenditDisbursement.push(xenditDisbursement);
+                    }
+                }
+            }
+
+            // Create PayrollBatchDisbursement
+            const batchDisbursement = await prismaClient.payrollBatchDisbursement.create({
+                data: {
+                    xenditBatchId: `batch_${faker.string.alphanumeric(16)}`,
+                    reference: `BATCH_${moment().format('YYYYMMDD')}`,
+                    status: faker.helpers.arrayElement(['PENDING', 'COMPLETED', 'FAILED']),
+                    totalAmount: faker.number.int({ min: 5000000, max: 50000000 }),
+                    totalCount: faker.number.int({ min: 5, max: 20 }),
+                    payrollIds: JSON.stringify(this.data.payroll.slice(0, 10).map(p => p.id)),
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                }
+            });
+            this.data.payrollBatchDisbursement.push(batchDisbursement);
+
+            console.log(`PayrollDisbursement created: ${this.data.payrollDisbursement.length} records`);
+            console.log(`XenditDisbursement created: ${this.data.xenditDisbursement.length} records`);
+            console.log(`PayrollBatchDisbursement created: ${this.data.payrollBatchDisbursement.length} records`);
+        } catch (error) {
+            console.error('Error creating payroll disbursement data:', error);
+            throw error;
+        }
+    }
+
+    async createKelasPenggantiData() {
+        console.log('Creating kelas pengganti data...');
+        try {
+            // Create KelasPengganti for some students
+            for (let i = 0; i < 10; i++) {
+                const kelasProgram = faker.helpers.arrayElement(this.data.kelasProgram);
+                const siswa = faker.helpers.arrayElement(this.users.siswas);
+
+                const kelasPengganti = await prismaClient.kelasPengganti.create({
+                    data: {
+                        kelasProgramId: kelasProgram.id,
+                        siswaId: siswa.siswa.id,
+                        isTemp: Math.random() > 0.3, // 70% chance to be temporary
+                        tanggal: this.generateDate(2025, 2025),
+                        count: faker.number.int({ min: 1, max: 3 }),
+                        deletedAt: Math.random() > 0.7 ? faker.date.recent() : null,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.kelasPengganti.push(kelasPengganti);
+            }
+
+            console.log(`KelasPengganti created: ${this.data.kelasPengganti.length} records`);
+        } catch (error) {
+            console.error('Error creating kelas pengganti data:', error);
+            throw error;
+        }
+    }
+
+    async createTokenData() {
+        console.log('Creating token data...');
+        try {
+            // Create some tokens for users
+            for (const user of this.users.admins.concat(this.users.gurus).concat(this.users.siswas).slice(0, 10)) {
+                const token = await prismaClient.token.create({
+                    data: {
+                        userId: user.id,
+                        token: faker.string.alphanumeric(64),
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+                this.data.tokens.push(token);
+            }
+
+            // Create some password reset tokens
+            for (let i = 0; i < 5; i++) {
+                const user = faker.helpers.arrayElement(this.users.admins.concat(this.users.gurus).concat(this.users.siswas));
+                const passwordResetToken = await prismaClient.passwordResetToken.create({
+                    data: {
+                        token: faker.string.alphanumeric(64),
+                        userId: user.id,
+                        expiresAt: moment().add(1, 'hour').toDate(),
+                        createdAt: new Date()
+                    }
+                });
+                this.data.passwordResetTokens.push(passwordResetToken);
+            }
+
+            console.log(`Tokens created: ${this.data.tokens.length} records`);
+            console.log(`PasswordResetTokens created: ${this.data.passwordResetTokens.length} records`);
+        } catch (error) {
+            console.error('Error creating token data:', error);
             throw error;
         }
     }
@@ -1003,6 +1263,11 @@ class FakerSeeder {
             await this.createUsers();
             await this.createMasterData();
             await this.createTransactionalData();
+            await this.createPendaftaranTempData();
+            await this.createXenditPaymentData();
+            await this.createPayrollDisbursementData();
+            await this.createKelasPenggantiData();
+            await this.createTokenData();
             await this.createFinanceData();
             await this.createTestimoniAndGaleri();
             console.log('Database seeding completed successfully!');

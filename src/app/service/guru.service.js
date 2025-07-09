@@ -315,13 +315,6 @@ class GuruService {
         where: { guruId: guruId },
         select: {
           id: true,
-          tipeKelas: true,
-          guru: {
-            select: {
-              id: true,
-              nama: true
-            }
-          },
           kelas: {
             select: {
               id: true,
@@ -341,45 +334,20 @@ class GuruService {
               jamMulai: true,
               jamSelesai: true
             }
-          },
-          programSiswa: {
-            select: {
-              siswa: {
-                select: {
-                  namaMurid: true,
-                  nis: true
-                }
-              }
-            }
           }
         }
       });
 
       return kelasPrograms.map(kp => ({
         kelasProgramId: kp.id,
-        tipeKelas: kp.tipeKelas,
-        kelas: {
-          id: kp.kelas.id,
-          namaKelas: kp.kelas.namaKelas
-        },
-        guru: {
-          id: kp.guru.id,
-          nama: kp.guru.nama
-        },
-        program: {
-          id: kp.program.id,
-          namaProgram: kp.program.namaProgram
-        },
+        kelasId: kp.kelasId,
+        programId: kp.programId,
+        jamMengajarId: kp.jamMengajar.id,
+        namaKelas: kp.kelas.namaKelas,
+        namaProgram: kp.program.namaProgram,
         hari: kp.hari,
-        jamMengajar: {
-          id: kp.jamMengajar.id,
-          jamMulai: kp.jamMengajar.jamMulai,
-          jamSelesai: kp.jamMengajar.jamSelesai
-        },
-        siswa: kp.programSiswa.map(ps => ({
-          namaSiswa: ps.siswa.namaMurid,
-          NIS: ps.siswa.nis
-        }))
+        jamMulai: kp.jamMengajar.jamMulai,
+        jamSelesai: kp.jamMengajar.jamSelesai
       }));
     } catch (error) {
       logger.error('Error getting kelas programs with students:', error);

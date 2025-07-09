@@ -274,6 +274,33 @@ class SiswaValidation {
         })
     });
   }
+
+  static pindahProgram() {
+    return ValidatorFactory.create({
+      programBaruId: Joi.string().guid({ version: 'uuidv4' }).required()
+        .messages({
+          'string.guid': 'Program Baru ID harus berupa UUID yang valid',
+          'any.required': 'Program Baru ID wajib diisi'
+        }),
+      jadwal: Joi.array().items(
+        Joi.object({
+          hari: Joi.string().valid('SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU').required()
+            .messages({
+              'any.only': 'Hari harus salah satu dari: SENIN, SELASA, RABU, KAMIS, JUMAT, SABTU',
+              'any.required': 'Hari wajib diisi'
+            }),
+          jamMengajarId: Joi.string().guid({ version: 'uuidv4' }).required()
+            .messages({
+              'string.guid': 'Jam Mengajar ID harus berupa UUID yang valid',
+              'any.required': 'Jam Mengajar ID wajib diisi'
+            })
+        })
+      ).max(2).optional()
+        .messages({
+          'array.max': 'Jadwal maksimal 2 pilihan'
+        })
+    });
+  }
 }
 
 module.exports = SiswaValidation;

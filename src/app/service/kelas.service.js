@@ -135,7 +135,6 @@ class KelasService {
             const result = kelasList.map(kelas => ({
                 kelasId: kelas.id,
                 namaKelas: kelas.namaKelas,
-                ipAddressHikvision: kelas.ipAddressHikvision,
                 program: kelas.kelasProgram.map(kp => ({
                     kelasProgramId: kp.id,
                     programId: kp.programId,
@@ -156,7 +155,7 @@ class KelasService {
                         }
                         : null,
                     siswa: kp.programSiswa
-                        .filter(ps => ps.status === 'AKTIF' && ps.isVerified === true)
+                        .filter(ps => ps.status === 'AKTIF')
                         .map(ps => ({
                             siswaId: ps.siswa.id,
                             namaSiswa: ps.siswa.namaMurid,
@@ -180,7 +179,8 @@ class KelasService {
                 hari,
                 jamMengajarId,
                 guruId,
-                tambahSiswaIds = []
+                tambahSiswaIds = [],
+                hapusSiswaIds = []
             } = data;
 
             return await PrismaUtils.transaction(async (tx) => {
@@ -213,15 +213,56 @@ class KelasService {
                     });
                 }
 
-                // Handle student updates
                 let siswaDitambah = [];
+                let siswaDihapus = [];
+
+                // Handle student removal first
+                if (hapusSiswaIds.length > 0) {
+                    // Remove students from kelas program
+                    await tx.programSiswa.updateMany({
+                        where: {
+                            siswaId: { in: hapusSiswaIds },
+                            kelasProgramId,
+                            status: 'AKTIF'
+                        },
+                        data: {
+                            kelasProgramId: null
+                        }
+                    });
+
+                    // Get removed students info
+                    const removedStudents = await tx.siswa.findMany({
+                        where: { id: { in: hapusSiswaIds } },
+                        select: {
+                            id: true,
+                            namaMurid: true,
+                            nis: true
+                        }
+                    });
+
+                    siswaDihapus = removedStudents.map(siswa => ({
+                        siswaId: siswa.id,
+                        namaSiswa: siswa.namaMurid,
+                        NIS: siswa.nis
+                    }));
+                }
+
+                // Handle student additions
                 if (tambahSiswaIds.length > 0) {
-                    // Find eligible students that are already verified in the program
+                    logger.info('Attempting to add students:', {
+                        kelasProgramId,
+                        programId: updatedKelasProgram.programId,
+                        tambahSiswaIds,
+                        count: tambahSiswaIds.length
+                    });
+
+                    // Find eligible students that are already verified in the program AND not assigned to any kelas program
                     const programSiswaList = await tx.programSiswa.findMany({
                         where: {
                             siswaId: { in: tambahSiswaIds },
                             status: 'AKTIF',
-                            programId: updatedKelasProgram.programId
+                            programId: updatedKelasProgram.programId,
+                            kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program manapun
                         },
                         include: {
                             siswa: true
@@ -232,26 +273,108 @@ class KelasService {
                         count: programSiswaList.length,
                         students: programSiswaList.map(ps => ({
                             siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid
+                            namaSiswa: ps.siswa.namaMurid,
+                            programSiswaId: ps.id
                         }))
                     });
 
-                    // Update each programSiswa record
-                    for (const ps of programSiswaList) {
-                        const updatedPs = await tx.programSiswa.update({
-                            where: { id: ps.id },
-                            data: {
-                                kelasProgramId: kelasProgramId,
-                                isVerified: true
+                    // Check if any students are already assigned to other kelas programs
+                    const alreadyAssignedStudents = await tx.programSiswa.findMany({
+                        where: {
+                            siswaId: { in: tambahSiswaIds },
+                            status: 'AKTIF',
+                            programId: updatedKelasProgram.programId,
+                            kelasProgramId: { not: null }
+                        },
+                        include: {
+                            siswa: true,
+                            kelasProgram: {
+                                include: {
+                                    kelas: true,
+                                    program: true
+                                }
                             }
-                        });
+                        }
+                    });
 
-                        siswaDitambah.push({
+                    if (alreadyAssignedStudents.length > 0) {
+                        const conflictDetails = alreadyAssignedStudents.map(ps => ({
                             siswaId: ps.siswa.id,
                             namaSiswa: ps.siswa.namaMurid,
-                            NIS: ps.siswa.nis
+                            kelasProgramId: ps.kelasProgramId,
+                            namaKelas: ps.kelasProgram?.kelas?.namaKelas,
+                            namaProgram: ps.kelasProgram?.program?.namaProgram
+                        }));
+
+                        logger.warn('Students already assigned to other classes:', conflictDetails);
+
+                        throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program lain: ${conflictDetails.map(s => s.namaSiswa).join(', ')}`);
+                    }
+
+                    // Check if any students are already in this specific kelas program
+                    const alreadyInThisClass = await tx.programSiswa.findMany({
+                        where: {
+                            siswaId: { in: tambahSiswaIds },
+                            status: 'AKTIF',
+                            programId: updatedKelasProgram.programId,
+                            kelasProgramId: kelasProgramId
+                        },
+                        include: {
+                            siswa: true
+                        }
+                    });
+
+                    if (alreadyInThisClass.length > 0) {
+                        const alreadyInClassDetails = alreadyInThisClass.map(ps => ({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid
+                        }));
+
+                        logger.warn('Students already in this class:', alreadyInClassDetails);
+
+                        throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program ini: ${alreadyInClassDetails.map(s => s.namaSiswa).join(', ')}`);
+                    }
+
+                    // Check if any students don't exist in the program
+                    const foundSiswaIds = programSiswaList.map(ps => ps.siswaId);
+                    const notFoundSiswaIds = tambahSiswaIds.filter(id => !foundSiswaIds.includes(id));
+
+                    if (notFoundSiswaIds.length > 0) {
+                        const notFoundStudents = await tx.siswa.findMany({
+                            where: { id: { in: notFoundSiswaIds } },
+                            select: { id: true, namaMurid: true, nis: true }
+                        });
+
+                        logger.warn('Students not found in program:', {
+                            notFoundStudents: notFoundStudents.map(s => ({
+                                siswaId: s.id,
+                                namaSiswa: s.namaMurid,
+                                nis: s.nis
+                            }))
+                        });
+
+                        throw new NotFoundError(`Beberapa siswa tidak ditemukan dalam program ini: ${notFoundStudents.map(s => s.namaMurid).join(', ')}`);
+                    }
+
+                    // Batch update programSiswa
+                    const ids = programSiswaList.map(ps => ps.id);
+                    if (ids.length > 0) {
+                        await tx.programSiswa.updateMany({
+                            where: { id: { in: ids } },
+                            data: { kelasProgramId: kelasProgramId }
+                        });
+
+                        logger.info('Successfully updated programSiswa records:', {
+                            updatedCount: ids.length,
+                            programSiswaIds: ids
                         });
                     }
+
+                    siswaDitambah = programSiswaList.map(ps => ({
+                        siswaId: ps.siswa.id,
+                        namaSiswa: ps.siswa.namaMurid,
+                        NIS: ps.siswa.nis
+                    }));
                 }
 
                 // Get updated kelas program with all relations
@@ -274,6 +397,7 @@ class KelasService {
                     kelasProgramId,
                     updateData,
                     siswaDitambah,
+                    siswaDihapus,
                     kelasProgram: {
                         id: finalKelasProgram.id,
                         namaProgram: finalKelasProgram.program?.namaProgram,
@@ -339,7 +463,8 @@ class KelasService {
                         where: {
                             siswaId: { in: siswaIds },
                             programId,
-                            status: 'AKTIF'
+                            status: 'AKTIF',
+                            kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program lain
                         },
                         include: {
                             siswa: true
@@ -354,22 +479,19 @@ class KelasService {
                         }))
                     });
 
-                    // Update each programSiswa record
-                    for (const ps of eligibleProgramSiswa) {
-                        const updatedPs = await tx.programSiswa.update({
-                            where: { id: ps.id },
-                            data: {
-                                kelasProgramId: kelasProgram.id,
-                                isVerified: true
-                            }
-                        });
-
-                        processedSiswa.push({
-                            siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            NIS: ps.siswa.nis
+                    // Batch update programSiswa
+                    const ids = eligibleProgramSiswa.map(ps => ps.id);
+                    if (ids.length > 0) {
+                        await tx.programSiswa.updateMany({
+                            where: { id: { in: ids } },
+                            data: { kelasProgramId: kelasProgram.id }
                         });
                     }
+                    processedSiswa.push(...eligibleProgramSiswa.map(ps => ({
+                        siswaId: ps.siswa.id,
+                        namaSiswa: ps.siswa.namaMurid,
+                        NIS: ps.siswa.nis
+                    })));
                 }
 
                 logger.info(`Created kelas program with ID: ${kelasProgram.id}`);
@@ -387,65 +509,6 @@ class KelasService {
             });
         } catch (error) {
             logger.error('Error creating kelas program:', error);
-            throw error;
-        }
-    }
-
-    async getAllProgramSiswaBasedOnProgramId(programId) {
-        try {
-            const programSiswaList = await prisma.programSiswa.findMany({
-                where: {
-                    programId,
-                    status: 'AKTIF',
-                    kelasProgramId: null,
-                },
-                include: {
-                    siswa: {
-                        select: {
-                            id: true,
-                            namaMurid: true,
-                            nis: true
-                        }
-                    },
-                    JadwalProgramSiswa: {
-                        include: {
-                            jamMengajar: {
-                                select: {
-                                    id: true,
-                                    jamMulai: true,
-                                    jamSelesai: true
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            const groupedBySchedule = {};
-
-            programSiswaList.forEach(ps => {
-                ps.JadwalProgramSiswa.forEach(jadwal => {
-                    const key = `${jadwal.hari}_${jadwal.jamMengajarId}`;
-
-                    if (!groupedBySchedule[key]) {
-                        groupedBySchedule[key] = {
-                            hari: jadwal.hari,
-                            jamMengajar: jadwal.jamMengajar,
-                            siswa: []
-                        };
-                    }
-
-                    groupedBySchedule[key].siswa.push({
-                        siswaId: ps.siswa.id,
-                        namaSiswa: ps.siswa.namaMurid,
-                        NIS: ps.siswa.nis
-                    });
-                });
-            });
-
-            return Object.values(groupedBySchedule);
-        } catch (error) {
-            logger.error('Error getting program siswa based on program ID:', error);
             throw error;
         }
     }
@@ -487,7 +550,6 @@ class KelasService {
                     where: { kelasProgramId },
                     data: {
                         kelasProgramId: null,
-                        isVerified: false
                     }
                 });
 

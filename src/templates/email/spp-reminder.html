@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminder Pembayaran SPP - Surau Quran</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 20px;
+        }
+        .logo {
+            max-width: 150px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        .title {
+            color: #2E7D32;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin: 5px 0 0 0;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            color: #2E7D32;
+            margin-bottom: 20px;
+        }
+        .details {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .detail-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .detail-value {
+            color: #333;
+        }
+        .amount {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2E7D32;
+        }
+        .payment-button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 20px 0;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        .payment-button:hover {
+            background-color: #45a049;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .warning-title {
+            color: #856404;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .warning-text {
+            color: #856404;
+            margin: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .contact-info {
+            margin: 15px 0;
+        }
+        .contact-item {
+            margin: 5px 0;
+        }
+        .highlight {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{logoUrl}}" alt="Surau Quran Logo" class="logo">
+            <h1 class="title">Reminder Pembayaran SPP</h1>
+            <p class="subtitle">Surau Quran</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                Assalamu'alaikum Warrahmatullahi Wabarakatuh
+            </div>
+
+            <p>Halo <strong>{{namaSiswa}}</strong>,</p>
+
+            <p>Ini adalah pengingat pembayaran SPP untuk program <strong>{{namaProgram}}</strong>.</p>
+
+            <div class="details">
+                <div class="detail-item">
+                    <span class="detail-label">Program:</span>
+                    <span class="detail-value">{{namaProgram}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Periode:</span>
+                    <span class="detail-value">{{bulan}} {{tahun}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Jatuh Tempo:</span>
+                    <span class="detail-value">{{dueDate}}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Jumlah Tagihan:</span>
+                    <span class="detail-value amount">{{jumlahTagihan}}</span>
+                </div>
+            </div>
+
+            <div class="highlight">
+                <h3 style="margin-top: 0; color: #2E7D32;">Cara Pembayaran:</h3>
+                <ol style="margin: 10px 0; padding-left: 20px;">
+                    <li>Klik tombol "Bayar Sekarang" di bawah ini</li>
+                    <li>Pilih metode pembayaran yang diinginkan</li>
+                    <li>Ikuti instruksi pembayaran</li>
+                    <li>Simpan bukti pembayaran</li>
+                </ol>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{paymentUrl}}" class="payment-button">
+                    💳 Bayar Sekarang
+                </a>
+            </div>
+
+            <div class="warning">
+                <div class="warning-title">⚠️ Penting:</div>
+                <div class="warning-text">• Pembayaran akan expired dalam 24 jam</div>
+                <div class="warning-text">• Pastikan pembayaran dilakukan sebelum jatuh tempo</div>
+                <div class="warning-text">• Hubungi admin jika ada kendala</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Terima kasih atas perhatiannya</strong></p>
+            
+            <div class="contact-info">
+                <div class="contact-item">
+                    <strong>Surau Quran</strong>
+                </div>
+                <div class="contact-item">
+                    📞 Admin: {{adminPhone}}
+                </div>
+                <div class="contact-item">
+                    📧 Email: {{adminEmail}}
+                </div>
+                <div class="contact-item">
+                    🌐 Website: {{websiteUrl}}
+                </div>
+            </div>
+
+            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                Email ini dikirim secara otomatis. Mohon tidak membalas email ini.
+            </p>
+        </div>
+    </div>
+</body>
+</html> 

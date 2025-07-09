@@ -209,7 +209,6 @@ class SiswaService {
     try {
       logger.info(`Starting pendaftaran process for payment ID: ${pembayaranId}`);
 
-      // First check if this payment has already been processed
       const existingPendaftaran = await prisma.pendaftaran.findUnique({
         where: { pembayaranId },
         include: {
@@ -221,13 +220,11 @@ class SiswaService {
         }
       });
 
-      // If a pendaftaran record already exists, this payment has been processed
       if (existingPendaftaran) {
         logger.info(`Payment ID ${pembayaranId} has already been processed. Student: ${existingPendaftaran.siswa.namaMurid} (${existingPendaftaran.siswa.user.email})`);
         return existingPendaftaran.siswa;
       }
 
-      // Get the payment data
       const pembayaran = await prisma.pembayaran.findUnique({
         where: { id: pembayaranId },
         include: {
@@ -316,7 +313,6 @@ class SiswaService {
           siswaId: siswa.id,
           programId: pendaftaranTemp.programId,
           status: 'AKTIF',
-          isVerified: true
         }
       });
 
@@ -931,7 +927,6 @@ class SiswaService {
                 siswaId: siswa.id,
                 programId: programId,
                 status: programStatus || 'AKTIF',
-                isVerified: true,
               }
             });
 
@@ -1138,7 +1133,6 @@ class SiswaService {
       let siswa;
 
       if (rfid) {
-        // Cari siswa berdasarkan RFID
         siswa = await prisma.siswa.findFirst({
           where: {
             user: {
@@ -1291,6 +1285,204 @@ class SiswaService {
       return result;
     } catch (error) {
       logger.error(`Error getting jadwal siswa with RFID ${rfid}:`, error);
+      throw error;
+    }
+  }
+
+  async pindahProgram(siswaId, data) {
+    try {
+      const { programBaruId, jadwal = [] } = data;
+
+      // 1. Validasi siswa
+      const siswa = await prisma.siswa.findUnique({
+        where: { id: siswaId },
+        include: {
+          user: true,
+          programSiswa: {
+            where: { status: 'AKTIF' },
+            include: {
+              program: true,
+              periodeSpp: true
+            }
+          }
+        }
+      });
+
+      if (!siswa) {
+        throw new NotFoundError(`Siswa dengan ID ${siswaId} tidak ditemukan`);
+      }
+
+      // 2. Validasi program aktif
+      if (siswa.programSiswa.length === 0) {
+        throw new BadRequestError('Siswa tidak memiliki program aktif');
+      }
+
+      const programLama = siswa.programSiswa[0];
+
+      // 3. Validasi program baru
+      const programBaru = await prisma.program.findUnique({
+        where: { id: programBaruId }
+      });
+
+      if (!programBaru) {
+        throw new NotFoundError(`Program dengan ID ${programBaruId} tidak ditemukan`);
+      }
+
+      // 4. Validasi tidak pindah ke program yang sama
+      if (programLama.programId === programBaruId) {
+        throw new BadRequestError('Tidak dapat pindah ke program yang sama');
+      }
+
+      // 5. Proses pindah program dalam transaction
+      return await PrismaUtils.transaction(async (tx) => {
+        // a. Update status program lama menjadi TIDAK_AKTIF
+        await tx.programSiswa.update({
+          where: { id: programLama.id },
+          data: { status: 'TIDAK_AKTIF' }
+        });
+
+        // b. Catat riwayat perubahan status
+        await tx.riwayatStatusSiswa.create({
+          data: {
+            programSiswaId: programLama.id,
+            statusLama: 'AKTIF',
+            statusBaru: 'TIDAK_AKTIF',
+            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
+            keterangan: `Pindah ke program ${programBaru.namaProgram}`
+          }
+        });
+
+        // c. Hapus SPP yang belum dibayar dari program lama
+        const sppBelumDibayar = programLama.periodeSpp.filter(spp => !spp.pembayaranId);
+
+        if (sppBelumDibayar.length > 0) {
+          await tx.periodeSpp.deleteMany({
+            where: {
+              id: { in: sppBelumDibayar.map(spp => spp.id) },
+              pembayaranId: null // Double check belum ada pembayaran
+            }
+          });
+
+          logger.info(`Deleted ${sppBelumDibayar.length} unpaid SPP records from old program`);
+        }
+
+        // d. Buat program siswa baru
+        const programSiswaBaru = await tx.programSiswa.create({
+          data: {
+            siswaId: siswaId,
+            programId: programBaruId,
+            status: 'AKTIF'
+          }
+        });
+
+        // e. Catat riwayat status untuk program baru
+        await tx.riwayatStatusSiswa.create({
+          data: {
+            programSiswaId: programSiswaBaru.id,
+            statusLama: 'TIDAK_AKTIF',
+            statusBaru: 'AKTIF',
+            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
+            keterangan: `Pindah dari program ${programLama.program.namaProgram}`
+          }
+        });
+
+        // f. Buat jadwal untuk program baru jika ada
+        if (jadwal && jadwal.length > 0) {
+          if (jadwal.length > 2) {
+            throw new BadRequestError('Maksimal 2 jadwal per program');
+          }
+
+          for (let i = 0; i < jadwal.length; i++) {
+            const jadwalItem = jadwal[i];
+
+            // Validasi jam mengajar exists
+            const jamMengajar = await tx.jamMengajar.findUnique({
+              where: { id: jadwalItem.jamMengajarId }
+            });
+
+            if (!jamMengajar) {
+              throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
+            }
+
+            await tx.jadwalProgramSiswa.create({
+              data: {
+                programSiswaId: programSiswaBaru.id,
+                hari: jadwalItem.hari,
+                jamMengajarId: jadwalItem.jamMengajarId,
+                urutan: i + 1
+              }
+            });
+          }
+        }
+
+        // g. Generate SPP 5 bulan ke depan untuk program baru
+        const tanggalPindah = moment().format(DATE_FORMATS.DEFAULT);
+        const sppBaru = await SppService.generateFiveMonthsAhead(
+          programSiswaBaru.id,
+          tanggalPindah,
+          tx
+        );
+
+        logger.info(`Generated ${sppBaru.length} SPP records for new program`);
+
+        // h. Send email notification
+        try {
+          await EmailUtils.sendEmail({
+            to: siswa.user.email,
+            subject: 'Pemberitahuan Pindah Program',
+            template: 'program-change',
+            context: {
+              namaSiswa: siswa.namaMurid,
+              programLama: programLama.program.namaProgram,
+              programBaru: programBaru.namaProgram,
+              tanggalPindah: tanggalPindah
+            }
+          });
+          logger.info(`Program change notification sent to ${siswa.user.email}`);
+        } catch (emailError) {
+          logger.error('Failed to send program change notification:', emailError);
+          // Don't throw, let the process continue
+        }
+
+        // Return complete data
+        const result = await tx.siswa.findUnique({
+          where: { id: siswaId },
+          include: {
+            programSiswa: {
+              where: { status: 'AKTIF' },
+              include: {
+                program: true,
+                JadwalProgramSiswa: {
+                  include: {
+                    jamMengajar: true
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        return {
+          siswa: {
+            id: result.id,
+            nama: result.namaMurid,
+            nis: result.nis
+          },
+          programLama: {
+            id: programLama.programId,
+            nama: programLama.program.namaProgram,
+            sppDihapus: sppBelumDibayar.length
+          },
+          programBaru: {
+            id: programSiswaBaru.programId,
+            nama: programBaru.namaProgram,
+            jadwal: result.programSiswa[0]?.JadwalProgramSiswa || [],
+            sppDigenerate: sppBaru.length
+          }
+        };
+      });
+    } catch (error) {
+      logger.error(`Error in pindahProgram for siswa ${siswaId}:`, error);
       throw error;
     }
   }

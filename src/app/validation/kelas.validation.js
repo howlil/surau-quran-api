@@ -80,7 +80,12 @@ class KelasValidation {
       tambahSiswaIds: Joi.array().items(Joi.string()).optional()
         .messages({
           'array.base': 'Daftar siswa harus berupa array',
-        })
+        }),
+      hapusSiswaIds: Joi.array().items(Joi.string()).optional()
+        .messages({
+          'array.base': 'Daftar siswa harus berupa array',
+        }),
+      
     });
   }
 

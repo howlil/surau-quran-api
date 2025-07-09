@@ -25,9 +25,6 @@ class PaymentController {
             const result = await paymentService.handleXenditCallback(rawBody);
             logger.info(`Payment status: ${result.statusPembayaran} for payment ID: ${result.id}`);
 
-            let pendaftaranResult = null;
-            let sppResult = null;
-
             if (result.statusPembayaran === 'PAID') {
                 if (result.tipePembayaran === 'PENDAFTARAN') {
                     try {

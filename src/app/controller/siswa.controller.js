@@ -70,6 +70,13 @@ class SiswaController {
     const result = await siswaService.getJadwalSiswa(rfid);
     return Http.Response.success(res, result);
   });
+
+  pindahProgram = ErrorHandler.asyncHandler(async (req, res) => {
+    const { id } = HttpRequest.getUrlParams(req);
+    const data = HttpRequest.getBodyParams(req);
+    const result = await siswaService.pindahProgram(id, data);
+    return Http.Response.success(res, result, 'Siswa berhasil pindah program');
+  });
 }
 
 module.exports = new SiswaController();

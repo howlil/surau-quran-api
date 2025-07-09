@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemberitahuan Pindah Program</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .message {
+            color: #555;
+            margin-bottom: 30px;
+            line-height: 1.7;
+        }
+        .program-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .program-info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        .program-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .program-old {
+            border-left-color: #dc3545;
+        }
+        .program-new {
+            border-left-color: #28a745;
+        }
+        .info-note {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #1565c0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 10px;
+        }
+        .contact-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        .contact-info h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Pemberitahuan Pindah Program</h1>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Assalamu'alaikum Warahmatullahi Wabarakatuh
+            </div>
+            
+            <div class="greeting">
+                Halo {{namaSiswa}},
+            </div>
+            
+            <div class="message">
+                Kami ingin memberitahukan bahwa Anda telah berhasil dipindahkan ke program baru di Surau Quran. 
+                Berikut adalah detail perubahan program Anda:
+            </div>
+            
+            <div class="program-info program-old">
+                <h3>🔴 Program Sebelumnya</h3>
+                <p><strong>Nama Program:</strong> {{programLama}}</p>
+                <p><strong>Status:</strong> Tidak Aktif</p>
+            </div>
+            
+            <div class="program-info program-new">
+                <h3>🟢 Program Baru</h3>
+                <p><strong>Nama Program:</strong> {{programBaru}}</p>
+                <p><strong>Tanggal Pindah:</strong> {{tanggalPindah}}</p>
+                <p><strong>Status:</strong> Aktif</p>
+            </div>
+            
+            <div class="info-note">
+                <strong>📌 Informasi Penting:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Tagihan SPP yang belum dibayar dari program lama telah dihapus</li>
+                    <li>Tagihan SPP baru untuk program ini akan dimulai bulan depan</li>
+                    <li>Silakan konfirmasi jadwal belajar baru dengan admin</li>
+                    <li>Jika ada pertanyaan, jangan ragu untuk menghubungi kami</li>
+                </ul>
+            </div>
+            
+            <div class="message">
+                Terima kasih atas kepercayaan Anda kepada Surau Quran. Semoga program baru ini dapat memberikan 
+                manfaat yang lebih baik untuk perkembangan spiritual dan ilmu Anda.
+            </div>
+            
+            <div class="contact-info">
+                <h4>📞 Hubungi Kami</h4>
+                <p><strong>Admin:</strong> {{adminPhone || '08123456789'}}</p>
+                <p><strong>Email:</strong> {{adminEmail || 'admin@surauquran.com'}}</p>
+                <p><strong>Jam Operasional:</strong> Senin - Sabtu, 08:00 - 17:00 WIB</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Surau Quran</strong></p>
+            <p>Belajar Al-Quran dengan Hati</p>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">
+                Email ini dikirim otomatis oleh sistem. Mohon jangan membalas email ini.
+            </p>
+        </div>
+    </div>
+</body>
+</html> 

@@ -89,38 +89,40 @@ class PaymentService {
 
       const externalId = XenditUtils.generateExternalId('SPP');
 
+      // Buat deskripsi yang mencakup diskon jika ada
+      let description = `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`;
+      if (payment.discountAmount > 0) {
+        description += ` (Diskon: Rp ${payment.discountAmount.toLocaleString('id-ID')})`;
+      }
+
       const invoiceData = {
         externalId,
-        amount: Number(payment.finalAmount),
+        amount: Number(payment.finalAmount), // Gunakan finalAmount yang sudah dikurangi diskon
         payerEmail: siswa.email,
-        description: `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`,
+        description: description,
         successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
         failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
         items: [{
           name: `SPP ${payment.periods}`,
           quantity: 1,
-          price: Number(payment.originalAmount)
+          price: Number(payment.finalAmount) // Gunakan finalAmount, bukan originalAmount
         }],
         customer: {
           givenNames: siswa.nama || 'Siswa',
           email: siswa.email,
-          phoneNumber: siswa.noWhatsapp || '',
-          address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : ''
+          phoneNumber: siswa.noWhatsapp || '08123456789', // Default phone number
+          address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : 'Alamat tidak tersedia' // Default address
         }
       };
-
-      if (payment.discountAmount > 0) {
-        invoiceData.items.push({
-          name: `Diskon Voucher ${payment.kodeVoucher}`,
-          quantity: 1,
-          price: -Number(payment.discountAmount)
-        });
-      }
 
       // Log customer data untuk debugging SPP
       logger.info('Creating Xendit SPP invoice with customer data:', {
         customer: invoiceData.customer,
-        description: invoiceData.description
+        description: invoiceData.description,
+        amount: invoiceData.amount,
+        originalAmount: payment.originalAmount,
+        discountAmount: payment.discountAmount,
+        finalAmount: payment.finalAmount
       });
 
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
@@ -267,6 +269,11 @@ class PaymentService {
               }
             });
 
+            // Generate NIS
+            const currentYear = new Date().getFullYear();
+            const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const nis = `${currentYear}${randomNumber}`;
+
             // Create siswa record
             const siswa = await tx.siswa.create({
               data: {
@@ -282,7 +289,8 @@ class PaymentService {
                 namaOrangTua: pendaftaranTemp.namaOrangTua,
                 namaPenjemput: pendaftaranTemp.namaPenjemput,
                 noWhatsapp: pendaftaranTemp.noWhatsapp,
-                isRegistered: true
+                isRegistered: true,
+                nis: nis
               }
             });
 
@@ -292,7 +300,6 @@ class PaymentService {
                 siswaId: siswa.id,
                 programId: pendaftaranTemp.programId,
                 status: 'AKTIF',
-                isVerified: true
               }
             });
 

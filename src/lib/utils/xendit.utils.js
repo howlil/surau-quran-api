@@ -33,6 +33,11 @@ class XenditUtils {
         throw new Error('amount is required for invoice creation');
       }
 
+      // Validasi amount minimal 1000 (requirement Xendit)
+      if (Number(amount) < 1000) {
+        throw new Error('Amount minimal Rp 1.000 untuk pembayaran Xendit');
+      }
+
       if (!payerEmail) {
         throw new Error('payerEmail is required for invoice creation');
       }
@@ -77,10 +82,10 @@ class XenditUtils {
       // Add customer data if provided
       if (customer) {
         invoiceParams.customer = {
-          givenNames: customer.givenNames || '',
+          givenNames: customer.givenNames || 'Customer',
           email: customer.email || payerEmail,
-          mobileNumber: customer.phoneNumber || customer.mobileNumber || '',
-          address: customer.address || ''
+          mobileNumber: customer.phoneNumber || customer.mobileNumber || '08123456789',
+          address: customer.address || 'Alamat tidak tersedia'
         };
       }
 
@@ -89,15 +94,24 @@ class XenditUtils {
         externalId: invoiceParams.externalId,
         amount: invoiceParams.amount,
         customer: invoiceParams.customer || 'No customer data',
-        description: invoiceParams.description
+        description: invoiceParams.description,
+        items: invoiceParams.items || 'No items',
+        paymentMethods: invoiceParams.paymentMethods || 'Default methods'
       });
 
       let invoice;
 
       try {
+        logger.info('Calling Xendit API with params:', JSON.stringify(invoiceParams, null, 2));
         invoice = await xendit.Invoice.createInvoice({ data: invoiceParams });
       } catch (err) {
-        logger.error('Error creating Xendit invoice:', err);
+        logger.error('Error creating Xendit invoice:', {
+          message: err.message,
+          status: err.status,
+          errorCode: err.errorCode,
+          errorMessage: err.errorMessage,
+          response: err.response ? JSON.stringify(err.response, null, 2) : 'No response'
+        });
         throw new Error(`Failed to create Xendit invoice: ${err.message}`);
       }
 

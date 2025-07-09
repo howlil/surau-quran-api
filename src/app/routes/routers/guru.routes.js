@@ -84,7 +84,7 @@ router.get(
 
 // Get all class programs with enrolled students
 router.get(
-  '/v1/guru/jadwal/siswa',
+  '/v2/guru/jadwal',
   authMiddleware.authenticate,
   authMiddleware.authorize(['GURU']),
   guruController.getKelasProgramWithStudents

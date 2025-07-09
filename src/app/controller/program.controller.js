@@ -85,6 +85,31 @@ class ProgramController {
     return Http.Response.success(res, result);
   });
 
+  addKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
+    const guruId = req.user.id;
+    const data = HttpRequest.getBodyParams(req);
+    const result = await programService.addKelasPengganti(guruId, data);
+    return Http.Response.created(res, result, 'Siswa berhasil ditambahkan ke kelas pengganti');
+  });
+
+  removeKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
+    const guruId = req.user.id;
+    const { kelasProgramId } = HttpRequest.getUrlParams(req);
+    const result = await programService.removeKelasPengganti(guruId, kelasProgramId);
+    return Http.Response.success(res, result, result.message);
+  });
+
+  getKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
+    const { kelasProgramId, tanggal } = HttpRequest.getQueryParams(req);
+
+    if (!kelasProgramId || !tanggal) {
+      return Http.Response.badRequest(res, null, 'Kelas Program ID dan tanggal wajib diisi');
+    }
+
+    const result = await programService.getKelasPenggantiByKelasProgram(kelasProgramId, tanggal);
+    return Http.Response.success(res, result, 'Data kelas pengganti berhasil diambil');
+  });
+
 }
 
 module.exports = new ProgramController();

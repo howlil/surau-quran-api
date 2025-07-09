@@ -14,22 +14,6 @@ class AbsensiController {
         return Http.Response.success(res, result);
     });
 
-    getAbsensiSiswaForGuru = ErrorHandler.asyncHandler(async (req, res) => {
-        const userId = req.user.id;
-        const filters = HttpRequest.getQueryParams(req, ['tanggal']);
-
-        const guru = await prisma.guru.findUnique({
-            where: { userId }
-        });
-
-        if (!guru) {
-            throw new NotFoundError('Profil guru tidak ditemukan');
-        }
-
-        const result = await absensiService.getAbsensiSiswaForGuru(guru.id, filters);
-        return Http.Response.success(res, result);
-    });
-
     getAbsensiGuruByDate = ErrorHandler.asyncHandler(async (req, res) => {
         const filters = HttpRequest.getQueryParams(req, ['tanggal', 'page', 'limit']);
         const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
@@ -72,11 +56,11 @@ class AbsensiController {
         return Http.Response.success(res, 'Berhasil mengupdate absensi siswa');
     });
 
-    createAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+    getAbsensiSiswaByKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
+        const { kelasProgramId } = HttpRequest.getUrlParams(req);
         const userId = req.user.id;
-        const data = HttpRequest.getBodyParams(req);
 
-        // Get guru ID from authenticated user
+        // Get guru profile
         const guru = await prisma.guru.findUnique({
             where: { userId }
         });
@@ -85,26 +69,11 @@ class AbsensiController {
             throw new NotFoundError('Profil guru tidak ditemukan');
         }
 
-        const result = await absensiService.createAbsensiSiswa(guru.id, data);
-        return Http.Response.success(res, result, 'Data absensi siswa berhasil dibuat');
+        const result = await absensiService.getAbsensiSiswaByKelasProgram(kelasProgramId, guru.id);
+        return Http.Response.success(res, result, 'Data absensi siswa berhasil diambil');
     });
 
-    getSiswaByKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
-        const userId = req.user.id;
-        const data = HttpRequest.getQueryParams(req, ['kelasProgramId', 'tanggal']);
 
-        // Get teacher profile
-        const guru = await prisma.guru.findUnique({
-            where: { userId }
-        });
-
-        if (!guru) {
-            throw new NotFoundError('Profil guru tidak ditemukan');
-        }
-
-        const result = await absensiService.getSiswaByKelasProgram(guru.id, data);
-        return Http.Response.success(res, result, 'Data siswa berhasil diambil');
-    });
 }
 
 module.exports = new AbsensiController();

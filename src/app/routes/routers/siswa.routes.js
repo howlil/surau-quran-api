@@ -56,5 +56,13 @@ router.get(
   siswaController.getJadwalSiswa
 );
 
+router.patch(
+  '/v1/siswa/:id/pindah-program',
+  authMiddleware.authenticate,
+  authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateBody(siswaValidation.pindahProgram()),
+  siswaController.pindahProgram
+);
+
 
 module.exports = router;

@@ -36,27 +36,13 @@ router.patch('/v1/absensi/siswa/:siswaId',
     absensiController.updateAbsensiSiswa
 );
 
-router.get('/v1/guru/absensi/siswa',
+router.get('/v1/absensi/siswa/:kelasProgramId',
     authMiddleware.authenticate,
     authMiddleware.authorize(['GURU']),
-    validationMiddleware.validateQuery(absensiValidation.tanggal()),
-    absensiController.getAbsensiSiswaForGuru
-);
-
-router.post('/v1/absensi/:kelasId/students',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['GURU']),
-    validationMiddleware.validateBody(absensiValidation.createAbsensiSiswa()),
-    absensiController.createAbsensiSiswa
+    validationMiddleware.validateParams(absensiValidation.getAbsensiSiswaByKelasProgram()),
+    absensiController.getAbsensiSiswaByKelasProgram
 );
 
 
-router.get(
-    '/v1/absensi/students',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['GURU']),
-    validationMiddleware.validateQuery(absensiValidation.getSiswaByKelasProgram()),
-    absensiController.getSiswaByKelasProgram
-);
 
 module.exports = router; 

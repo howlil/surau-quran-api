@@ -59,6 +59,7 @@ class KelasController {
         const result = await kelasService.getCCTVByUserId(userId);
         return Http.Response.success(res, result, 'CCTV IP berhasil diambil');
     });
+
 }
 
 module.exports = new KelasController();

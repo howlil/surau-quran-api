@@ -53,7 +53,7 @@ model Siswa {
   id               String   @id @default(uuid())
   userId           String   @unique
   noWhatsapp       String?
-  nis              String?
+  nis              String? @unique
   namaMurid        String
   namaPanggilan    String?
   tanggalLahir     String?
@@ -73,6 +73,7 @@ model Siswa {
   pendaftaran  Pendaftaran? // Siswa hanya memiliki satu pendaftaran
   programSiswa ProgramSiswa[] // Siswa hanya memiliki satu program aktif, history program lama tetap ada
   AbsensiSiswa AbsensiSiswa[]
+  kelasPengganti KelasPengganti[]
 }
 
 // Admin model
@@ -199,6 +200,26 @@ model KelasProgram {
   programSiswa ProgramSiswa[] // Relasi langsung ke ProgramSiswa
   absensiSiswa AbsensiSiswa[]
   absensiGuru  AbsensiGuru[]
+  kelasPengganti KelasPengganti[]
+}
+
+model KelasPengganti {
+  id             String    @id @default(uuid())
+  kelasProgramId String
+  siswaId        String
+  isTemp         Boolean   @default(true)
+  tanggal        String
+  count          Int       @default(1)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  kelasProgram KelasProgram @relation(fields: [kelasProgramId], references: [id])
+  siswa        Siswa        @relation(fields: [siswaId], references: [id])
+
+  @@unique([kelasProgramId, siswaId, tanggal])
+  @@map("kelas_pengganti")
 }
 
 enum TipeKelas {
@@ -234,7 +255,6 @@ model ProgramSiswa {
   programId      String
   kelasProgramId String?
   status         StatusSiswa
-  isVerified     Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

@@ -43,8 +43,6 @@ router.delete(
 
 router.get(
     '/v1/program',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
     ProgramController.getAll
 );
 
@@ -59,6 +57,30 @@ router.get(
 router.get(
     '/v2/program',
     ProgramController.getAllPublic
+);
+
+// API untuk kelas pengganti (hanya untuk guru)
+router.post(
+    '/v1/program/kelas-pengganti',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateBody(ProgramValidation.addKelasPengganti()),
+    ProgramController.addKelasPengganti
+);
+
+router.delete(
+    '/v1/program/kelas-pengganti/:kelasProgramId',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateParams(ProgramValidation.removeKelasPengganti()),
+    ProgramController.removeKelasPengganti
+);
+
+router.get(
+    '/v1/program/kelas-pengganti',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    ProgramController.getKelasPengganti
 );
 
 module.exports = router;
