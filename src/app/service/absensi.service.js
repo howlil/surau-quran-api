@@ -1,6 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const { NotFoundError, BadRequestError,ForbiddenError } = require('../../lib/http/errors.http');
 const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
@@ -638,10 +638,21 @@ class AbsensiService {
     async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId) {
         try {
             // Validasi bahwa kelas program ini milik guru yang login
-            const kelasProgram = await prisma.kelasProgram.findFirst({
+
+            // const kelasProgram = await prisma.kelasProgram.findUnique({
+            //     where: { id: kelasProgramId },
+            //     include: {
+            //         kelas: true,
+            //         program: true,
+            //         guru: true,
+            //         jamMengajar: true
+            //     }
+            // });
+
+
+            const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
-                    id: kelasProgramId,
-                    guruId: guruId
+                    id: kelasProgramId
                 },
                 include: {
                     kelas: {
@@ -702,9 +713,16 @@ class AbsensiService {
                 }
             });
 
+            
             if (!kelasProgram) {
-                throw new NotFoundError('Kelas program tidak ditemukan atau Anda tidak memiliki akses ke kelas ini');
+                throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
             }
+
+            // Check if guru has access to this kelas program
+            if (kelasProgram.guruId !== guruId) {
+                throw new ForbiddenError('Anda tidak memiliki akses ke kelas program ini');
+            }
+      
 
             // Format absensi siswa dengan informasi apakah siswa temporary atau tidak
             const absensiSiswaFormatted = kelasProgram.absensiSiswa.map(absensi => {

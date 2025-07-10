@@ -36,7 +36,7 @@ router.patch('/v1/absensi/siswa/:siswaId',
     absensiController.updateAbsensiSiswa
 );
 
-router.get('/v1/absensi/siswa/:kelasProgramId',
+router.get('/v2/absensi/siswa/:kelasProgramId',
     authMiddleware.authenticate,
     authMiddleware.authorize(['GURU']),
     validationMiddleware.validateParams(absensiValidation.getAbsensiSiswaByKelasProgram()),

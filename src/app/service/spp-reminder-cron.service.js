@@ -4,6 +4,7 @@ const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const WhatsAppUtils = require('../../lib/utils/whatsapp.utils');
 
 class SppReminderCronService {
     static async sendSppReminders() {
@@ -264,14 +265,38 @@ class SppReminderCronService {
                 return;
             }
 
-            const message = this.generateWhatsAppMessage(spp, siswa, program, formattedAmount, xenditInvoice);
+            // Validate phone number
+            if (!WhatsAppUtils.validatePhoneNumber(siswa.noWhatsapp)) {
+                logger.warn(`Invalid WhatsApp number format for siswa ${siswa.id}: ${siswa.noWhatsapp}`);
+                return;
+            }
 
-            // Here you would integrate with your WhatsApp service
-            // For now, we'll just log the message
-            logger.info(`WhatsApp message for ${siswa.noWhatsapp}:`, message);
+            const sppData = {
+                namaSiswa: siswa.namaMurid,
+                namaProgram: program.namaProgram,
+                bulan: spp.bulan,
+                tahun: spp.tahun,
+                jumlahTagihan: formattedAmount,
+                paymentUrl: xenditInvoice?.invoice_url,
+                dueDate: moment().add(7, 'days').format('DD MMMM YYYY')
+            };
 
-            // TODO: Integrate with WhatsApp API (Twilio, WA Business API, etc.)
-            // await WhatsAppUtils.sendMessage(siswa.noWhatsapp, message);
+            // Send WhatsApp message using Twilio
+            const result = await WhatsAppUtils.sendSppReminder(siswa.noWhatsapp, sppData);
+
+            if (result.success) {
+                logger.info(`WhatsApp reminder sent successfully to ${siswa.noWhatsapp} for SPP ${spp.id}`, {
+                    messageSid: result.messageSid,
+                    status: result.status
+                });
+            } else {
+                logger.error(`Failed to send WhatsApp reminder to ${siswa.noWhatsapp} for SPP ${spp.id}:`, {
+                    error: result.error,
+                    code: result.code
+                });
+            }
+
+            return result;
 
         } catch (error) {
             logger.error(`Error sending WhatsApp reminder for SPP ${spp.id}:`, error);
@@ -315,7 +340,7 @@ Terima kasih atas perhatiannya 🙏
 📧 Email: ${process.env.ADMIN_EMAIL || 'admin@surauquran.com'}`;
     }
 
-    
+
 
 }
 
