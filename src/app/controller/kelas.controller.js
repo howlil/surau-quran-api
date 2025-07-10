@@ -30,7 +30,7 @@ class KelasController {
 
     getInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
         const query = HttpRequest.getQueryParams(req);
-        const result = await kelasService.getInitialStudentIntoClass(query);
+    const result = await kelasService.getInitialStudentIntoClass(query);
         return Http.Response.success(res, result, 'Data siswa awal untuk kelas berhasil diambil');
     });
 

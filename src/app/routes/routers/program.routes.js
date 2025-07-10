@@ -77,10 +77,10 @@ router.delete(
 );
 
 router.get(
-    '/v1/program/kelas-pengganti',
+    '/v1/program/siswa',
     authMiddleware.authenticate,
     authMiddleware.authorize(['GURU']),
-    ProgramController.getKelasPengganti
+    ProgramController.getSiswaKelasPengganti
 );
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class ProgramService {
   async create(data) {
@@ -372,33 +373,30 @@ class ProgramService {
     }
   }
 
-  async getKelasPenggantiByKelasProgram(kelasProgramId, tanggal) {
+  async getSiswaKelasPengganti(filters = {}) {
     try {
-      const kelasPengganti = await prisma.kelasPengganti.findMany({
-        where: {
-          kelasProgramId,
-          tanggal,
-          isTemp: true,
-          deletedAt: null // Hanya yang belum di soft delete
-        },
-        include: {
-          siswa: {
-            select: {
-              id: true,
-              namaMurid: true,
-              nis: true
-            }
-          }
-        }
-      });
+      const { search, page = 1, limit = 10 } = filters;
 
-      return kelasPengganti.map(kp => ({
-        id: kp.id,
-        siswaId: kp.siswa.id,
-        namaSiswa: kp.siswa.namaMurid,
-        nis: kp.siswa.nis,
-        tanggal: kp.tanggal
-      }));
+      const whereClause = {};
+      if (search) {
+        whereClause.namaMurid = {
+          contains: search
+        };
+      }
+
+      const siswa = await PrismaUtils.paginate(prisma.siswa, {
+        limit,
+        page,
+        where: whereClause,
+        select: {
+          id: true,
+          namaMurid: true
+        },
+        orderBy: [
+          { namaMurid: 'asc' }
+        ]
+      })
+      return siswa
     } catch (error) {
       logger.error('Error getting substitute class students:', error);
       throw error;

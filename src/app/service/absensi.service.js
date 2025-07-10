@@ -637,17 +637,7 @@ class AbsensiService {
 
     async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId) {
         try {
-            // Validasi bahwa kelas program ini milik guru yang login
 
-            // const kelasProgram = await prisma.kelasProgram.findUnique({
-            //     where: { id: kelasProgramId },
-            //     include: {
-            //         kelas: true,
-            //         program: true,
-            //         guru: true,
-            //         jamMengajar: true
-            //     }
-            // });
 
 
             const kelasProgram = await prisma.kelasProgram.findUnique({

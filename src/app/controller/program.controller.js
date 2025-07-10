@@ -99,14 +99,10 @@ class ProgramController {
     return Http.Response.success(res, result, result.message);
   });
 
-  getKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
-    const { kelasProgramId, tanggal } = HttpRequest.getQueryParams(req);
-
-    if (!kelasProgramId || !tanggal) {
-      return Http.Response.badRequest(res, null, 'Kelas Program ID dan tanggal wajib diisi');
-    }
-
-    const result = await programService.getKelasPenggantiByKelasProgram(kelasProgramId, tanggal);
+  getSiswaKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
+    const filters = HttpRequest.getQueryParams(req, ['search', 'page', 'limit']);
+    
+    const result = await programService.getSiswaKelasPengganti(filters);
     return Http.Response.success(res, result, 'Data kelas pengganti berhasil diambil');
   });
 
