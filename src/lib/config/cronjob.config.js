@@ -55,7 +55,7 @@ class CronJobs {
 
   static scheduleDailyAbsensiGuru() {
     const schedule = '0 1 * * *';
-    logger.info('Setting up Daily Guru Attendance Cron Job:');
+  logger.info('Setting up Daily Guru Attendance Cron Job:');
     logger.info('- Schedule:', schedule);
     logger.info('- Description: Create daily attendance records at 1:00 AM every day');
 
@@ -85,7 +85,7 @@ class CronJobs {
   }
 
   static scheduleDailyAbsensiSiswa() {
-    const schedule = '0 1 * * *';
+    const schedule = '* * * * *';
     logger.info('Setting up Daily Siswa Attendance Cron Job:');
     logger.info('- Schedule:', schedule);
     logger.info('- Description: Create daily attendance records at 1:00 AM every day');

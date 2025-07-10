@@ -355,6 +355,14 @@ class SppService {
                             include: {
                                 siswa: true
                             }
+                        },
+                        voucher: {
+                            select: {
+                                kodeVoucher: true,
+                                namaVoucher: true,
+                                tipe: true,
+                                nominal: true
+                            }
                         }
                     }
                 }
@@ -369,6 +377,11 @@ class SppService {
 
         const siswa = periode.programSiswa.siswa;
 
+        // Gunakan nominal dari pembayaran (sudah final amount setelah voucher)
+        const finalAmount = Number(pembayaran.jumlahTagihan);
+        const originalAmount = Number(periode.jumlahTagihan);
+        const discount = Number(periode.diskon) || 0;
+
         return {
             invoiceNumber: pembayaran.id,
             date: pembayaran.tanggalPembayaran,
@@ -378,10 +391,18 @@ class SppService {
                 noWhatsapp: siswa.noWhatsapp
             },
             paymentMethod: pembayaran.metodePembayaran,
-            deskripsi: `SPP Bulan ${periode.bulan}`,
+            deskripsi: `SPP Bulan ${periode.bulan} ${periode.tahun}`,
             qty: 1,
-            biaya: Number(periode.jumlahTagihan),
-            total: Number(periode.jumlahTagihan)
+            biaya: finalAmount, // Gunakan nominal final dari pembayaran
+            total: finalAmount, // Gunakan nominal final dari pembayaran
+            originalAmount: originalAmount,
+            discount: discount,
+            voucher: periode.voucher ? {
+                kode: periode.voucher.kodeVoucher,
+                nama: periode.voucher.namaVoucher,
+                tipe: periode.voucher.tipe,
+                nominal: Number(periode.voucher.nominal)
+            } : null
         };
     }
 

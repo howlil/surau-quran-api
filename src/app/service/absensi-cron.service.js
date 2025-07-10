@@ -167,10 +167,10 @@ class AbsensiCronService {
 
         for (const kelasProgram of kelasPrograms) {
             // Get all active students in this class
-            const activeSiswa = kelasProgram.programSiswa;
+            const activeSiswa = kelasProgram.programSiswa || [];
 
             // Get substitute students for today
-            const substituteSiswa = kelasProgram.kelasPengganti;
+            const substituteSiswa = kelasProgram.kelasPengganti || [];
 
             // Combine regular and substitute students
             const allSiswa = [

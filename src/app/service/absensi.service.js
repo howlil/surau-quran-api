@@ -1,9 +1,11 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, BadRequestError,ForbiddenError } = require('../../lib/http/errors.http');
+const { NotFoundError, BadRequestError, ForbiddenError } = require('../../lib/http/errors.http');
 const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
-
+const moment = require('moment');
+const { DATE_FORMATS } = require('../../lib/constants');
+const todayDate = moment().format(DATE_FORMATS.DEFAULT);
 class AbsensiService {
 
     async getAbsensiSiswaForAdmin(filters = {}) {
@@ -360,11 +362,22 @@ class AbsensiService {
         }
     }
 
-    async updateAbsensiSiswa(siswaId, guruId, data) {
+    async updateAbsensiSiswa(kelasProgramId, siswaId, guruId, statusKehadiran) {
         try {
-            const { kelasProgramId, tanggal, statusKehadiran } = data.value || data;
+            const tanggal = todayDate;
+            const kelasProgram = await prisma.kelasProgram.findUnique({
+                where: {
+                    id: kelasProgramId
+                }
+            });
 
-            // Cek apakah siswa adalah siswa temporary
+            if (!kelasProgram) {
+                throw new NotFoundError('Kelas program tidak ditemukan');
+            }
+
+            if (kelasProgram.guruId !== guruId) {
+                throw new ForbiddenError('Guru tidak berwenang mengubah absensi siswa');
+            }
             const kelasPengganti = await prisma.kelasPengganti.findFirst({
                 where: {
                     kelasProgramId,
@@ -377,14 +390,16 @@ class AbsensiService {
 
             // Jika siswa adalah temporary, gunakan logic khusus
             if (kelasPengganti) {
-                return await this.updateAbsensiSiswaTemporary(siswaId, guruId, data);
+                return await this.updateAbsensiSiswaTemporary(kelasProgramId, siswaId, guruId, statusKehadiran, tanggal);
             }
 
             // Logic untuk siswa regular
-            // Get existing absensi
+            // Get existing absensi berdasarkan siswa, kelas program, dan tanggal
             const absensi = await prisma.absensiSiswa.findFirst({
                 where: {
                     siswaId,
+                    kelasProgramId,
+                    tanggal,
                     kelasProgram: {
                         guruId
                     }
@@ -395,15 +410,14 @@ class AbsensiService {
             });
 
             if (!absensi) {
-                throw new NotFoundError('Absensi siswa tidak ditemukan atau guru tidak berwenang mengubah absensi ini');
+                throw new NotFoundError(`Absensi siswa tidak ditemukan untuk hari ini di kelas program ${kelasProgramId} atau guru tidak berwenang mengubah absensi ini`);
             }
 
-            logger.info(`Updating attendance for regular student ID: ${siswaId} ${data.value?.statusKehadiran || data.statusKehadiran}`);
-            // Format data
+            // Update absensi
             const updated = await prisma.absensiSiswa.update({
                 where: { id: absensi.id },
                 data: {
-                    statusKehadiran: data.value?.statusKehadiran || data.statusKehadiran,
+                    statusKehadiran: statusKehadiran,
                 },
                 include: {
                     siswa: {
@@ -416,7 +430,9 @@ class AbsensiService {
                 }
             });
 
-            const formattedResponse = {
+            logger.info(`Updated attendance for regular student ${updated.siswa.namaMurid} to ${statusKehadiran} for today (${tanggal}) in kelas program ${kelasProgramId}`);
+
+            return {
                 id: updated.id,
                 tanggal: updated.tanggal,
                 namaSiswa: updated.siswa.namaMurid,
@@ -424,8 +440,6 @@ class AbsensiService {
                 statusKehadiran: updated.statusKehadiran,
                 isTemporary: false
             };
-
-            return formattedResponse;
         } catch (error) {
             logger.error(`Error updating siswa attendance:`, error);
             throw error;
@@ -513,10 +527,9 @@ class AbsensiService {
         }
     }
 
-    async updateAbsensiSiswaTemporary(siswaId, guruId, data) {
+    async updateAbsensiSiswaTemporary(kelasProgramId, siswaId, guruId, statusKehadiran, tanggal) {
         try {
-            const { kelasProgramId, tanggal, statusKehadiran, keterangan } = data;
-
+            // Validate guru access to kelas program
             const kelasProgram = await prisma.kelasProgram.findFirst({
                 where: {
                     id: kelasProgramId,
@@ -531,6 +544,7 @@ class AbsensiService {
                 throw new NotFoundError('Kelas program tidak ditemukan atau guru tidak berwenang');
             }
 
+            // Validate temporary student assignment
             const kelasPengganti = await prisma.kelasPengganti.findFirst({
                 where: {
                     kelasProgramId,
@@ -542,7 +556,7 @@ class AbsensiService {
             });
 
             if (!kelasPengganti) {
-                throw new NotFoundError('Siswa tidak ditemukan dalam kelas pengganti untuk tanggal tersebut');
+                throw new NotFoundError('Siswa tidak ditemukan dalam kelas pengganti untuk hari ini');
             }
 
             // Cari jadwal asli siswa
@@ -594,7 +608,7 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Updated existing attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id}`);
+                logger.info(`Updated existing attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id} for today (${tanggal})`);
 
                 return {
                     message: 'Absensi berhasil diupdate',
@@ -616,7 +630,7 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Created new attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id}`);
+                logger.info(`Created new attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id} for today (${tanggal})`);
 
                 return {
                     message: 'Absensi berhasil dibuat',
@@ -637,7 +651,7 @@ class AbsensiService {
 
     async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId) {
         try {
-
+            // Get today's date in the same format used throughout the system
 
 
             const kelasProgram = await prisma.kelasProgram.findUnique({
@@ -672,6 +686,9 @@ class AbsensiService {
                         }
                     },
                     absensiSiswa: {
+                        where: {
+                            tanggal: todayDate // Filter hanya absensi hari ini
+                        },
                         include: {
                             siswa: {
                                 select: {
@@ -682,12 +699,12 @@ class AbsensiService {
                             }
                         },
                         orderBy: [
-                            { tanggal: 'desc' },
                             { siswa: { namaMurid: 'asc' } }
                         ]
                     },
                     kelasPengganti: {
                         where: {
+                            tanggal: todayDate, // Filter hanya kelas pengganti hari ini
                             deletedAt: null
                         },
                         include: {
@@ -703,7 +720,7 @@ class AbsensiService {
                 }
             });
 
-            
+
             if (!kelasProgram) {
                 throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
             }
@@ -712,13 +729,14 @@ class AbsensiService {
             if (kelasProgram.guruId !== guruId) {
                 throw new ForbiddenError('Anda tidak memiliki akses ke kelas program ini');
             }
-      
+
 
             // Format absensi siswa dengan informasi apakah siswa temporary atau tidak
             const absensiSiswaFormatted = kelasProgram.absensiSiswa.map(absensi => {
-                // Cek apakah siswa ini adalah siswa pengganti di tanggal tersebut
+                // Cek apakah siswa ini adalah siswa pengganti hari ini
+                // Tanggal tidak perlu di-check karena sudah di-filter di query
                 const isTemp = kelasProgram.kelasPengganti.some(kp =>
-                    kp.siswaId === absensi.siswaId && kp.tanggal === absensi.tanggal
+                    kp.siswaId === absensi.siswaId
                 );
 
                 return {
@@ -749,7 +767,7 @@ class AbsensiService {
                 absensiSiswa: absensiSiswaFormatted
             };
 
-            logger.info(`Retrieved absensi siswa for kelas program: ${kelasProgramId} by guru: ${guruId}`);
+            logger.info(`Retrieved today's attendance (${todayDate}) for kelas program: ${kelasProgramId} by guru: ${guruId}`);
             return result;
         } catch (error) {
             logger.error('Error getting absensi siswa by kelas program:', error);

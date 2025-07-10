@@ -149,7 +149,7 @@ class SppReminderCronService {
                     {
                         name: `SPP ${program.namaProgram}`,
                         quantity: 1,
-                        price: Number(spp.jumlahTagihan),
+                        price: Number(spp.totalTagihan), // Gunakan totalTagihan yang sudah termasuk diskon
                         category: 'Education'
                     }
                 ],

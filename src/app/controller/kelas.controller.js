@@ -2,6 +2,7 @@ const kelasService = require('../service/kelas.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const { logger } = require('../../lib/config/logger.config');
 
 class KelasController {
     create = ErrorHandler.asyncHandler(async (req, res) => {
@@ -30,7 +31,7 @@ class KelasController {
 
     getInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
         const query = HttpRequest.getQueryParams(req);
-    const result = await kelasService.getInitialStudentIntoClass(query);
+        const result = await kelasService.getInitialStudentIntoClass(query);
         return Http.Response.success(res, result, 'Data siswa awal untuk kelas berhasil diambil');
     });
 
@@ -43,6 +44,7 @@ class KelasController {
     patchInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
         const { kelasProgramId } = HttpRequest.getUrlParams(req);
         const data = HttpRequest.getBodyParams(req);
+
         const result = await kelasService.patchInitialStudentIntoClass(kelasProgramId, data);
         return Http.Response.success(res, result, 'Kelas program berhasil diupdate');
     });

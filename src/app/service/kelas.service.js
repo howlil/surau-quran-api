@@ -216,46 +216,60 @@ class KelasService {
                 let siswaDitambah = [];
                 let siswaDihapus = [];
 
-                // Handle student removal first
-                if (hapusSiswaIds.length > 0) {
-                    // Remove students from kelas program
-                    await tx.programSiswa.updateMany({
+                // Check if this is purely a class program metadata update (no student management intent)
+                const isMetadataOnlyUpdate = (programId || hari || jamMengajarId || guruId) &&
+                    (!tambahSiswaIds || tambahSiswaIds.length === 0) &&
+                    (!hapusSiswaIds || hapusSiswaIds.length === 0);
+
+                if (isMetadataOnlyUpdate) {
+                    logger.info('Detected metadata-only update, skipping student management operations');
+                }
+
+                // Handle student removal first - only if not a metadata-only update
+                if (!isMetadataOnlyUpdate && hapusSiswaIds && hapusSiswaIds.length > 0) {
+                    // Verify that these students actually exist in this kelas program
+                    const existingStudentsInClass = await tx.programSiswa.findMany({
                         where: {
                             siswaId: { in: hapusSiswaIds },
                             kelasProgramId,
                             status: 'AKTIF'
                         },
-                        data: {
-                            kelasProgramId: null
+                        include: {
+                            siswa: {
+                                select: {
+                                    id: true,
+                                    namaMurid: true,
+                                    nis: true
+                                }
+                            }
                         }
                     });
 
-                    // Get removed students info
-                    const removedStudents = await tx.siswa.findMany({
-                        where: { id: { in: hapusSiswaIds } },
-                        select: {
-                            id: true,
-                            namaMurid: true,
-                            nis: true
-                        }
-                    });
+                    if (existingStudentsInClass.length > 0) {
+                        // Remove students from kelas program
+                        await tx.programSiswa.updateMany({
+                            where: {
+                                siswaId: { in: existingStudentsInClass.map(ps => ps.siswaId) },
+                                kelasProgramId,
+                                status: 'AKTIF'
+                            },
+                            data: {
+                                kelasProgramId: null
+                            }
+                        });
 
-                    siswaDihapus = removedStudents.map(siswa => ({
-                        siswaId: siswa.id,
-                        namaSiswa: siswa.namaMurid,
-                        NIS: siswa.nis
-                    }));
+                        siswaDihapus = existingStudentsInClass.map(ps => ({
+                            siswaId: ps.siswa.id,
+                            namaSiswa: ps.siswa.namaMurid,
+                            NIS: ps.siswa.nis
+                        }));
+
+                        logger.info(`Successfully removed ${siswaDihapus.length} students from class ${kelasProgramId}`);
+                    }
                 }
 
-                // Handle student additions
-                if (tambahSiswaIds.length > 0) {
-                    logger.info('Attempting to add students:', {
-                        kelasProgramId,
-                        programId: updatedKelasProgram.programId,
-                        tambahSiswaIds,
-                        count: tambahSiswaIds.length
-                    });
-
+                // Handle student additions - only if not a metadata-only update
+                if (!isMetadataOnlyUpdate && tambahSiswaIds && tambahSiswaIds.length > 0) {
                     // Find eligible students that are already verified in the program AND not assigned to any kelas program
                     const programSiswaList = await tx.programSiswa.findMany({
                         where: {
@@ -267,15 +281,6 @@ class KelasService {
                         include: {
                             siswa: true
                         }
-                    });
-
-                    logger.info('Found eligible students:', {
-                        count: programSiswaList.length,
-                        students: programSiswaList.map(ps => ({
-                            siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            programSiswaId: ps.id
-                        }))
                     });
 
                     // Check if any students are already assigned to other kelas programs
@@ -306,8 +311,6 @@ class KelasService {
                             namaProgram: ps.kelasProgram?.program?.namaProgram
                         }));
 
-                        logger.warn('Students already assigned to other classes:', conflictDetails);
-
                         throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program lain: ${conflictDetails.map(s => s.namaSiswa).join(', ')}`);
                     }
 
@@ -330,8 +333,6 @@ class KelasService {
                             namaSiswa: ps.siswa.namaMurid
                         }));
 
-                        logger.warn('Students already in this class:', alreadyInClassDetails);
-
                         throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program ini: ${alreadyInClassDetails.map(s => s.namaSiswa).join(', ')}`);
                     }
 
@@ -345,14 +346,6 @@ class KelasService {
                             select: { id: true, namaMurid: true, nis: true }
                         });
 
-                        logger.warn('Students not found in program:', {
-                            notFoundStudents: notFoundStudents.map(s => ({
-                                siswaId: s.id,
-                                namaSiswa: s.namaMurid,
-                                nis: s.nis
-                            }))
-                        });
-
                         throw new NotFoundError(`Beberapa siswa tidak ditemukan dalam program ini: ${notFoundStudents.map(s => s.namaMurid).join(', ')}`);
                     }
 
@@ -364,10 +357,7 @@ class KelasService {
                             data: { kelasProgramId: kelasProgramId }
                         });
 
-                        logger.info('Successfully updated programSiswa records:', {
-                            updatedCount: ids.length,
-                            programSiswaIds: ids
-                        });
+                        logger.info(`Successfully added ${ids.length} students to class ${kelasProgramId}`);
                     }
 
                     siswaDitambah = programSiswaList.map(ps => ({

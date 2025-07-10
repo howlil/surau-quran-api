@@ -104,6 +104,21 @@ class AbsensiValidation {
                     'any.required': 'Status kehadiran wajib diisi',
                     'any.only': 'Status kehadiran tidak valid'
                 }),
+            siswaId: Joi.string().guid({ version: 'uuidv4' }).required()
+                .messages({
+                    'string.guid': 'Siswa ID harus berupa UUID yang valid',
+                    'any.required': 'Siswa ID wajib diisi'
+                })
+        });
+    }
+
+    updateAbsensiSiswaParams() {
+        return Joi.object({
+            kelasProgramId: Joi.string().guid({ version: 'uuidv4' }).required()
+                .messages({
+                    'string.guid': 'Kelas Program ID harus berupa UUID yang valid',
+                    'any.required': 'Kelas Program ID wajib diisi'
+                })
         });
     }
 
