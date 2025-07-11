@@ -132,6 +132,17 @@ class AbsensiValidation {
         });
     }
 
+    tanggalOptional() {
+        return Joi.object({
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .optional()
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
+                }),
+        });
+    }
+
 
 }
 

@@ -41,6 +41,7 @@ router.get('/v2/absensi/siswa/:kelasProgramId',
     authMiddleware.authenticate,
     authMiddleware.authorize(['GURU']),
     validationMiddleware.validateParams(absensiValidation.getAbsensiSiswaByKelasProgram()),
+    validationMiddleware.validateQuery(absensiValidation.tanggalOptional()),
     absensiController.getAbsensiSiswaByKelasProgram
 );
 

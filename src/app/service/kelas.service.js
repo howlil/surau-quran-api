@@ -125,6 +125,15 @@ class KelasService {
                                 include: {
                                     siswa: true
                                 }
+                            },
+                            kelasPengganti: {
+                                where: {
+                                    deletedAt: null,
+                                    isTemp: true
+                                },
+                                include: {
+                                    siswa: true
+                                }
                             }
                         }
                     }
@@ -135,33 +144,56 @@ class KelasService {
             const result = kelasList.map(kelas => ({
                 kelasId: kelas.id,
                 namaKelas: kelas.namaKelas,
-                program: kelas.kelasProgram.map(kp => ({
-                    kelasProgramId: kp.id,
-                    programId: kp.programId,
-                    namaProgram: kp.program?.namaProgram || null,
-                    hari: kp.hari,
-                    jadwal: kp.jamMengajar
-                        ? {
-                            jamMengajarId: kp.jamMengajar.id,
-                            jamMulai: kp.jamMengajar.jamMulai,
-                            jamSelesai: kp.jamMengajar.jamSelesai
-                        }
-                        : null,
-                    guru: kp.guru
-                        ? {
-                            guruId: kp.guru.id,
-                            namaGuru: kp.guru.nama,
-                            NIP: kp.guru.nip || null
-                        }
-                        : null,
-                    siswa: kp.programSiswa
+                program: kelas.kelasProgram.map(kp => {
+                    // Get regular students
+                    const regularStudents = kp.programSiswa
                         .filter(ps => ps.status === 'AKTIF')
                         .map(ps => ({
                             siswaId: ps.siswa.id,
                             namaSiswa: ps.siswa.namaMurid,
-                            NIS: ps.siswa.nis
-                        }))
-                }))
+                            NIS: ps.siswa.nis,
+                            isTemp: false
+                        }));
+
+                    // Get temporary students (unique by siswaId)
+                    const tempStudentsMap = new Map();
+                    kp.kelasPengganti.forEach(kpg => {
+                        if (!tempStudentsMap.has(kpg.siswa.id)) {
+                            tempStudentsMap.set(kpg.siswa.id, {
+                                siswaId: kpg.siswa.id,
+                                namaSiswa: kpg.siswa.namaMurid,
+                                NIS: kpg.siswa.nis,
+                                isTemp: true
+                            });
+                        }
+                    });
+                    const tempStudents = Array.from(tempStudentsMap.values());
+
+                    // Combine all students
+                    const allStudents = [...regularStudents, ...tempStudents];
+
+                    return {
+                        kelasProgramId: kp.id,
+                        programId: kp.programId,
+                        namaProgram: kp.program?.namaProgram || null,
+                        hari: kp.hari,
+                        jadwal: kp.jamMengajar
+                            ? {
+                                jamMengajarId: kp.jamMengajar.id,
+                                jamMulai: kp.jamMengajar.jamMulai,
+                                jamSelesai: kp.jamMengajar.jamSelesai
+                            }
+                            : null,
+                        guru: kp.guru
+                            ? {
+                                guruId: kp.guru.id,
+                                namaGuru: kp.guru.nama,
+                                NIP: kp.guru.nip || null
+                            }
+                            : null,
+                        siswa: allStudents
+                    };
+                })
             }));
 
             return result;

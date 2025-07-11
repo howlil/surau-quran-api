@@ -334,21 +334,78 @@ class GuruService {
               jamMulai: true,
               jamSelesai: true
             }
+          },
+          programSiswa: {
+            where: {
+              status: 'AKTIF'
+            },
+            include: {
+              siswa: {
+                select: {
+                  id: true,
+                  namaMurid: true,
+                  nis: true
+                }
+              }
+            }
+          },
+          kelasPengganti: {
+            where: {
+              deletedAt: null,
+              isTemp: true
+            },
+            include: {
+              siswa: {
+                select: {
+                  id: true,
+                  namaMurid: true,
+                  nis: true
+                }
+              }
+            }
           }
         }
       });
 
-      return kelasPrograms.map(kp => ({
-        kelasProgramId: kp.id,
-        kelasId: kp.kelasId,
-        programId: kp.programId,
-        jamMengajarId: kp.jamMengajar.id,
-        namaKelas: kp.kelas.namaKelas,
-        namaProgram: kp.program.namaProgram,
-        hari: kp.hari,
-        jamMulai: kp.jamMengajar.jamMulai,
-        jamSelesai: kp.jamMengajar.jamSelesai
-      }));
+      return kelasPrograms.map(kp => {
+        // Get regular students
+        const regularStudents = kp.programSiswa.map(ps => ({
+          siswaId: ps.siswa.id,
+          namaSiswa: ps.siswa.namaMurid,
+          NIS: ps.siswa.nis,
+          isTemp: false
+        }));
+
+        // Get temporary students (unique by siswaId)
+        const tempStudentsMap = new Map();
+        kp.kelasPengganti.forEach(kpg => {
+          if (!tempStudentsMap.has(kpg.siswa.id)) {
+            tempStudentsMap.set(kpg.siswa.id, {
+              siswaId: kpg.siswa.id,
+              namaSiswa: kpg.siswa.namaMurid,
+              NIS: kpg.siswa.nis,
+              isTemp: true
+            });
+          }
+        });
+        const tempStudents = Array.from(tempStudentsMap.values());
+
+        // Combine all students
+        const allStudents = [...regularStudents, ...tempStudents];
+
+        return {
+          kelasProgramId: kp.id,
+          kelasId: kp.kelasId,
+          programId: kp.programId,
+          jamMengajarId: kp.jamMengajar.id,
+          namaKelas: kp.kelas.namaKelas,
+          namaProgram: kp.program.namaProgram,
+          hari: kp.hari,
+          jamMulai: kp.jamMengajar.jamMulai,
+          jamSelesai: kp.jamMengajar.jamSelesai,
+          siswa: allStudents
+        };
+      });
     } catch (error) {
       logger.error('Error getting kelas programs with students:', error);
       throw error;

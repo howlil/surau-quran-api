@@ -365,6 +365,73 @@ class AbsensiService {
     async updateAbsensiSiswa(kelasProgramId, siswaId, guruId, statusKehadiran) {
         try {
             const tanggal = todayDate;
+
+            // Cek apakah siswa ada di kelas pengganti untuk kelas program ini
+            const kelasPengganti = await prisma.kelasPengganti.findFirst({
+                where: {
+                    kelasProgramId,
+                    siswaId,
+                    tanggal,
+                    isTemp: true,
+                    deletedAt: null
+                }
+            });
+
+            // Jika siswa adalah temporary, guru kelas pengganti berwenang mengubah absensi
+            if (kelasPengganti) {
+                // Validasi bahwa guru berwenang untuk kelas pengganti ini
+                const kelasProgram = await prisma.kelasProgram.findUnique({
+                    where: { id: kelasProgramId }
+                });
+
+                if (!kelasProgram) {
+                    throw new NotFoundError('Kelas program tidak ditemukan');
+                }
+
+                if (kelasProgram.guruId !== guruId) {
+                    throw new ForbiddenError('Guru tidak berwenang mengubah absensi siswa kelas pengganti');
+                }
+
+                // Update absensi langsung di kelas pengganti
+                const absensi = await prisma.absensiSiswa.findFirst({
+                    where: {
+                        siswaId,
+                        kelasProgramId,
+                        tanggal
+                    }
+                });
+
+                if (!absensi) {
+                    throw new NotFoundError('Absensi siswa tidak ditemukan untuk kelas pengganti ini');
+                }
+
+                const updated = await prisma.absensiSiswa.update({
+                    where: { id: absensi.id },
+                    data: { statusKehadiran },
+                    include: {
+                        siswa: {
+                            select: {
+                                id: true,
+                                namaMurid: true,
+                                nis: true
+                            }
+                        }
+                    }
+                });
+
+                logger.info(`Updated attendance for temporary student ${updated.siswa.namaMurid} to ${statusKehadiran} for today (${tanggal}) in substitute class ${kelasProgramId}`);
+
+                return {
+                    id: updated.id,
+                    tanggal: updated.tanggal,
+                    namaSiswa: updated.siswa.namaMurid,
+                    nisSiswa: updated.siswa.nis,
+                    statusKehadiran: updated.statusKehadiran,
+                    isTemporary: true
+                };
+            }
+
+            // Logic untuk siswa regular
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
                     id: kelasProgramId
@@ -377,20 +444,6 @@ class AbsensiService {
 
             if (kelasProgram.guruId !== guruId) {
                 throw new ForbiddenError('Guru tidak berwenang mengubah absensi siswa');
-            }
-            const kelasPengganti = await prisma.kelasPengganti.findFirst({
-                where: {
-                    kelasProgramId,
-                    siswaId,
-                    tanggal,
-                    isTemp: true,
-                    deletedAt: null
-                }
-            });
-
-            // Jika siswa adalah temporary, gunakan logic khusus
-            if (kelasPengganti) {
-                return await this.updateAbsensiSiswaTemporary(kelasProgramId, siswaId, guruId, statusKehadiran, tanggal);
             }
 
             // Logic untuk siswa regular
@@ -445,7 +498,6 @@ class AbsensiService {
             throw error;
         }
     }
-
 
     static getSuratIzinUrl(baseUrl, filename) {
         if (!filename) return null;
@@ -649,10 +701,10 @@ class AbsensiService {
         }
     }
 
-    async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId) {
+    async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId, tanggal = null) {
         try {
-            // Get today's date in the same format used throughout the system
-
+            // Use provided date or default to today's date
+            const targetDate = tanggal || todayDate;
 
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
@@ -687,7 +739,7 @@ class AbsensiService {
                     },
                     absensiSiswa: {
                         where: {
-                            tanggal: todayDate // Filter hanya absensi hari ini
+                            tanggal: targetDate
                         },
                         include: {
                             siswa: {
@@ -704,7 +756,7 @@ class AbsensiService {
                     },
                     kelasPengganti: {
                         where: {
-                            tanggal: todayDate, // Filter hanya kelas pengganti hari ini
+                            tanggal: targetDate,
                             deletedAt: null
                         },
                         include: {
@@ -719,7 +771,6 @@ class AbsensiService {
                     }
                 }
             });
-
 
             if (!kelasProgram) {
                 throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
@@ -767,7 +818,7 @@ class AbsensiService {
                 absensiSiswa: absensiSiswaFormatted
             };
 
-            logger.info(`Retrieved today's attendance (${todayDate}) for kelas program: ${kelasProgramId} by guru: ${guruId}`);
+            logger.info(`Retrieved attendance (${targetDate}) for kelas program: ${kelasProgramId} by guru: ${guruId}`);
             return result;
         } catch (error) {
             logger.error('Error getting absensi siswa by kelas program:', error);

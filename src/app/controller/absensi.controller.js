@@ -59,6 +59,7 @@ class AbsensiController {
 
     getAbsensiSiswaByKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
         const { kelasProgramId } = HttpRequest.getUrlParams(req);
+        const { tanggal } = HttpRequest.getQueryParams(req, ['tanggal']);
         const userId = req.user.id;
 
         // Get guru profile
@@ -70,7 +71,7 @@ class AbsensiController {
             throw new NotFoundError('Profil guru tidak ditemukan');
         }
 
-        const result = await absensiService.getAbsensiSiswaByKelasProgram(kelasProgramId, guru.id);
+        const result = await absensiService.getAbsensiSiswaByKelasProgram(kelasProgramId, guru.id, tanggal);
         return Http.Response.success(res, result, 'Data absensi siswa berhasil diambil');
     });
 

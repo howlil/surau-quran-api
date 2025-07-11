@@ -3,6 +3,8 @@ const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const FileUtils = require('../../lib/utils/file.utils');
+const { prisma } = require('../../lib/config/prisma.config');
+const { NotFoundError } = require('../../lib/http/errors.http');
 
 class ProgramController {
   create = ErrorHandler.asyncHandler(async (req, res) => {
@@ -86,22 +88,42 @@ class ProgramController {
   });
 
   addKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
-    const guruId = req.user.id;
+    const userId = req.user.id;
+
+    // Convert userId to guruId
+    const guru = await prisma.guru.findUnique({
+      where: { userId }
+    });
+
+    if (!guru) {
+      throw new NotFoundError('Profil guru tidak ditemukan');
+    }
+
     const data = HttpRequest.getBodyParams(req);
-    const result = await programService.addKelasPengganti(guruId, data);
+    const result = await programService.addKelasPengganti(guru.id, data);
     return Http.Response.created(res, result, 'Siswa berhasil ditambahkan ke kelas pengganti');
   });
 
   removeKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
-    const guruId = req.user.id;
+    const userId = req.user.id;
+
+    // Convert userId to guruId
+    const guru = await prisma.guru.findUnique({
+      where: { userId }
+    });
+
+    if (!guru) {
+      throw new NotFoundError('Profil guru tidak ditemukan');
+    }
+
     const { kelasProgramId } = HttpRequest.getUrlParams(req);
-    const result = await programService.removeKelasPengganti(guruId, kelasProgramId);
+    const result = await programService.removeKelasPengganti(guru.id, kelasProgramId);
     return Http.Response.success(res, result, result.message);
   });
 
   getSiswaKelasPengganti = ErrorHandler.asyncHandler(async (req, res) => {
     const filters = HttpRequest.getQueryParams(req, ['search', 'page', 'limit']);
-    
+
     const result = await programService.getSiswaKelasPengganti(filters);
     return Http.Response.success(res, result, 'Data kelas pengganti berhasil diambil');
   });
