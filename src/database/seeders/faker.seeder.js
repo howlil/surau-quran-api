@@ -1262,14 +1262,14 @@ class FakerSeeder {
             console.log('Starting database seeding...');
             await this.createUsers();
             await this.createMasterData();
-            await this.createTransactionalData();
-            await this.createPendaftaranTempData();
-            await this.createXenditPaymentData();
-            await this.createPayrollDisbursementData();
-            await this.createKelasPenggantiData();
-            await this.createTokenData();
-            await this.createFinanceData();
-            await this.createTestimoniAndGaleri();
+            // await this.createTransactionalData();
+            // await this.createPendaftaranTempData();
+            // await this.createXenditPaymentData();
+            // await this.createPayrollDisbursementData();
+            // await this.createKelasPenggantiData();
+            // await this.createTokenData();
+            // await this.createFinanceData();
+            // await this.createTestimoniAndGaleri();
             console.log('Database seeding completed successfully!');
         } catch (error) {
             console.error('Error seeding database:', error);

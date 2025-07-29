@@ -1185,7 +1185,7 @@ class AbsensiService {
      * 
      * Study Case: Jadwal (10-12, 13-15, 16-18)
      * - Sebelum 10:00 = Absen shift 10-12 dengan status HADIR
-     * - 10:00-12:00 = Absen shift 10-12 dengan status HADIR/TERLAMBAT (terlambat > 15 menit)
+     * - 10:00-12:00 = Absen shift 10-12 dengan status HADIR/TERLAMBAT (terlambat jika lebih dari 0 menit)
      * - 12:00-13:00 = Absen shift 13-15 dengan status HADIR, shift 10-12 auto TIDAK_HADIR (jika masih BELUM_ABSEN)
      * - 13:00-15:00 = Absen shift 13-15 dengan status HADIR/TERLAMBAT
      * - 15:00-16:00 = Absen shift 16-18 dengan status HADIR, shift 13-15 auto TIDAK_HADIR (jika masih BELUM_ABSEN)
@@ -1329,7 +1329,7 @@ class AbsensiService {
                     
                     // Tentukan status berdasarkan keterlambatan
                     const keterlambatanMenit = jamInput.diff(jamMulai, 'minutes');
-                    if (keterlambatanMenit <= 15) {
+                    if (keterlambatanMenit <= 0) {
                         statusKehadiran = 'HADIR';
                         keterangan = 'Absen dengan RFID tepat waktu';
                     } else {
