@@ -71,6 +71,7 @@ router.get(
   '/v1/guru',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(guruValidation.getGuruQuery()),
   guruController.getAll
 );
 
@@ -79,6 +80,7 @@ router.get(
   '/v1/guru/jadwal',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(guruValidation.getJadwalGuruQuery()),
   guruController.getAllWithSchedules
 );
 

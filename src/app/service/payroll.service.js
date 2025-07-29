@@ -38,23 +38,30 @@ class PayrollService {
 
       logger.info(`Payroll filter - monthYear: ${monthYear}, parsed bulan: ${bulan}, tahun: ${tahun}`);
 
-      const where = {
-        bulan,
-        tahun
-      };
+      // Get all active gurus first
+      const gurus = await prisma.guru.findMany({
+        select: {
+          id: true,
+          nama: true,
+          nip: true,
+          noRekening: true,
+          namaBank: true
+        },
+        orderBy: { nama: 'asc' }
+      });
 
-      const result = await PrismaUtils.paginate(prisma.payroll, {
-        page,
-        limit,
-        where,
+      logger.info(`Found ${gurus.length} active gurus`);
+
+      // Get payroll data for all gurus in the specified month
+      const payrollData = await prisma.payroll.findMany({
+        where: {
+          bulan,
+          tahun,
+          guruId: {
+            in: gurus.map(guru => guru.id)
+          }
+        },
         include: {
-          guru: {
-            select: {
-              id: true,
-              nama: true,
-              nip: true
-            }
-          },
           absensiGuru: {
             where: {
               tanggal: {
@@ -86,13 +93,83 @@ class PayrollService {
               }
             }
           }
-        },
-        orderBy: { createdAt: 'desc' }
+        }
       });
 
-      logger.info(`Found ${result.data.length} payroll records with filter`);
+      logger.info(`Found ${payrollData.length} payroll records for ${bulan}-${tahun}`);
 
-      const formattedData = result.data.map((payroll, index) => {
+      // Create a map of guru payroll data for quick lookup
+      const payrollMap = new Map();
+      payrollData.forEach(payroll => {
+        payrollMap.set(payroll.guruId, payroll);
+      });
+
+      // Check if current date is before the 25th of the month
+      const currentDate = moment();
+      const targetMonth = moment(`${tahun}-${bulan}-01`);
+      const isBefore25th = currentDate.isBefore(targetMonth.clone().date(25));
+      const isCurrentMonth = currentDate.format('MM-YYYY') === `${bulan}-${tahun}`;
+
+      // Build response data for all gurus
+      const allGuruData = gurus.map(guru => {
+        const payroll = payrollMap.get(guru.id);
+        
+        if (!payroll) {
+          // No payroll data exists for this guru
+          if (isCurrentMonth && isBefore25th) {
+            // Before 25th of current month - payroll not calculated yet
+            return {
+              id: null,
+              namaGuru: guru.nama,
+              idGuru: guru.nip || guru.id,
+              bulan: this.getNamaBulan(parseInt(bulan)),
+              bulanAngka: parseInt(bulan),
+              tahun: parseInt(tahun),
+              status: 'BELUM_DIHITUNG',
+              paymentStatus: null,
+              tanggalKalkulasi: null,
+              gajiBersih: 0,
+              detail: {
+                mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
+                insentif: { jumlah: 0, rate: 10000, total: 0 },
+                potongan: {
+                  telat: { jumlah: 0, rate: 10000, total: 0 },
+                  izin: { jumlah: 0, rate: 10000, total: 0 },
+                  dll: { jumlah: 0, rate: 10000, total: 0 },
+                  totalPotongan: 0
+                }
+              },
+              message: 'Payroll akan dihitung otomatis pada tanggal 25'
+            };
+          } else {
+            // Past month or after 25th - no payroll data
+            return {
+              id: null,
+              namaGuru: guru.nama,
+              idGuru: guru.nip || guru.id,
+              bulan: this.getNamaBulan(parseInt(bulan)),
+              bulanAngka: parseInt(bulan),
+              tahun: parseInt(tahun),
+              status: 'TIDAK_ADA_DATA',
+              paymentStatus: null,
+              tanggalKalkulasi: null,
+              gajiBersih: 0,
+              detail: {
+                mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
+                insentif: { jumlah: 0, rate: 10000, total: 0 },
+                potongan: {
+                  telat: { jumlah: 0, rate: 10000, total: 0 },
+                  izin: { jumlah: 0, rate: 10000, total: 0 },
+                  dll: { jumlah: 0, rate: 10000, total: 0 },
+                  totalPotongan: 0
+                }
+              },
+              message: 'Tidak ada data payroll untuk periode ini'
+            };
+          }
+        }
+
+        // Payroll data exists - calculate as before
         const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
         const totalMengajar = absensiStats.totalSKS * 35000;
         const totalInsentif = absensiStats.totalInsentif;
@@ -100,8 +177,8 @@ class PayrollService {
 
         return {
           id: payroll.id,
-          namaGuru: payroll.guru.nama,
-          idGuru: payroll.guru.nip || payroll.guruId,
+          namaGuru: guru.nama,
+          idGuru: guru.nip || guru.id,
           bulan: this.getNamaBulan(parseInt(payroll.bulan)),
           bulanAngka: parseInt(payroll.bulan),
           tahun: payroll.tahun,
@@ -142,9 +219,31 @@ class PayrollService {
         };
       });
 
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = allGuruData.slice(startIndex, endIndex);
+
+      const totalItems = allGuruData.length;
+      const totalPages = Math.ceil(totalItems / limit);
+
       return {
-        data: formattedData,
-        pagination: result.pagination
+        data: paginatedData,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalItems,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        },
+        summary: {
+          totalGurus: gurus.length,
+          totalPayrollData: payrollData.length,
+          bulan: this.getNamaBulan(parseInt(bulan)),
+          tahun: parseInt(tahun),
+          isBefore25th: isCurrentMonth && isBefore25th
+        }
       };
     } catch (error) {
       logger.error('Error getting all payrolls for admin:', error);
@@ -439,26 +538,30 @@ class PayrollService {
       const { page = 1, limit = 10, monthYear } = filters;
       const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
 
-      const where = {
-        guruId,
-        bulan,
-        tahun
-      };
+      // Get guru data first
+      const guru = await prisma.guru.findUnique({
+        where: { id: guruId },
+        select: {
+          id: true,
+          nama: true,
+          nip: true,
+          noRekening: true,
+          namaBank: true
+        }
+      });
 
-      const result = await PrismaUtils.paginate(prisma.payroll, {
-        page,
-        limit,
-        where,
+      if (!guru) {
+        throw new NotFoundError('Guru tidak ditemukan');
+      }
+
+      // Get payroll data for this guru
+      const payrollData = await prisma.payroll.findMany({
+        where: {
+          guruId,
+          bulan,
+          tahun
+        },
         include: {
-          guru: {
-            select: {
-              id: true,
-              nama: true,
-              nip: true,
-              noRekening: true,
-              namaBank: true
-            }
-          },
           absensiGuru: {
             where: {
               tanggal: {
@@ -493,60 +596,146 @@ class PayrollService {
         orderBy: { createdAt: 'desc' }
       });
 
-      const formattedData = result.data.map(payroll => {
-        const absensiStats = this.calculateAbsensiStats(payroll.absensiGuru);
-        const disbursementStatus = this.getDisbursementStatus(payroll.payrollDisbursement);
-        const totalMengajar = absensiStats.totalSKS * 35000;
-        const totalInsentif = absensiStats.totalInsentif;
-        const totalPotongan = absensiStats.totalPotongan;
+      // Check if current date is before the 25th of the month
+      const currentDate = moment();
+      const targetMonth = moment(`${tahun}-${bulan}-01`);
+      const isBefore25th = currentDate.isBefore(targetMonth.clone().date(25));
+      const isCurrentMonth = currentDate.format('MM-YYYY') === `${bulan}-${tahun}`;
 
-        return {
-          id: payroll.id,
-          namaGuru: payroll.guru.nama,
-          idGuru: payroll.guru.nip || payroll.guruId,
-          bulan: this.getNamaBulan(parseInt(payroll.bulan)),
-          bulanAngka: parseInt(payroll.bulan),
-          tahun: payroll.tahun,
-          status: payroll.status,
-          paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
-          gajiBersih: totalMengajar + totalInsentif - totalPotongan,
-          detail: {
-            mengajar: {
-              jumlah: absensiStats.totalSKS,
-              sksRate: 35000,
-              total: totalMengajar
+      let formattedData;
+
+      if (payrollData.length === 0) {
+        // No payroll data exists
+        if (isCurrentMonth && isBefore25th) {
+          // Before 25th of current month - payroll not calculated yet
+          formattedData = [{
+            id: null,
+            namaGuru: guru.nama,
+            idGuru: guru.nip || guru.id,
+            bulan: this.getNamaBulan(parseInt(bulan)),
+            bulanAngka: parseInt(bulan),
+            tahun: parseInt(tahun),
+            status: 'BELUM_DIHITUNG',
+            paymentStatus: null,
+            tanggalKalkulasi: null,
+            gajiBersih: 0,
+            detail: {
+              mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
+              insentif: { jumlah: 0, rate: 10000, total: 0 },
+              potongan: {
+                telat: { jumlah: 0, rate: 10000, total: 0 },
+                izin: { jumlah: 0, rate: 10000, total: 0 },
+                dll: { jumlah: 0, rate: 10000, total: 0 },
+                totalPotongan: 0
+              }
             },
-            insentif: {
-              jumlah: absensiStats.totalKehadiran,
-              rate: 10000,
-              total: totalInsentif
+            message: 'Payroll akan dihitung otomatis pada tanggal 25'
+          }];
+        } else {
+          // Past month or after 25th - no payroll data
+          formattedData = [{
+            id: null,
+            namaGuru: guru.nama,
+            idGuru: guru.nip || guru.id,
+            bulan: this.getNamaBulan(parseInt(bulan)),
+            bulanAngka: parseInt(bulan),
+            tahun: parseInt(tahun),
+            status: 'TIDAK_ADA_DATA',
+            paymentStatus: null,
+            tanggalKalkulasi: null,
+            gajiBersih: 0,
+            detail: {
+              mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
+              insentif: { jumlah: 0, rate: 10000, total: 0 },
+              potongan: {
+                telat: { jumlah: 0, rate: 10000, total: 0 },
+                izin: { jumlah: 0, rate: 10000, total: 0 },
+                dll: { jumlah: 0, rate: 10000, total: 0 },
+                totalPotongan: 0
+              }
             },
-            potongan: {
-              telat: {
-                jumlah: absensiStats.rincianKehadiran.tidakHadir,
-                rate: 10000,
-                total: absensiStats.totalPotongan
+            message: 'Tidak ada data payroll untuk periode ini'
+          }];
+        }
+      } else {
+        // Payroll data exists - format as before
+        formattedData = payrollData.map(payroll => {
+          const absensiStats = this.calculateAbsensiStats(payroll.absensiGuru);
+          const disbursementStatus = this.getDisbursementStatus(payroll.payrollDisbursement);
+          const totalMengajar = absensiStats.totalSKS * 35000;
+          const totalInsentif = absensiStats.totalInsentif;
+          const totalPotongan = absensiStats.totalPotongan;
+
+          return {
+            id: payroll.id,
+            namaGuru: guru.nama,
+            idGuru: guru.nip || guru.id,
+            bulan: this.getNamaBulan(parseInt(payroll.bulan)),
+            bulanAngka: parseInt(payroll.bulan),
+            tahun: payroll.tahun,
+            status: payroll.status,
+            paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
+            tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
+            gajiBersih: totalMengajar + totalInsentif - totalPotongan,
+            detail: {
+              mengajar: {
+                jumlah: absensiStats.totalSKS,
+                sksRate: 35000,
+                total: totalMengajar
               },
-              izin: {
-                jumlah: absensiStats.rincianKehadiran.izin,
+              insentif: {
+                jumlah: absensiStats.totalKehadiran,
                 rate: 10000,
-                total: 0
+                total: totalInsentif
               },
-              dll: {
-                jumlah: absensiStats.rincianKehadiran.sakit,
-                rate: 10000,
-                total: 0
-              },
-              totalPotongan: absensiStats.totalPotongan
+              potongan: {
+                telat: {
+                  jumlah: absensiStats.rincianKehadiran.tidakHadir,
+                  rate: 10000,
+                  total: absensiStats.totalPotongan
+                },
+                izin: {
+                  jumlah: absensiStats.rincianKehadiran.izin,
+                  rate: 10000,
+                  total: 0
+                },
+                dll: {
+                  jumlah: absensiStats.rincianKehadiran.sakit,
+                  rate: 10000,
+                  total: 0
+                },
+                totalPotongan: absensiStats.totalPotongan
+              }
             }
-          }
-        };
-      });
+          };
+        });
+      }
+
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = formattedData.slice(startIndex, endIndex);
+
+      const totalItems = formattedData.length;
+      const totalPages = Math.ceil(totalItems / limit);
 
       return {
-        data: formattedData,
-        pagination: result.meta
+        data: paginatedData,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalItems,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        },
+        summary: {
+          guruId: guru.id,
+          namaGuru: guru.nama,
+          bulan: this.getNamaBulan(parseInt(bulan)),
+          tahun: parseInt(tahun),
+          isBefore25th: isCurrentMonth && isBefore25th
+        }
       };
     } catch (error) {
       logger.error('Error getting payrolls for guru:', error);

@@ -32,15 +32,20 @@ class GaleriController {
     });
 
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
+        const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'judul']);
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const result = await galeriService.getAll();
-        const transformedResult = FileUtils.transformGaleriListFiles(result, baseUrl);
-        const mappedResult = transformedResult.map(galeri => ({
-            galeriId: galeri.id,
-            judulFoto: galeri.judulFoto,
-            coverGaleri: galeri.coverGaleri
-        }));
-        return Http.Response.success(res, mappedResult, 'Data galeri berhasil diambil');
+        const result = await galeriService.getAll(filters);
+        
+        const transformedData = {
+            ...result,
+            data: result.data.map(galeri => ({
+                galeriId: galeri.id,
+                judulFoto: galeri.judulFoto,
+                coverGaleri: FileUtils.getImageUrl(baseUrl, galeri.coverGaleri)
+            }))
+        };
+        
+        return Http.Response.success(res, transformedData, 'Data galeri berhasil diambil');
     });
 
     update = ErrorHandler.asyncHandler(async (req, res) => {

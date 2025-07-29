@@ -6,7 +6,6 @@ const { uploadCoverMiddleware } = require('../../middleware/upload.middleware');
 const ProgramController = require('../../controller/program.controller');
 const ProgramValidation = require('../../validation/program.validation');
 
-// API v1 - Internal (dengan authentication)
 router.post(
     '/v1/program',
     authMiddleware.authenticate,
@@ -43,6 +42,7 @@ router.delete(
 
 router.get(
     '/v1/program',
+    validationMiddleware.validateQuery(ProgramValidation.getProgramQuery()),
     ProgramController.getAll
 );
 

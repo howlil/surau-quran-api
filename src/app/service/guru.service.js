@@ -221,11 +221,20 @@ class GuruService {
 
   async getAll(filters = {}) {
     try {
-      const { page = 1, limit = 10 } = filters;
+      const { page = 1, limit = 10, nama } = filters;
+
+      const where = {};
+      
+      if (nama) {
+        where.nama = {
+          contains: nama
+        };
+      }
 
       return await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
+        where,
         select: {
           id: true,
           nama: true,
@@ -256,11 +265,20 @@ class GuruService {
 
   async getAllGuruWithSchedules(filters = {}) {
     try {
-      const { page = 1, limit = 10 } = filters;
+      const { page = 1, limit = 10, nama } = filters;
+
+      const where = {};
+      
+      if (nama) {
+        where.nama = {
+          contains: nama
+        };
+      }
 
       const paginatedResult = await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
+        where,
         select: {
           id: true,
           nama: true,

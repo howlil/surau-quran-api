@@ -27,17 +27,22 @@ class TestimoniController {
     });
 
     getAll = ErrorHandler.asyncHandler(async (req, res) => {
+        const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'nama']);
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const result = await testimoniService.getAll();
-        const transformedResult = FileUtils.transformTestimoniListFiles(result, baseUrl);
-        const mappedResult = transformedResult.map(testimoni => ({
-            testimoniId: testimoni.id,
-            nama: testimoni.nama,
-            posisi: testimoni.posisi,
-            isi: testimoni.isi,
-            fotoUrl: testimoni.fotoUrl
-        }));
-        return Http.Response.success(res, mappedResult, 'Data testimoni berhasil diambil');
+        const result = await testimoniService.getAll(filters);
+        
+        const transformedData = {
+            ...result,
+            data: result.data.map(testimoni => ({
+                testimoniId: testimoni.id,
+                nama: testimoni.nama,
+                posisi: testimoni.posisi,
+                isi: testimoni.isi,
+                fotoUrl: FileUtils.getImageUrl(baseUrl, testimoni.fotoUrl)
+            }))
+        };
+        
+        return Http.Response.success(res, transformedData, 'Data testimoni berhasil diambil');
     });
 
 

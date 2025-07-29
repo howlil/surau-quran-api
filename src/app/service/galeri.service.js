@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, handlePrismaError } = require('../../lib/http/error.handler.http');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class GaleriService {
     async create(data) {
@@ -20,13 +21,24 @@ class GaleriService {
         }
     }
 
-    async getAll() {
+    async getAll(filters = {}) {
         try {
-            const galeriList = await prisma.galeri.findMany({
+            const { page = 1, limit = 10, judul } = filters;
+
+            const where = {};
+            
+            if (judul) {
+                where.judulFoto = {
+                    contains: judul
+                };
+            }
+
+            return await PrismaUtils.paginate(prisma.galeri, {
+                page,
+                limit,
+                where,
                 orderBy: { createdAt: 'desc' }
             });
-
-            return galeriList;
         } catch (error) {
             logger.error('Error getting all galeri:', error);
             throw handlePrismaError(error);

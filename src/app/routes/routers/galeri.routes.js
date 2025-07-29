@@ -9,6 +9,7 @@ const GaleriValidation = require('../../validation/galeri.validation');
 // GET all galeri
 router.get(
     '/v1/galeri',
+    validationMiddleware.validateQuery(GaleriValidation.getGaleriQuery()),
     GaleriController.getAll
 );
 

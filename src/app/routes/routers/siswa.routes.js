@@ -47,6 +47,7 @@ router.get(
   '/v1/pendaftaran/invoice',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(siswaValidation.getPendaftaranInvoiceQuery()),
   siswaController.getPendaftaranInvoice
 )
 

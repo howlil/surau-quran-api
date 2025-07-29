@@ -9,6 +9,7 @@ const TestimoniValidation = require('../../validation/testimoni.validation');
 // GET all testimoni
 router.get(
     '/v1/testimoni',
+    validationMiddleware.validateQuery(TestimoniValidation.getTestimoniQuery()),
     TestimoniController.getAll
 );
 

@@ -60,12 +60,24 @@ class ProgramController {
   });
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
-    const result = await programService.getAll();
-    const mappedResult = result.map(program => ({
-      programId: program.id,
-      namaProgram: program.namaProgram
-    }));
-    return Http.Response.success(res, mappedResult, 'Data program berhasil diambil');
+    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'namaProgram']);
+    const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+    const result = await programService.getAll(filters);
+    
+    const transformedData = {
+      ...result,
+      data: result.data.map(program => ({
+        programId: program.id,
+        namaProgram: program.namaProgram,
+        deskripsi: program.deskripsi,
+        cover: FileUtils.getImageUrl(baseUrl, program.cover),
+        biayaSpp: Number(program.biayaSpp),
+        createdAt: program.createdAt,
+        updatedAt: program.updatedAt
+      }))
+    };
+    
+    return Http.Response.success(res, transformedData, 'Data program berhasil diambil');
   });
 
   getAllPublic = ErrorHandler.asyncHandler(async (req, res) => {

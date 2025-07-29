@@ -27,6 +27,19 @@ class StatisticsController {
     // Get today's schedule with student counts
     getTodaySchedule = ErrorHandler.asyncHandler(async (req, res) => {
         const result = await statisticsService.getTodaySchedule();
+        
+        // Validasi hari Minggu - tidak ada jadwal
+        if (result.hari === 'MINGGU') {
+            return Http.Response.success(res, {
+                tanggal: result.tanggal,
+                hari: result.hari,
+                message: 'Tidak ada jadwal kelas pada hari Minggu',
+                jumlahSiswa: 0,
+                siswaHadir: 0,
+                schedules: []
+            }, 'Tidak ada jadwal kelas pada hari Minggu');
+        }
+        
         return Http.Response.success(res, result, 'Jadwal hari ini berhasil diambil');
     });
 }

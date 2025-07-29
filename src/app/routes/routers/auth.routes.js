@@ -25,6 +25,7 @@ router.post('/v1/admin',
 
 router.get('/v1/admin',
   authMiddleware.authenticate,
+  validationMiddleware.validateQuery(authValidation.getAdminQuery()),
   authController.getAllAdmins
 );
 
@@ -54,6 +55,11 @@ router.patch('/v1/change-password',
   authMiddleware.authenticate,
   validationMiddleware.validateBody(authValidation.changePassword()),
   authController.changePassword
+);
+
+router.post('/v1/role/rfid',
+  validationMiddleware.validateBody(authValidation.checkRoleByRfid()),
+  authController.checkRoleByRfid
 );
 
 module.exports = router;

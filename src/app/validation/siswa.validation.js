@@ -98,7 +98,7 @@ class SiswaValidation {
   }
 
   static updateStatusSiswa() {
-    return ValidatorFactory.create({
+    return Joi.object({
       programId: Joi.string().guid({ version: 'uuidv4' }).optional()
         .messages({
           'string.guid': 'Program ID harus berupa UUID yang valid'
@@ -298,6 +298,37 @@ class SiswaValidation {
       ).max(2).optional()
         .messages({
           'array.max': 'Jadwal maksimal 2 pilihan'
+        })
+    });
+  }
+
+  static getPendaftaranInvoiceQuery() {
+    return ValidatorFactory.create({
+      tanggal: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
+        .messages({
+          'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
+        }),
+      status: Joi.string().valid('PENDING', 'PAID', 'EXPIRED', 'FAILED').optional()
+        .messages({
+          'any.only': 'Status harus salah satu dari: PENDING, PAID, EXPIRED, FAILED'
+        }),
+      nama: Joi.string().min(1).max(191).optional()
+        .messages({
+          'string.min': 'Nama minimal 1 karakter',
+          'string.max': 'Nama maksimal 191 karakter'
+        }),
+      page: Joi.number().integer().min(1).default(1)
+        .messages({
+          'number.base': 'Page harus berupa angka',
+          'number.integer': 'Page harus berupa bilangan bulat',
+          'number.min': 'Page minimal 1'
+        }),
+      limit: Joi.number().integer().min(1).max(100).default(10)
+        .messages({
+          'number.base': 'Limit harus berupa angka',
+          'number.integer': 'Limit harus berupa bilangan bulat',
+          'number.min': 'Limit minimal 1',
+          'number.max': 'Limit maksimal 100'
         })
     });
   }

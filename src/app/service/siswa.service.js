@@ -5,6 +5,7 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const paymentService = require('./payment.service');
+const financeService = require('./finance.service');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
 const SppService = require('./spp.service');
@@ -363,6 +364,23 @@ class SiswaService {
         logger.info(`Registration completed successfully for ${user.email}, but welcome email could not be sent`);
       }
 
+      // Auto-sync to Finance when enrollment payment is successful
+      try {
+        await financeService.createFromEnrollmentPayment({
+          id: pembayaranId,
+          jumlahTagihan: pendaftaranTemp.totalBiaya,
+          tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
+        });
+        logger.info(`Auto-created finance record for enrollment payment ID: ${pembayaranId}, Amount: ${pendaftaranTemp.totalBiaya}`);
+      } catch (financeError) {
+        // Log error but don't fail the main enrollment processing
+        logger.error('Failed to auto-sync enrollment payment to finance:', {
+          pembayaranId,
+          amount: pendaftaranTemp.totalBiaya,
+          error: financeError.message
+        });
+      }
+
       logger.info(`Successfully completed pendaftaran process for siswa: ${siswa.namaMurid} (ID: ${siswa.id})`);
       return siswa;
     } catch (error) {
@@ -377,7 +395,7 @@ class SiswaService {
 
 
   async getPendaftaranInvoice(invoices, filters = {}) {
-    const { status, tanggal, page = 1, limit = 10 } = filters;
+    const { status, tanggal, nama, page = 1, limit = 10 } = filters;
 
     let filteredInvoices = invoices;
     if (status) {
@@ -527,16 +545,41 @@ class SiswaService {
       result.push(data);
     }
 
+    // Apply nama filter if provided
+    let finalResult = result;
+    if (nama) {
+      finalResult = result.filter(item => {
+        const studentName = item.student?.nama || '';
+        return studentName.toLowerCase().includes(nama.toLowerCase());
+      });
+    }
+
     return {
-      result,
+      result: finalResult,
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total: filteredInvoices.length
+        total: finalResult.length
       }
     };
   }
 
+  /**
+   * Get all siswa dengan program terbaru
+   * 
+   * Logic pengambilan program:
+   * 1. Query mengambil programSiswa dengan orderBy: { createdAt: 'desc' }
+   * 2. take: 1 untuk mengambil hanya 1 record terbaru
+   * 3. Jika siswa memiliki multiple program (naik kelas/pindah program), 
+   *    yang ditampilkan adalah program yang TERBARU
+   * 
+   * Contoh scenario:
+   * - Siswa A: BTA LVL 1 (AKTIF) → BTA LVL 2 (AKTIF) → BTA LVL 2 (CUTI)
+   * - Yang ditampilkan: BTA LVL 2 dengan status CUTI
+   * 
+   * - Siswa B: Tahsin (AKTIF) → Tahfidz (AKTIF) → Tahfidz (TIDAK_AKTIF)
+   * - Yang ditampilkan: Tahfidz dengan status TIDAK_AKTIF
+   */
   async getAll(filters = {}) {
     try {
       const { nama, programId, page = 1, limit = 10 } = filters;
@@ -553,8 +596,7 @@ class SiswaService {
       if (programId) {
         where.programSiswa = {
           some: {
-            programId: programId,
-            status: 'AKTIF'
+            programId: programId
           }
         };
       }
@@ -583,12 +625,13 @@ class SiswaService {
             }
           },
           programSiswa: {
-            where: {
-              status: 'AKTIF'
-            },
             take: 1,
+            orderBy: { createdAt: 'desc' },
             select: {
+              id: true,
               status: true,
+              createdAt: true,
+              updatedAt: true,
               program: {
                 select: {
                   id: true,
@@ -621,10 +664,41 @@ class SiswaService {
       });
 
       // Transform programSiswa dari array menjadi objek tunggal
-      const transformedData = result.data.map(siswa => ({
-        ...siswa,
-        programSiswa: siswa.programSiswa.length > 0 ? siswa.programSiswa[0] : null
-      }));
+      // Logic: Mengambil program siswa yang TERBARU berdasarkan createdAt DESC
+      // Jika siswa naik kelas atau pindah program, yang ditampilkan adalah program terbaru
+      // Contoh: Siswa dari BTA LVL 1 → BTA LVL 2 → CUTI di BTA LVL 2
+      // Yang ditampilkan: BTA LVL 2 dengan status CUTI
+      const transformedData = result.data.map(siswa => {
+        const latestProgram = siswa.programSiswa.length > 0 ? siswa.programSiswa[0] : null;
+        
+        // Debug log untuk semua program siswa (untuk tracking)
+        if (siswa.programSiswa.length > 1) {
+          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki ${siswa.programSiswa.length} program. Mengambil yang terbaru: ${latestProgram?.program?.namaProgram} (${latestProgram?.status})`);
+          
+          // Log semua program untuk debugging
+          siswa.programSiswa.forEach((program, index) => {
+            logger.info(`  Program ${index + 1}: ${program.program?.namaProgram} - Status: ${program.status} - Created: ${program.createdAt}`);
+          });
+        }
+        
+        const transformedSiswa = {
+          ...siswa,
+          programSiswa: latestProgram ? {
+            ...latestProgram,
+            statusProgram: latestProgram.status, // Menambahkan status program
+            isActive: latestProgram.status === 'AKTIF', // Flag untuk status aktif
+            createdAt: latestProgram.createdAt, // Tambahkan createdAt untuk tracking
+            updatedAt: latestProgram.updatedAt // Tambahkan updatedAt untuk tracking
+          } : null
+        };
+
+        // Debug log untuk siswa yang statusnya CUTI
+        if (latestProgram && latestProgram.status === 'CUTI') {
+          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki status program: ${latestProgram.status} pada program: ${latestProgram.program?.namaProgram}`);
+        }
+
+        return transformedSiswa;
+      });
 
       return {
         ...result,
@@ -1086,28 +1160,54 @@ class SiswaService {
 
   async updateStatusSiswa(programId, siswaId, status) {
     try {
-      // Find the active program for this student
-      const activeProgramSiswa = await prisma.programSiswa.findFirst({
+      // Find the program for this student (bisa aktif atau tidak aktif)
+      const programSiswa = await prisma.programSiswa.findFirst({
         where: {
           siswaId,
-          status: 'AKTIF'
+          ...(programId && { programId }) // Only filter by programId if provided
+        },
+        include: {
+          program: {
+            select: {
+              id: true,
+              namaProgram: true
+            }
+          },
+          siswa: {
+            select: {
+              id: true,
+              namaMurid: true,
+              nis: true
+            }
+          }
         }
       });
 
-      if (!activeProgramSiswa) {
-        throw new NotFoundError(`Siswa dengan ID ${siswaId} tidak memiliki program aktif`);
+      if (!programSiswa) {
+        throw new NotFoundError(`Program siswa tidak ditemukan untuk siswa ID ${siswaId}${programId ? ` dan program ID ${programId}` : ''}`);
       }
 
-      // Validate that the programId matches the active program (optional check)
-      if (programId && activeProgramSiswa.programId !== programId) {
-        throw new BadRequestError(`Program ID ${programId} tidak sesuai dengan program aktif siswa`);
-      }
+      const oldStatus = programSiswa.status;
 
-      const oldStatus = activeProgramSiswa.status;
-
+      // Update status
       const updatedProgramSiswa = await prisma.programSiswa.update({
-        where: { id: activeProgramSiswa.id },
-        data: { status }
+        where: { id: programSiswa.id },
+        data: { status },
+        include: {
+          program: {
+            select: {
+              id: true,
+              namaProgram: true
+            }
+          },
+          siswa: {
+            select: {
+              id: true,
+              namaMurid: true,
+              nis: true
+            }
+          }
+        }
       });
 
       // Catat riwayat perubahan status
@@ -1116,12 +1216,27 @@ class SiswaService {
           programSiswaId: updatedProgramSiswa.id,
           statusLama: oldStatus,
           statusBaru: status,
-          tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
-          keterangan: `Status diubah menjadi ${status}`
+          tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
         }
       });
 
-      return updatedProgramSiswa;
+      logger.info(`Successfully updated status for siswa ${updatedProgramSiswa.siswa.namaMurid} (${updatedProgramSiswa.siswa.nis}) from ${oldStatus} to ${status} in program ${updatedProgramSiswa.program.namaProgram}`);
+
+      return {
+        programId: updatedProgramSiswa.programId,
+        status: updatedProgramSiswa.status,
+        siswa: {
+          id: updatedProgramSiswa.siswa.id,
+          namaMurid: updatedProgramSiswa.siswa.namaMurid,
+          nis: updatedProgramSiswa.siswa.nis
+        },
+        program: {
+          id: updatedProgramSiswa.program.id,
+          namaProgram: updatedProgramSiswa.program.namaProgram
+        },
+        statusLama: oldStatus,
+        statusBaru: status
+      };
     } catch (error) {
       logger.error(`Error updating status for siswa ID ${siswaId}:`, error);
       throw error;

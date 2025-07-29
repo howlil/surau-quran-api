@@ -200,8 +200,8 @@ class SppService {
                     }
                 },
                 orderBy: [
-                    { tahun: 'desc' },
-                    { tanggalTagihan: 'desc' }
+                    { tahun: 'asc' },
+                    { bulan: 'asc' }
                 ]
             });
 

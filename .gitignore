@@ -5,3 +5,5 @@ generated
 .idea
 .github/instructions
 logs
+venv
+scripts/

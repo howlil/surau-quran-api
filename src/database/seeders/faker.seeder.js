@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const prismaClient = new PrismaClient();
 
-const TOTAL_RECORDS = 60; // Increased for more comprehensive data
+const TOTAL_RECORDS = 4; // Increased for more comprehensive data
 const DEFAULT_PASSWORD = '@Test123';
 
 // Updated shift times to match working hours (10:00 - 20:45)

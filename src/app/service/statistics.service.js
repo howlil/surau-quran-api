@@ -494,6 +494,19 @@ class StatisticsService {
             const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
             const todayDayName = dayNames[moment().day()];
 
+            // Validasi hari Minggu - tidak ada jadwal
+            if (todayDayName === 'MINGGU') {
+                logger.info(`Today is Sunday (${today}) - No class schedules available`);
+                return {
+                    tanggal: today,
+                    hari: todayDayName,
+                    message: 'Tidak ada jadwal kelas pada hari Minggu',
+                    jumlahSiswa: 0,
+                    siswaHadir: 0,
+                    schedules: []
+                };
+            }
+
             // Get total registered students count
             const jumlahSiswa = await prisma.siswa.count({
                 where: {
@@ -567,6 +580,7 @@ class StatisticsService {
 
             const result = {
                 tanggal: today,
+                hari: todayDayName,
                 jumlahSiswa,
                 siswaHadir,
                 schedules

@@ -43,7 +43,7 @@ class SiswaController {
   });
 
   getPendaftaranInvoice = ErrorHandler.asyncHandler(async (req, res) => {
-    const filters = HttpRequest.getQueryParams(req, ['tanggal', 'status', 'page', 'limit']);
+    const filters = HttpRequest.getQueryParams(req, ['tanggal', 'status', 'nama', 'page', 'limit']);
 
     const invoices = await XenditUtils.getAllInvoice()
 
@@ -59,8 +59,12 @@ class SiswaController {
       message: 'Status program siswa berhasil diperbarui',
       data: {
         siswaId: id,
+        siswaNama: result.siswa.namaMurid,
+        siswaNis: result.siswa.nis,
         programId: result.programId,
-        statusBaru: result.status
+        programNama: result.program.namaProgram,
+        statusLama: result.statusLama,
+        statusBaru: result.statusBaru
       }
     });
   });

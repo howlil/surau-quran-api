@@ -143,6 +143,40 @@ class AbsensiValidation {
         });
     }
 
+    createAbsensiSiswa() {
+        return Joi.object({
+            kelasProgramId: Joi.string().guid({ version: 'uuidv4' }).required()
+                .messages({
+                    'string.guid': 'Kelas Program ID harus berupa UUID yang valid',
+                    'any.required': 'Kelas Program ID wajib diisi'
+                }),
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .required()
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'any.required': 'Tanggal wajib diisi'
+                })
+        });
+    }
+
+    updateAbsensiGuruWithRfid() {
+        return Joi.object({
+            rfid: Joi.string().required().messages({
+                'string.empty': 'RFID tidak boleh kosong',
+                'any.required': 'RFID wajib diisi'
+            }),
+            tanggal: Joi.string().regex(/^\d{2}-\d{2}-\d{4}$/).required().messages({
+                'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                'any.required': 'Tanggal wajib diisi'
+            }),
+            jam: Joi.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).required().messages({
+                'string.pattern.base': 'Format jam harus HH:MM (24 jam)',
+                'any.required': 'Jam wajib diisi'
+            })
+        });
+    }
+
 
 }
 

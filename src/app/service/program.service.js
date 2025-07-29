@@ -105,22 +105,37 @@ class ProgramService {
     }
   }
 
-  async getAll() {
+  async getAll(filters = {}) {
     try {
-      const programList = await prisma.program.findMany({
+      const { page = 1, limit = 10, namaProgram } = filters;
+
+      const where = {};
+      
+      if (namaProgram) {
+        where.namaProgram = {
+          contains: namaProgram
+        };
+      }
+
+      return await PrismaUtils.paginate(prisma.program, {
+        page,
+        limit,
+        where,
         select: {
           id: true,
-          namaProgram: true
+          namaProgram: true,
+          deskripsi: true,
+          cover: true,
+          biayaSpp: true,
+          createdAt: true,
+          updatedAt: true
         },
         orderBy: { namaProgram: 'asc' }
       });
-
-      return programList;
     } catch (error) {
       logger.error('Error getting all programs:', error);
       throw error;
     }
-
   }
 
   async getAllPublic() {

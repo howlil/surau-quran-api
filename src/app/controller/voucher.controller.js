@@ -25,7 +25,7 @@ class VoucherController {
 
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
-    const filters = HttpRequest.getQueryParams(req, ['page', 'limit']);
+    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'nama']);
     const result = await voucherService.getAll(filters);
     return Http.Response.success(res, result);
   });

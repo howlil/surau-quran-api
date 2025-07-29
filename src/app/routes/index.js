@@ -16,6 +16,7 @@ const testimoniRoutes = require('./routers/testimoni.routes');
 const galeriRoutes = require('./routers/galeri.routes');
 const financeRoutes = require('./routers/finance.routes');
 const sppReminderRoutes = require('./routers/spp-reminder.routes');
+const rfidRoutes = require('./routers/rfid.routes');
 
 // API Routes
 router.use(authRoutes);
@@ -34,5 +35,6 @@ router.use(testimoniRoutes);
 router.use(galeriRoutes);
 router.use(financeRoutes);
 router.use(sppReminderRoutes);
+router.use(rfidRoutes);
 
 module.exports = router;

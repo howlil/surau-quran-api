@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, handlePrismaError } = require('../../lib/http/error.handler.http');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class TestimoniService {
     async create(data) {
@@ -22,13 +23,25 @@ class TestimoniService {
         }
     }
 
-    async getAll() {
+    async getAll(filters = {}) {
         try {
-            const testimoniList = await prisma.testimoni.findMany({
+            const { page = 1, limit = 10, nama } = filters;
+
+            const where = {};
+            
+            if (nama) {
+                where.OR = [
+                    { nama: { contains: nama } },
+                    { posisi: { contains: nama } }
+                ];
+            }
+
+            return await PrismaUtils.paginate(prisma.testimoni, {
+                page,
+                limit,
+                where,
                 orderBy: { createdAt: 'desc' }
             });
-
-            return testimoniList;
         } catch (error) {
             logger.error('Error getting all testimoni:', error);
             throw handlePrismaError(error);

@@ -45,4 +45,17 @@ router.get('/v2/absensi/siswa/:kelasProgramId',
     absensiController.getAbsensiSiswaByKelasProgram
 );
 
+router.post('/v1/absensi/siswa',
+    authMiddleware.authenticate,
+    authMiddleware.authorize(['GURU']),
+    validationMiddleware.validateBody(absensiValidation.createAbsensiSiswa()),
+    absensiController.createAbsensiSiswa
+);
+
+// Update absensi guru dengan RFID (tanpa autentikasi)
+router.post('/v1/absensi/guru/rfid',
+    validationMiddleware.validateBody(absensiValidation.updateAbsensiGuruWithRfid()),
+    absensiController.updateAbsensiGuruWithRfid
+);
+
 module.exports = router; 

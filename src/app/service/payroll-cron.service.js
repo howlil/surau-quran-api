@@ -179,6 +179,8 @@ class PayrollCronService {
     }
   }
 
+
+
   static async runManualPayrollGeneration(bulan, tahun) {
     logger.info(`Running manual payroll generation for ${bulan} ${tahun}...`);
 

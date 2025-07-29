@@ -1,5 +1,6 @@
 const authService = require('../service/auth.service');
 const Http = require('../../lib/http');
+const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError } = require('../../lib/http/error.handler.http');
@@ -30,8 +31,19 @@ class AuthController {
 
   getAllAdmins = ErrorHandler.asyncHandler(async (req, res) => {
     const userId = req.user.id;
-    const admins = await authService.getAllAdmins(userId);
-    return Http.Response.success(res, admins, 'Daftar admin berhasil diambil');
+    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'nama']);
+    const result = await authService.getAllAdmins(userId, filters);
+    
+    const transformedData = {
+      ...result,
+      data: result.data.map(admin => ({
+        id: admin.id,
+        nama: admin.nama,
+        email: admin.user.email,
+      }))
+    };
+    
+    return Http.Response.success(res, transformedData, 'Daftar admin berhasil diambil');
   });
 
   updateAdmin = ErrorHandler.asyncHandler(async (req, res) => {
@@ -96,6 +108,12 @@ class AuthController {
     const userId = req.user.id;
     const result = await authService.changePassword(userId, oldPassword, newPassword);
     return Http.Response.success(res, null, result.message);
+  });
+
+  checkRoleByRfid = ErrorHandler.asyncHandler(async (req, res) => {
+    const { rfid } = req.body;
+    const result = await authService.checkRoleByRfid(rfid);
+    return Http.Response.success(res, result, 'Role berhasil ditemukan');
   });
 }
 

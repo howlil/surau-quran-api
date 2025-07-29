@@ -34,6 +34,7 @@ router.get(
   '/v1/voucher',
   authMiddleware.authenticate,
   authMiddleware.authorize(['ADMIN']),
+  validationMiddleware.validateQuery(voucherValidation.getVoucherQuery()),
   voucherController.getAll
 );
 

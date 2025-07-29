@@ -4,6 +4,7 @@ const { logger } = require('../../lib/config/logger.config');
 const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const PrismaUtils = require('../../lib/utils/prisma.utils');
 const crypto = require('crypto');
 const moment = require('moment');
 
@@ -234,7 +235,12 @@ class AuthService {
 
         try {
             const user = await prisma.user.findUnique({
-                where: { email: email.toLowerCase().trim() }
+                where: { email: email.toLowerCase().trim() },
+                include: {
+                    siswa: true,
+                    guru: true,
+                    admin: true
+                }
             });
 
             if (!user) {
@@ -247,6 +253,16 @@ class AuthService {
                 throw new UnauthorizedError('Email atau password salah');
             }
 
+            // Get nama based on user role
+            let nama = '';
+            if (user.role === 'SISWA' && user.siswa) {
+                nama = user.siswa.namaMurid;
+            } else if (user.role === 'GURU' && user.guru) {
+                nama = user.guru.nama;
+            } else if (user.role === 'ADMIN' && user.admin) {
+                nama = user.admin.nama;
+            }
+
             const token = await TokenUtils.generateToken(user.id);
 
             return {
@@ -255,6 +271,7 @@ class AuthService {
                 user: {
                     id: user.id,
                     email: user.email,
+                    nama: nama,
                     role: user.role
                 }
             };
@@ -323,8 +340,10 @@ class AuthService {
         }
     }
 
-    async getAllAdmins(requestUserId) {
+    async getAllAdmins(requestUserId, filters = {}) {
         try {
+            const { page = 1, limit = 10, nama } = filters;
+            
             const requestUser = await prisma.user.findUnique({
                 where: { id: requestUserId },
                 include: { admin: true }
@@ -334,7 +353,18 @@ class AuthService {
                 throw new ForbiddenError('Hanya admin yang dapat melihat daftar admin');
             }
 
-            const admins = await prisma.admin.findMany({
+            const where = {};
+            
+            if (nama) {
+                where.nama = {
+                    contains: nama
+                };
+            }
+
+            return await PrismaUtils.paginate(prisma.admin, {
+                page,
+                limit,
+                where,
                 include: {
                     user: {
                         select: {
@@ -342,14 +372,9 @@ class AuthService {
                             email: true,
                         }
                     }
-                }
+                },
+                orderBy: { createdAt: 'desc' }
             });
-
-            return admins.map(admin => ({
-                id: admin.id,
-                nama: admin.nama,
-                email: admin.user.email,
-            }));
         } catch (error) {
             logger.error('Get admins error:', error);
             throw handlePrismaError(error);
@@ -468,6 +493,28 @@ class AuthService {
             return true;
         } catch (error) {
             logger.error('Delete admin error:', error);
+            throw handlePrismaError(error);
+        }
+    }
+
+    async checkRoleByRfid(rfid) {
+        try {
+            const user = await prisma.user.findUnique({
+                where: { rfid },
+                select: {
+                    role: true
+                }
+            });
+
+            if (!user) {
+                throw new NotFoundError('RFID tidak ditemukan');
+            }
+
+            return {
+                role: user.role
+            };
+        } catch (error) {
+            logger.error('Check role by RFID error:', error);
             throw handlePrismaError(error);
         }
     }

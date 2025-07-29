@@ -94,11 +94,21 @@ class VoucherService {
   }
 
   async getAll(filters = {}) {
-    const { page = 1, limit = 10 } = filters;
+    const { page = 1, limit = 10, nama } = filters;
     try {
+      const where = {};
+      
+      if (nama) {
+        where.OR = [
+          { namaVoucher: { contains: nama } },
+          { kodeVoucher: { contains: nama } }
+        ];
+      }
+
       const voucherList = await PrismaUtils.paginate(prisma.voucher, {
         page,
         limit,
+        where,
         select: {
           id: true,
           kodeVoucher: true,

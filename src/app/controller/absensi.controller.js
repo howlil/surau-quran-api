@@ -75,6 +75,26 @@ class AbsensiController {
         return Http.Response.success(res, result, 'Data absensi siswa berhasil diambil');
     });
 
+    createAbsensiSiswa = ErrorHandler.asyncHandler(async (req, res) => {
+        const { kelasProgramId, tanggal } = HttpRequest.getBodyParams(req);
+        
+        const result = await absensiService.createAbsensiSiswa(kelasProgramId, tanggal);
+        return Http.Response.success(res,  'Absensi siswa berhasil dibuat');
+    });
+
+    // Update absensi guru dengan RFID (tanpa autentikasi)
+    updateAbsensiGuruWithRfid = ErrorHandler.asyncHandler(async (req, res) => {
+        const { rfid, tanggal, jam } = req.body;
+
+        const result = await absensiService.updateAbsensiGuruWithRfid(rfid, tanggal, jam);
+
+        const message = result.isUpdate 
+            ? 'Absensi guru berhasil diperbarui dengan RFID' 
+            : 'Absensi guru berhasil dibuat dengan RFID';
+
+        return Http.Response.success(res, result, message);
+    });
+
 
 }
 
