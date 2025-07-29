@@ -48,7 +48,6 @@ class CronJobs {
   }
 
 
-
   static scheduleSppReminder() {
     const schedule = '0 9 25 * *';
     logger.info('Setting up SPP Reminder Cron Job:');

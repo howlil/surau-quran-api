@@ -245,14 +245,36 @@ class AbsensiService {
                 ]
             });
 
-            const transformedData = result.data.map(guru => {
+            const transformedData = await Promise.all(result.data.map(async (guru) => {
                 let sksHariIni = 0;
                 const absensiData = [];
 
                 // Process jadwal kelas program untuk hari tersebut
-                guru.kelasProgram.forEach(kelasProgram => {
+                for (const kelasProgram of guru.kelasProgram) {
                     // Check if there's absensi data for this kelas program
-                    const absensiRecord = kelasProgram.absensiGuru[0]; // Should be max 1 record per kelas program per date
+                    let absensiRecord = kelasProgram.absensiGuru[0]; // Should be max 1 record per kelas program per date
+
+                    // Jika belum ada absensi record, buat entry baru dengan status BELUM_ABSEN
+                    if (!absensiRecord) {
+                        try {
+                            absensiRecord = await prisma.absensiGuru.create({
+                                data: {
+                                    guruId: guru.id,
+                                    kelasProgramId: kelasProgram.id,
+                                    tanggal: tanggal,
+                                    statusKehadiran: 'BELUM_ABSEN',
+                                    jamMasuk: null,
+                                    sks: 0,
+                                    keterangan: 'Auto-created: Belum absen'
+                                }
+                            });
+                            
+                            logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
+                        } catch (error) {
+                            logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
+                            // Jika gagal create, tetap tampilkan dengan status BELUM_ABSEN
+                        }
+                    }
 
                     // Calculate SKS for hari ini (only if hadir)
                     if (absensiRecord && absensiRecord.statusKehadiran === 'HADIR') {
@@ -283,13 +305,13 @@ class AbsensiService {
                     };
 
                     absensiData.push(absensiEntry);
-                });
+                }
 
                 // Process absensi yang tidak terkait dengan jadwal hari ini (misalnya absen di hari lain)
-                guru.AbsensiGuru.forEach(absensiRecord => {
+                for (const absensiRecord of guru.AbsensiGuru) {
                     // Skip jika sudah diproses di atas (sudah ada di jadwal hari ini)
                     const sudahDiproses = absensiData.some(data => data.absensiGuruId === absensiRecord.id);
-                    if (sudahDiproses) return;
+                    if (sudahDiproses) continue;
 
                     // Calculate SKS for hari ini (only if hadir)
                     if (absensiRecord.statusKehadiran === 'HADIR') {
@@ -320,7 +342,7 @@ class AbsensiService {
                     };
 
                     absensiData.push(absensiEntry);
-                });
+                }
 
                 return {
                     guruId: guru.id,
@@ -330,7 +352,7 @@ class AbsensiService {
                     sksHariIni,
                     absensi: absensiData
                 };
-            });
+            }));
 
             return {
                 tanggal,
@@ -1152,20 +1174,27 @@ class AbsensiService {
     }
 
     /**
-     * Update absensi guru dengan RFID
+     * Update absensi guru dengan RFID - Logic Per Shift
      * 
-     * Logic:
+     * Logic Per Shift:
      * 1. Cari guru dengan RFID inputan
      * 2. Cek jadwal kelas program pada tanggal berdasarkan hari
-     * 3. Bandingkan jam input dengan rentang jam mengajar
-     * 4. Jika dalam rentang = HADIR, jika tidak = TIDAK_HADIR
-     * 5. Create atau update data absensi
+     * 3. Tentukan shift yang sedang berjalan berdasarkan jam input
+     * 4. Handle absensi per shift dengan status HADIR/TERLAMBAT/TIDAK_HADIR/BELUM_ABSEN
+     * 5. Auto-update shift sebelumnya yang masih BELUM_ABSEN menjadi TIDAK_HADIR
      * 
-     * Validasi:
-     * - Tanggal tidak boleh masa lalu atau masa depan (hanya hari ini)
-     * - Guru harus memiliki jadwal mengajar pada tanggal tersebut
-     * - Jika jam sebelum rentang mengajar = tidak bisa create entry
-     * - Jika jam setelah rentang mengajar = TIDAK_HADIR
+     * Study Case: Jadwal (10-12, 13-15, 16-18)
+     * - Sebelum 10:00 = Absen shift 10-12 dengan status HADIR
+     * - 10:00-12:00 = Absen shift 10-12 dengan status HADIR/TERLAMBAT (terlambat > 15 menit)
+     * - 12:00-13:00 = Absen shift 13-15 dengan status HADIR, shift 10-12 auto TIDAK_HADIR (jika masih BELUM_ABSEN)
+     * - 13:00-15:00 = Absen shift 13-15 dengan status HADIR/TERLAMBAT
+     * - 15:00-16:00 = Absen shift 16-18 dengan status HADIR, shift 13-15 auto TIDAK_HADIR (jika masih BELUM_ABSEN)
+     * - 16:00-18:00 = Absen shift 16-18 dengan status HADIR/TERLAMBAT
+     * - Setelah 18:00 = Tidak bisa absen lagi
+     * 
+     * Auto-Update Rules:
+     * - Hanya update status BELUM_ABSEN menjadi TIDAK_HADIR
+     * - Status HADIR, TERLAMBAT, IZIN, SAKIT tidak akan diubah
      * 
      * @param {string} rfid - RFID guru
      * @param {string} tanggal - Tanggal dalam format DD-MM-YYYY
@@ -1259,55 +1288,154 @@ class AbsensiService {
                 throw new BadRequestError('Format jam tidak valid');
             }
 
-            // Cek apakah jam input berada dalam rentang jadwal mengajar
+            // Logic Per Shift - Tentukan shift yang sedang berjalan
             let jadwalYangCocok = null;
             let statusKehadiran = 'TIDAK_HADIR';
             let keterangan = '';
+            let jadwalUntukAutoUpdate = []; // Jadwal yang perlu di-auto update menjadi TIDAK_HADIR
 
-            for (const jadwal of jadwalKelasProgram) {
-                const jamMulai = jadwal.jamMengajar.jamMulai;
-                const jamSelesai = jadwal.jamMengajar.jamSelesai;
+            // Urutkan jadwal berdasarkan jam mulai (ascending)
+            const jadwalTerurut = [...jadwalKelasProgram].sort((a, b) => {
+                const jamMulaiA = moment(a.jamMengajar.jamMulai, 'HH:mm');
+                const jamMulaiB = moment(b.jamMengajar.jamMulai, 'HH:mm');
+                return jamMulaiA.diff(jamMulaiB);
+            });
 
-                // Parse jam untuk perbandingan
-                const jamMulaiMoment = moment(jamMulai, 'HH:mm');
-                const jamSelesaiMoment = moment(jamSelesai, 'HH:mm');
+            // Cek apakah sudah lewat dari shift terakhir
+            const shiftTerakhir = jadwalTerurut[jadwalTerurut.length - 1];
+            const jamSelesaiTerakhir = moment(shiftTerakhir.jamMengajar.jamSelesai, 'HH:mm');
+            
+            if (jamInput.isAfter(jamSelesaiTerakhir)) {
+                throw new BadRequestError(`Jam absen (${jam}) sudah lewat dari shift terakhir. Tidak bisa absen lagi setelah jam ${shiftTerakhir.jamMengajar.jamSelesai}`);
+            }
 
-                // Cek apakah jam input berada dalam rentang
-                if (jamInput.isBetween(jamMulaiMoment, jamSelesaiMoment, null, '[]')) {
+            // Tentukan shift yang sedang berjalan
+            for (let i = 0; i < jadwalTerurut.length; i++) {
+                const jadwal = jadwalTerurut[i];
+                const jamMulai = moment(jadwal.jamMengajar.jamMulai, 'HH:mm');
+                const jamSelesai = moment(jadwal.jamMengajar.jamSelesai, 'HH:mm');
+                const jadwalBerikutnya = jadwalTerurut[i + 1];
+
+                // Logic untuk menentukan shift yang sedang berjalan
+                if (jamInput.isBefore(jamMulai)) {
+                    // Sebelum shift ini dimulai - absen untuk shift ini dengan status HADIR
                     jadwalYangCocok = jadwal;
                     statusKehadiran = 'HADIR';
-                    keterangan = 'Absen dengan RFID tepat waktu';
+                    keterangan = 'Absen dengan RFID sebelum shift dimulai';
                     break;
-                } else if (jamInput.isAfter(jamSelesaiMoment)) {
-                    // Jika jam setelah rentang, gunakan jadwal ini dan status TIDAK_HADIR
+                } else if (jamInput.isBetween(jamMulai, jamSelesai, null, '[]')) {
+                    // Dalam rentang shift ini
                     jadwalYangCocok = jadwal;
-                    statusKehadiran = 'TIDAK_HADIR';
-                    keterangan = 'Absen dengan RFID setelah jam mengajar';
+                    
+                    // Tentukan status berdasarkan keterlambatan
+                    const keterlambatanMenit = jamInput.diff(jamMulai, 'minutes');
+                    if (keterlambatanMenit <= 15) {
+                        statusKehadiran = 'HADIR';
+                        keterangan = 'Absen dengan RFID tepat waktu';
+                    } else {
+                        statusKehadiran = 'TERLAMBAT';
+                        keterangan = `Absen dengan RFID terlambat ${keterlambatanMenit} menit`;
+                    }
                     break;
-                } else if (jamInput.isBefore(jamMulaiMoment)) {
-                    // Jika jam sebelum rentang, tidak bisa create entry
-                    throw new BadRequestError(`Jam absen (${jam}) terlalu awal. Jadwal mengajar dimulai pada ${jamMulai}. Absensi hanya bisa dilakukan saat atau setelah jam mengajar dimulai`);
+                } else if (jamInput.isAfter(jamSelesai)) {
+                    // Setelah shift ini selesai
+                    if (jadwalBerikutnya && jamInput.isBefore(jadwalBerikutnya.jamMengajar.jamMulai)) {
+                        // Di antara shift ini dan shift berikutnya - absen untuk shift berikutnya
+                        jadwalYangCocok = jadwalBerikutnya;
+                        statusKehadiran = 'HADIR';
+                        keterangan = 'Absen dengan RFID sebelum shift berikutnya dimulai';
+                        
+                        // Shift yang baru selesai perlu di-auto update menjadi TIDAK_HADIR jika masih BELUM_ABSEN
+                        jadwalUntukAutoUpdate.push(jadwal);
+                        break;
+                    } else if (!jadwalBerikutnya) {
+                        // Shift terakhir - masih bisa absen sampai jam selesai + toleransi
+                        const toleransiMenit = 30; // Toleransi 30 menit setelah shift selesai
+                        const jamSelesaiDenganToleransi = jamSelesai.add(toleransiMenit, 'minutes');
+                        
+                        if (jamInput.isBefore(jamSelesaiDenganToleransi)) {
+                            jadwalYangCocok = jadwal;
+                            statusKehadiran = 'TERLAMBAT';
+                            keterangan = 'Absen dengan RFID setelah shift selesai';
+                            break;
+                        }
+                    }
                 }
             }
 
-            // Jika tidak ada jadwal yang cocok (jam terlalu awal untuk semua jadwal)
+            // Jika tidak ada jadwal yang cocok
             if (!jadwalYangCocok) {
-                const jadwalPertama = jadwalKelasProgram[0];
+                const jadwalPertama = jadwalTerurut[0];
                 const jamMulaiPertama = jadwalPertama.jamMengajar.jamMulai;
-                throw new BadRequestError(`Jam absen (${jam}) terlalu awal. Jadwal mengajar pertama dimulai pada ${jamMulaiPertama}. Absensi hanya bisa dilakukan saat atau setelah jam mengajar dimulai`);
+                throw new BadRequestError(`Jam absen (${jam}) tidak valid. Jadwal mengajar pertama dimulai pada ${jamMulaiPertama}`);
             }
 
-            // Cek apakah sudah ada data absensi untuk tanggal dan kelas program ini
-            const existingAbsensi = await prisma.absensiGuru.findFirst({
+            // Cek absensi yang sudah ada untuk semua jadwal hari ini
+            const existingAbsensiList = await prisma.absensiGuru.findMany({
                 where: {
                     guruId: guru.id,
-                    kelasProgramId: jadwalYangCocok.id,
-                    tanggal: tanggal
+                    tanggal: tanggal,
+                    kelasProgramId: {
+                        in: jadwalKelasProgram.map(j => j.id)
+                    }
                 }
             });
 
+            // Auto-update shift sebelumnya yang masih BELUM_ABSEN menjadi TIDAK_HADIR
+            for (const jadwalAutoUpdate of jadwalUntukAutoUpdate) {
+                const existingAbsensiAutoUpdate = existingAbsensiList.find(abs => abs.kelasProgramId === jadwalAutoUpdate.id);
+                
+                if (!existingAbsensiAutoUpdate) {
+                    // Buat absensi TIDAK_HADIR untuk shift yang belum absen
+                    await prisma.absensiGuru.create({
+                        data: {
+                            guruId: guru.id,
+                            kelasProgramId: jadwalAutoUpdate.id,
+                            tanggal: tanggal,
+                            jamMasuk: null,
+                            statusKehadiran: 'TIDAK_HADIR',
+                            sks: 0,
+                            keterangan: 'Auto-update: Tidak hadir karena absen di shift berikutnya'
+                        }
+                    });
+                    
+                    logger.info(`Auto-created TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
+                } else if (existingAbsensiAutoUpdate.statusKehadiran === 'BELUM_ABSEN') {
+                    // Hanya update status BELUM_ABSEN menjadi TIDAK_HADIR
+                    await prisma.absensiGuru.update({
+                        where: { id: existingAbsensiAutoUpdate.id },
+                        data: {
+                            statusKehadiran: 'TIDAK_HADIR',
+                            keterangan: 'Auto-update: Tidak hadir karena absen di shift berikutnya',
+                            updatedAt: new Date()
+                        }
+                    });
+                    
+                    logger.info(`Auto-updated BELUM_ABSEN to TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
+                } else {
+                    // Jika status bukan BELUM_ABSEN, tidak diubah (HADIR, TERLAMBAT, IZIN, SAKIT tetap tidak berubah)
+                    logger.info(`Skip auto-update for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai} with status ${existingAbsensiAutoUpdate.statusKehadiran}`);
+                }
+            }
+
+            // Cek apakah sudah ada data absensi untuk shift yang sedang berjalan
+            const existingAbsensi = existingAbsensiList.find(abs => abs.kelasProgramId === jadwalYangCocok.id);
+
             let result;
             if (existingAbsensi) {
+                // Validasi: Jangan overwrite status yang sudah final
+                if (existingAbsensi.statusKehadiran === 'HADIR' && statusKehadiran === 'TIDAK_HADIR') {
+                    throw new BadRequestError(`Guru sudah hadir di shift ini. Tidak dapat mengubah status dari HADIR menjadi TIDAK_HADIR.`);
+                }
+                
+                if (existingAbsensi.statusKehadiran === 'TERLAMBAT' && statusKehadiran === 'TIDAK_HADIR') {
+                    throw new BadRequestError(`Guru sudah terlambat di shift ini. Tidak dapat mengubah status dari TERLAMBAT menjadi TIDAK_HADIR.`);
+                }
+
+                if (existingAbsensi.statusKehadiran === 'IZIN' || existingAbsensi.statusKehadiran === 'SAKIT') {
+                    throw new BadRequestError(`Guru sudah memiliki status ${existingAbsensi.statusKehadiran} di shift ini. Tidak dapat mengubah status.`);
+                }
+
                 // Update data absensi yang sudah ada
                 result = await prisma.absensiGuru.update({
                     where: {
@@ -1316,7 +1444,7 @@ class AbsensiService {
                     data: {
                         jamMasuk: jam,
                         statusKehadiran: statusKehadiran,
-                        sks: statusKehadiran === 'HADIR' ? 2 : 0, // Default SKS
+                        sks: statusKehadiran === 'HADIR' || statusKehadiran === 'TERLAMBAT' ? 2 : 0,
                         keterangan: keterangan,
                         updatedAt: new Date()
                     },
@@ -1354,7 +1482,7 @@ class AbsensiService {
                         tanggal: tanggal,
                         jamMasuk: jam,
                         statusKehadiran: statusKehadiran,
-                        sks: statusKehadiran === 'HADIR' ? 2 : 0, // Default SKS
+                        sks: statusKehadiran === 'HADIR' || statusKehadiran === 'TERLAMBAT' ? 2 : 0,
                         keterangan: keterangan
                     },
                     include: {
@@ -1403,7 +1531,18 @@ class AbsensiService {
                         jamSelesai: jadwalYangCocok.jamMengajar.jamSelesai
                     }
                 },
-                isUpdate: !!existingAbsensi
+                autoUpdate: jadwalUntukAutoUpdate.length > 0 ? {
+                    message: `${jadwalUntukAutoUpdate.length} shift sebelumnya di-auto update menjadi TIDAK_HADIR`,
+                    shifts: jadwalUntukAutoUpdate.map(j => ({
+                        kelasProgramId: j.id,
+                        namaKelas: j.kelas?.namaKelas || 'Tidak Ada Kelas',
+                        namaProgram: j.program.namaProgram,
+                        jamMengajar: {
+                            jamMulai: j.jamMengajar.jamMulai,
+                            jamSelesai: j.jamMengajar.jamSelesai
+                        }
+                    }))
+                } : null
             };
 
         } catch (error) {

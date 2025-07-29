@@ -522,6 +522,8 @@ enum StatusKehadiran {
   TIDAK_HADIR
   IZIN
   SAKIT
+  BELUM_ABSEN
+  TERLAMBAT
 }
 
 enum StatusSiswa {

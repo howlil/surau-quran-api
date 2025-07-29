@@ -259,6 +259,7 @@ class PayrollService {
       jumlahTelat: 0,
       jumlahIzin: 0,
       jumlahTidakHadir: 0,
+      jumlahBelumAbsen: 0,
       potonganTelat: 0,
       potonganIzin: 0,
       potonganLainnya: 0
@@ -276,25 +277,60 @@ class PayrollService {
       const potonganTanpaSuratIzin = Number(absensi.potonganTanpaSuratIzin) || 0;
       const insentifKehadiran = Number(absensi.insentifKehadiran) || 0;
 
-      if (absensi.statusKehadiran === 'HADIR') {
-        stats.totalKehadiran++;
-        stats.totalSKS += sks;
-        stats.totalInsentif += insentifKehadiran;
+      switch (absensi.statusKehadiran) {
+        case 'HADIR':
+          stats.totalKehadiran++;
+          stats.totalSKS += sks;
+          stats.totalInsentif += insentifKehadiran;
+          // Jika ada potongan terlambat meskipun status HADIR
+          if (potonganTerlambat > 0) {
+            stats.jumlahTelat++;
+            stats.potonganTelat += potonganTerlambat;
+          }
+          break;
 
-        if (potonganTerlambat > 0) {
+        case 'TERLAMBAT':
+          stats.totalKehadiran++;
+          stats.totalSKS += sks;
+          stats.totalInsentif += insentifKehadiran;
+          // Status TERLAMBAT otomatis ada potongan
           stats.jumlahTelat++;
-          stats.potonganTelat += potonganTerlambat;
-        }
-      } else if (absensi.statusKehadiran === 'IZIN') {
-        stats.jumlahIzin++;
-        if (potonganTanpaSuratIzin > 0) {
-          stats.potonganIzin += potonganTanpaSuratIzin;
-        }
-      } else if (absensi.statusKehadiran === 'TIDAK_HADIR' || absensi.statusKehadiran === 'ALPHA') {
-        stats.jumlahTidakHadir++;
-        if (potonganTanpaKabar > 0) {
-          stats.potonganLainnya += potonganTanpaKabar;
-        }
+          stats.potonganTelat += potonganTerlambat > 0 ? potonganTerlambat : 10000; // Default Rp 10.000
+          break;
+
+        case 'IZIN':
+          stats.jumlahIzin++;
+          if (potonganTanpaSuratIzin > 0) {
+            stats.potonganIzin += potonganTanpaSuratIzin;
+          }
+          break;
+
+        case 'SAKIT':
+          stats.jumlahIzin++; // Sakit dihitung sama seperti izin
+          if (potonganTanpaSuratIzin > 0) {
+            stats.potonganIzin += potonganTanpaSuratIzin;
+          }
+          break;
+
+        case 'TIDAK_HADIR':
+          stats.jumlahTidakHadir++;
+          if (potonganTanpaKabar > 0) {
+            stats.potonganLainnya += potonganTanpaKabar;
+          } else {
+            // Default potongan tanpa kabar Rp 20.000
+            stats.potonganLainnya += 20000;
+          }
+          break;
+
+        case 'BELUM_ABSEN':
+          stats.jumlahBelumAbsen++;
+          // BELUM_ABSEN tidak dihitung dalam kalkulasi gaji
+          break;
+
+        default:
+          // Handle status yang tidak dikenal
+          logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
+          break;
       }
     });
 
@@ -490,9 +526,11 @@ class PayrollService {
       },
       rincianKehadiran: {
         hadir: 0,
+        terlambat: 0,
         izin: 0,
         sakit: 0,
-        tidakHadir: 0
+        tidakHadir: 0,
+        belumAbsen: 0
       }
     };
 
@@ -504,21 +542,29 @@ class PayrollService {
     };
 
     absensiList.forEach(absensi => {
-      stats.rincianKehadiran[absensi.statusKehadiran.toLowerCase()]++;
+      // Update rincian kehadiran berdasarkan status
+      const statusKey = absensi.statusKehadiran.toLowerCase().replace('_', '');
+      if (stats.rincianKehadiran.hasOwnProperty(statusKey)) {
+        stats.rincianKehadiran[statusKey]++;
+      }
 
-      if (absensi.statusKehadiran === 'HADIR') {
+      // Hanya HADIR dan TERLAMBAT yang dihitung untuk gaji
+      if (absensi.statusKehadiran === 'HADIR' || absensi.statusKehadiran === 'TERLAMBAT') {
         stats.totalKehadiran++;
         stats.totalSKS += absensi.sks;
 
         const tipeKelas = absensi.kelasProgram.tipeKelas;
-        stats.rincianKelas[tipeKelas].sks += absensi.sks;
-        stats.rincianKelas[tipeKelas].honor += absensi.sks * HONOR_RATES[tipeKelas];
+        if (stats.rincianKelas[tipeKelas]) {
+          stats.rincianKelas[tipeKelas].sks += absensi.sks;
+          stats.rincianKelas[tipeKelas].honor += absensi.sks * HONOR_RATES[tipeKelas];
+        }
 
         if (absensi.insentifKehadiran) {
           stats.totalInsentif += Number(absensi.insentifKehadiran);
         }
       }
 
+      // Hitung potongan berdasarkan status dan field yang ada
       if (absensi.potonganTerlambat) {
         stats.totalPotongan += Number(absensi.potonganTerlambat);
       }
@@ -527,6 +573,14 @@ class PayrollService {
       }
       if (absensi.potonganTanpaSuratIzin) {
         stats.totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+      }
+
+      // Default potongan untuk status tertentu jika tidak ada field potongan
+      if (absensi.statusKehadiran === 'TERLAMBAT' && !absensi.potonganTerlambat) {
+        stats.totalPotongan += 10000; // Default Rp 10.000 untuk terlambat
+      }
+      if (absensi.statusKehadiran === 'TIDAK_HADIR' && !absensi.potonganTanpaKabar) {
+        stats.totalPotongan += 20000; // Default Rp 20.000 untuk tidak hadir tanpa kabar
       }
     });
 

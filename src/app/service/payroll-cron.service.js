@@ -84,7 +84,8 @@ class PayrollCronService {
           const dailySKS = {};
 
           absensiData.forEach(absensi => {
-            if (absensi.statusKehadiran === 'HADIR') {
+            // Hanya HADIR dan TERLAMBAT yang dihitung untuk gaji
+            if (absensi.statusKehadiran === 'HADIR' || absensi.statusKehadiran === 'TERLAMBAT') {
               const tipeKelas = absensi.kelasProgram.tipeKelas;
               const honorPerSKS = HONOR_RATES[tipeKelas];
 
@@ -104,15 +105,48 @@ class PayrollCronService {
               }
             }
 
-            // Calculate penalties
-            if (absensi.potonganTerlambat) {
-              totalPotongan += Number(absensi.potonganTerlambat);
-            }
-            if (absensi.potonganTanpaKabar) {
-              totalPotongan += Number(absensi.potonganTanpaKabar);
-            }
-            if (absensi.potonganTanpaSuratIzin) {
-              totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+            // Calculate penalties based on status
+            switch (absensi.statusKehadiran) {
+              case 'HADIR':
+                // Jika HADIR tapi ada potongan terlambat
+                if (absensi.potonganTerlambat) {
+                  totalPotongan += Number(absensi.potonganTerlambat);
+                }
+                break;
+
+              case 'TERLAMBAT':
+                // Status TERLAMBAT otomatis ada potongan
+                if (absensi.potonganTerlambat) {
+                  totalPotongan += Number(absensi.potonganTerlambat);
+                } else {
+                  totalPotongan += 10000; // Default Rp 10.000 untuk terlambat
+                }
+                break;
+
+              case 'IZIN':
+              case 'SAKIT':
+                // Potongan untuk izin tanpa surat
+                if (absensi.potonganTanpaSuratIzin) {
+                  totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+                }
+                break;
+
+              case 'TIDAK_HADIR':
+                // Potongan untuk tidak hadir tanpa kabar
+                if (absensi.potonganTanpaKabar) {
+                  totalPotongan += Number(absensi.potonganTanpaKabar);
+                } else {
+                  totalPotongan += 20000; // Default Rp 20.000 untuk tidak hadir tanpa kabar
+                }
+                break;
+
+              case 'BELUM_ABSEN':
+                // BELUM_ABSEN tidak dihitung dalam kalkulasi gaji
+                break;
+
+              default:
+                logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
+                break;
             }
           });
 
@@ -179,8 +213,6 @@ class PayrollCronService {
     }
   }
 
-
-
   static async runManualPayrollGeneration(bulan, tahun) {
     logger.info(`Running manual payroll generation for ${bulan} ${tahun}...`);
 
@@ -246,7 +278,8 @@ class PayrollCronService {
           const dailySKS = {};
 
           absensiData.forEach(absensi => {
-            if (absensi.statusKehadiran === 'HADIR') {
+            // Hanya HADIR dan TERLAMBAT yang dihitung untuk gaji
+            if (absensi.statusKehadiran === 'HADIR' || absensi.statusKehadiran === 'TERLAMBAT') {
               const tipeKelas = absensi.kelasProgram.tipeKelas;
               const honorPerSKS = HONOR_RATES[tipeKelas];
 
@@ -266,15 +299,48 @@ class PayrollCronService {
               }
             }
 
-            // Calculate penalties
-            if (absensi.potonganTerlambat) {
-              totalPotongan += Number(absensi.potonganTerlambat);
-            }
-            if (absensi.potonganTanpaKabar) {
-              totalPotongan += Number(absensi.potonganTanpaKabar);
-            }
-            if (absensi.potonganTanpaSuratIzin) {
-              totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+            // Calculate penalties based on status
+            switch (absensi.statusKehadiran) {
+              case 'HADIR':
+                // Jika HADIR tapi ada potongan terlambat
+                if (absensi.potonganTerlambat) {
+                  totalPotongan += Number(absensi.potonganTerlambat);
+                }
+                break;
+
+              case 'TERLAMBAT':
+                // Status TERLAMBAT otomatis ada potongan
+                if (absensi.potonganTerlambat) {
+                  totalPotongan += Number(absensi.potonganTerlambat);
+                } else {
+                  totalPotongan += 10000; // Default Rp 10.000 untuk terlambat
+                }
+                break;
+
+              case 'IZIN':
+              case 'SAKIT':
+                // Potongan untuk izin tanpa surat
+                if (absensi.potonganTanpaSuratIzin) {
+                  totalPotongan += Number(absensi.potonganTanpaSuratIzin);
+                }
+                break;
+
+              case 'TIDAK_HADIR':
+                // Potongan untuk tidak hadir tanpa kabar
+                if (absensi.potonganTanpaKabar) {
+                  totalPotongan += Number(absensi.potonganTanpaKabar);
+                } else {
+                  totalPotongan += 20000; // Default Rp 20.000 untuk tidak hadir tanpa kabar
+                }
+                break;
+
+              case 'BELUM_ABSEN':
+                // BELUM_ABSEN tidak dihitung dalam kalkulasi gaji
+                break;
+
+              default:
+                logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
+                break;
             }
           });
 
