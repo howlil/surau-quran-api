@@ -1325,22 +1325,43 @@ class SiswaService {
 
       // Process each active program
       for (const programSiswa of siswa.programSiswa) {
+        logger.info(`Processing program ${programSiswa.program.namaProgram} for siswa ${siswa.namaMurid}`);
+        
         // Group jadwal by kelas program
         const kelasPrograms = new Map();
 
-        // Add from kelasProgram if exists
+        // Add from kelasProgram if exists (this is the main schedule)
         if (programSiswa.kelasProgram) {
           const kp = programSiswa.kelasProgram;
-          kelasPrograms.set(kp.id, {
+          logger.info(`Found kelas program: ${kp.kelas?.namaKelas} for program: ${kp.program.namaProgram}`);
+          
+          const scheduleEntry = {
             kelasProgramId: kp.id,
             namaKelas: kp.kelas?.namaKelas || 'Tidak Ada Kelas',
             namaProgram: kp.program.namaProgram,
             jamMengajar: []
-          });
+          };
+
+          // Add jam mengajar from kelas program if exists
+          if (kp.jamMengajar) {
+            scheduleEntry.jamMengajar.push({
+              jamMengajarId: kp.jamMengajar.id,
+              Hari: kp.hari, // Get hari from kelas program
+              jamMulai: kp.jamMengajar.jamMulai,
+              jamSelesai: kp.jamMengajar.jamSelesai
+            });
+            logger.info(`Added jam mengajar from kelas program: ${kp.jamMengajar.jamMulai} - ${kp.jamMengajar.jamSelesai}`);
+          }
+
+          kelasPrograms.set(kp.id, scheduleEntry);
         }
 
-        // Add from JadwalProgramSiswa
+        // Add from JadwalProgramSiswa (additional schedules)
+        logger.info(`Found ${programSiswa.JadwalProgramSiswa.length} jadwal program siswa`);
+        
         for (const jadwal of programSiswa.JadwalProgramSiswa) {
+          logger.info(`Processing jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
+          
           // Find or create kelasProgram entry
           const kelasProgram = await prisma.kelasProgram.findFirst({
             where: {
@@ -1365,6 +1386,8 @@ class SiswaService {
           });
 
           if (kelasProgram) {
+            logger.info(`Found matching kelas program: ${kelasProgram.kelas?.namaKelas}`);
+            
             if (!kelasPrograms.has(kelasProgram.id)) {
               kelasPrograms.set(kelasProgram.id, {
                 kelasProgramId: kelasProgram.id,
@@ -1381,6 +1404,55 @@ class SiswaService {
               jamMulai: jadwal.jamMengajar.jamMulai,
               jamSelesai: jadwal.jamMengajar.jamSelesai
             });
+          } else {
+            logger.warn(`No matching kelas program found for jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
+          }
+        }
+
+        // If no schedules found from either source, create a basic entry
+        if (kelasPrograms.size === 0) {
+          logger.warn(`No schedules found for program ${programSiswa.program.namaProgram}, creating basic entry`);
+          
+          // Try to find any kelas program for this program
+          const anyKelasProgram = await prisma.kelasProgram.findFirst({
+            where: {
+              programId: programSiswa.programId
+            },
+            include: {
+              kelas: {
+                select: {
+                  id: true,
+                  namaKelas: true
+                }
+              },
+              program: {
+                select: {
+                  id: true,
+                  namaProgram: true
+                }
+              },
+              jamMengajar: {
+                select: {
+                  id: true,
+                  jamMulai: true,
+                  jamSelesai: true
+                }
+              }
+            }
+          });
+
+          if (anyKelasProgram) {
+            kelasPrograms.set(anyKelasProgram.id, {
+              kelasProgramId: anyKelasProgram.id,
+              namaKelas: anyKelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
+              namaProgram: anyKelasProgram.program.namaProgram,
+              jamMengajar: anyKelasProgram.jamMengajar ? [{
+                jamMengajarId: anyKelasProgram.jamMengajar.id,
+                Hari: anyKelasProgram.hari,
+                jamMulai: anyKelasProgram.jamMengajar.jamMulai,
+                jamSelesai: anyKelasProgram.jamMengajar.jamSelesai
+              }] : []
+            });
           }
         }
 
@@ -1396,7 +1468,7 @@ class SiswaService {
         schedules: schedules
       };
 
-      logger.info(`Retrieved jadwal for siswa with RFID: ${rfid}`);
+      logger.info(`Retrieved jadwal for siswa with RFID: ${rfid}, found ${schedules.length} schedules`);
       return result;
     } catch (error) {
       logger.error(`Error getting jadwal siswa with RFID ${rfid}:`, error);
