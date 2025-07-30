@@ -369,7 +369,19 @@ class AbsensiService {
     async updateAbsensiGuru(id, data) {
         try {
             const absensi = await prisma.absensiGuru.findUnique({
-                where: { id }
+                where: { id },
+                include: {
+                    kelasProgram: {
+                        include: {
+                            jamMengajar: {
+                                select: {
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
             if (!absensi) {
@@ -395,6 +407,7 @@ class AbsensiService {
                 // Logic for IZIN or SAKIT
                 if (data.statusKehadiran === 'IZIN' || data.statusKehadiran === 'SAKIT') {
                     updateData.jamMasuk = null; // waktuMasuk jadi null
+                    updateData.sks = 0; // SKS = 0 untuk izin/sakit
                     updateData.keterangan = data.keterangan || null;
 
                     // Handle surat izin file upload
@@ -405,6 +418,7 @@ class AbsensiService {
                 // Logic for TIDAK_HADIR
                 else if (data.statusKehadiran === 'TIDAK_HADIR') {
                     updateData.jamMasuk = null;
+                    updateData.sks = 0; // SKS = 0 untuk tidak hadir
                     updateData.keterangan = null;
                     updateData.suratIzin = null;
                 }
@@ -415,6 +429,9 @@ class AbsensiService {
                     }
                     updateData.keterangan = data.keterangan || null;
                     updateData.suratIzin = null; // Clear surat izin for HADIR
+                    
+                    updateData.sks = 2;
+                    logger.info(`Set SKS: 2 for HADIR status`);
                 }
             } else {
                 // Update individual fields if no statusKehadiran change
@@ -426,6 +443,10 @@ class AbsensiService {
                 }
                 if (data.suratIzin !== undefined) {
                     updateData.suratIzin = data.suratIzin;
+                }
+                // Update SKS if provided
+                if (data.sks !== undefined) {
+                    updateData.sks = data.sks;
                 }
             }
 
@@ -477,11 +498,12 @@ class AbsensiService {
                 },
                 statusKehadiran: updated.statusKehadiran,
                 waktuMasuk: updated.jamMasuk,
+                sks: updated.sks,
                 keterangan: updated.keterangan,
                 suratIzin: updated.suratIzin
             };
 
-            logger.info(`Updated absensi guru with ID: ${id}`);
+            logger.info(`Updated absensi guru with ID: ${id}, SKS: ${updated.sks}`);
             return result;
         } catch (error) {
             logger.error(`Error updating absensi guru with ID ${id}:`, error);
