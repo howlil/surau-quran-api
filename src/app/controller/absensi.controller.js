@@ -95,6 +95,13 @@ class AbsensiController {
         return Http.Response.success(res, result, message);
     });
 
+    // Public endpoint untuk mendapatkan absensi guru hari ini (tanpa autentikasi)
+    getAbsensiGuruTodayPublic = ErrorHandler.asyncHandler(async (req, res) => {
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const result = await absensiService.getAbsensiGuruTodayPublic(baseUrl);
+        return Http.Response.success(res, result, 'Data absensi guru hari ini berhasil diambil');
+    });
+
 
 }
 

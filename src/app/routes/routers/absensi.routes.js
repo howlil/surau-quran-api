@@ -58,4 +58,8 @@ router.post('/v1/absensi/guru/rfid',
     absensiController.updateAbsensiGuruWithRfid
 );
 
+router.get('/v1/absensi/guru/today',
+    absensiController.getAbsensiGuruTodayPublic
+);
+
 module.exports = router; 

@@ -117,21 +117,7 @@ class AbsensiService {
     }
 
     
-    /**
-     * Get absensi guru by date - menampilkan semua guru yang memiliki jadwal ATAU sudah ada data absensi
-     * 
-     * Logic yang diperbaiki:
-     * 1. Ambil guru yang memiliki jadwal kelas program pada hari tersebut
-     * 2. ATAU guru yang sudah ada data absensi pada tanggal tersebut (misalnya absen via RFID)
-     * 3. Tampilkan jadwal kelas program untuk setiap guru
-     * 4. Jika ada data absensi untuk tanggal tersebut, tampilkan juga
-     * 5. Jika belum ada absensi, status = 'BELUM_ABSEN'
-     * 6. Handle kasus guru yang absen di hari lain (tidak punya jadwal hari ini)
-     * 
-     * @param {Object} filters - Filter parameters (tanggal, page, limit)
-     * @param {string} baseUrl - Base URL for file access
-     * @returns {Object} Data absensi guru dengan jadwal kelas program
-     */
+
     async getAbsensiGuruByDate(filters = {}, baseUrl) {
         try {
             const { tanggal, page = 1, limit = 10 } = filters;
@@ -1547,6 +1533,236 @@ class AbsensiService {
 
         } catch (error) {
             logger.error('Error updating absensi guru with RFID:', error);
+            throw error;
+        }
+    }
+
+    async getAbsensiGuruTodayPublic(baseUrl) {
+        try {
+            const tanggal = todayDate;
+
+            // Parse tanggal untuk mendapatkan hari
+            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            if (!dateObj.isValid()) {
+                throw new BadRequestError('Format tanggal tidak valid');
+            }
+
+            // Get current day name in Indonesian format
+            const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+            const hari = dayNames[dateObj.day()];
+
+            // Get all guru yang memiliki jadwal kelas program pada hari tersebut ATAU sudah ada data absensi
+            const result = await prisma.guru.findMany({
+                where: {
+                    OR: [
+                        // Guru yang memiliki jadwal kelas program pada hari tersebut
+                        {
+                            kelasProgram: {
+                                some: {
+                                    hari: hari
+                                }
+                            }
+                        },
+                        // Guru yang sudah ada data absensi pada tanggal tersebut
+                        {
+                            AbsensiGuru: {
+                                some: {
+                                    tanggal: tanggal
+                                }
+                            }
+                        }
+                    ]
+                },
+                include: {
+                    // Include jadwal kelas program untuk hari tersebut
+                    kelasProgram: {
+                        where: {
+                            hari: hari
+                        },
+                        include: {
+                            kelas: {
+                                select: {
+                                    namaKelas: true
+                                }
+                            },
+                            program: {
+                                select: {
+                                    namaProgram: true
+                                }
+                            },
+                            jamMengajar: {
+                                select: {
+                                    id: true,
+                                    jamMulai: true,
+                                    jamSelesai: true
+                                }
+                            },
+                            // Include absensi guru jika ada untuk tanggal tersebut
+                            absensiGuru: {
+                                where: {
+                                    tanggal: tanggal
+                                }
+                            }
+                        },
+                        orderBy: {
+                            jamMengajar: {
+                                jamMulai: 'asc'
+                            }
+                        }
+                    },
+                    // Include semua absensi guru untuk tanggal tersebut (untuk guru yang tidak punya jadwal hari ini)
+                    AbsensiGuru: {
+                        where: {
+                            tanggal: tanggal
+                        },
+                        include: {
+                            kelasProgram: {
+                                include: {
+                                    kelas: {
+                                        select: {
+                                            namaKelas: true
+                                        }
+                                    },
+                                    program: {
+                                        select: {
+                                            namaProgram: true
+                                        }
+                                    },
+                                    jamMengajar: {
+                                        select: {
+                                            id: true,
+                                            jamMulai: true,
+                                            jamSelesai: true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        orderBy: {
+                            jamMasuk: 'asc'
+                        }
+                    }
+                },
+                orderBy: [
+                    { nama: 'asc' }
+                ]
+            });
+
+            const transformedData = await Promise.all(result.map(async (guru) => {
+                let sksHariIni = 0;
+                const absensiData = [];
+
+                // Process jadwal kelas program untuk hari tersebut
+                for (const kelasProgram of guru.kelasProgram) {
+                    // Check if there's absensi data for this kelas program
+                    let absensiRecord = kelasProgram.absensiGuru[0]; // Should be max 1 record per kelas program per date
+
+                    // Jika belum ada absensi record, buat entry baru dengan status BELUM_ABSEN
+                    if (!absensiRecord) {
+                        try {
+                            absensiRecord = await prisma.absensiGuru.create({
+                                data: {
+                                    guruId: guru.id,
+                                    kelasProgramId: kelasProgram.id,
+                                    tanggal: tanggal,
+                                    statusKehadiran: 'BELUM_ABSEN',
+                                    jamMasuk: null,
+                                    sks: 0,
+                                    keterangan: 'Auto-created: Belum absen'
+                                }
+                            });
+                            
+                            logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
+                        } catch (error) {
+                            logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
+                            // Jika gagal create, tetap tampilkan dengan status BELUM_ABSEN
+                        }
+                    }
+
+                    // Calculate SKS for hari ini (only if hadir)
+                    if (absensiRecord && absensiRecord.statusKehadiran === 'HADIR') {
+                        sksHariIni += absensiRecord.sks || 0;
+                    }
+
+                    // Format surat izin URL jika ada
+                    let suratIzinUrl = null;
+                    if (absensiRecord && absensiRecord.suratIzin) {
+                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                    }
+
+                    // Create absensi data entry
+                    const absensiEntry = {
+                        absensiGuruId: absensiRecord ? absensiRecord.id : null,
+                        kelasProgramId: kelasProgram.id,
+                        namaKelas: kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
+                        namaProgram: kelasProgram.program.namaProgram,
+                        jamMengajar: {
+                            jamMengajarId: kelasProgram.jamMengajar.id,
+                            jamMulai: kelasProgram.jamMengajar.jamMulai,
+                            jamSelesai: kelasProgram.jamMengajar.jamSelesai
+                        },
+                        statusKehadiran: absensiRecord ? absensiRecord.statusKehadiran : 'BELUM_ABSEN',
+                        waktuMasuk: absensiRecord ? absensiRecord.jamMasuk : null,
+                        keterangan: absensiRecord ? absensiRecord.keterangan : null,
+                        suratIzin: suratIzinUrl
+                    };
+
+                    absensiData.push(absensiEntry);
+                }
+
+                // Process absensi yang tidak terkait dengan jadwal hari ini (misalnya absen di hari lain)
+                for (const absensiRecord of guru.AbsensiGuru) {
+                    // Skip jika sudah diproses di atas (sudah ada di jadwal hari ini)
+                    const sudahDiproses = absensiData.some(data => data.absensiGuruId === absensiRecord.id);
+                    if (sudahDiproses) continue;
+
+                    // Calculate SKS for hari ini (only if hadir)
+                    if (absensiRecord.statusKehadiran === 'HADIR') {
+                        sksHariIni += absensiRecord.sks || 0;
+                    }
+
+                    // Format surat izin URL jika ada
+                    let suratIzinUrl = null;
+                    if (absensiRecord.suratIzin) {
+                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                    }
+
+                    // Create absensi data entry untuk absensi yang tidak terkait jadwal hari ini
+                    const absensiEntry = {
+                        absensiGuruId: absensiRecord.id,
+                        kelasProgramId: absensiRecord.kelasProgramId,
+                        namaKelas: absensiRecord.kelasProgram.kelas?.namaKelas || 'Belum ditentukan',
+                        namaProgram: absensiRecord.kelasProgram.program.namaProgram,
+                        jamMengajar: {
+                            jamMengajarId: absensiRecord.kelasProgram.jamMengajar.id,
+                            jamMulai: absensiRecord.kelasProgram.jamMengajar.jamMulai,
+                            jamSelesai: absensiRecord.kelasProgram.jamMengajar.jamSelesai
+                        },
+                        statusKehadiran: absensiRecord.statusKehadiran,
+                        waktuMasuk: absensiRecord.jamMasuk,
+                        keterangan: absensiRecord.keterangan,
+                        suratIzin: suratIzinUrl
+                    };
+
+                    absensiData.push(absensiEntry);
+                }
+
+                return {
+                    guruId: guru.id,
+                    fotoProfile: guru.fotoProfile,
+                    namaGuru: guru.nama,
+                    nip: guru.nip,
+                    sksHariIni,
+                    absensi: absensiData
+                };
+            }));
+
+            return {
+                tanggal,
+                data: transformedData
+            };
+        } catch (error) {
+            logger.error('Error getting today\'s absensi guru (public):', error);
             throw error;
         }
     }
