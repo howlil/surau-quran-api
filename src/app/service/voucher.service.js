@@ -132,6 +132,33 @@ class VoucherService {
       throw error;
     }
   }
+
+
+  async getVoucherByKode(kodeVoucher) {
+    try {
+      const voucher = await prisma.voucher.findUnique({
+        where: { kodeVoucher },
+        select: {
+          id: true,
+          kodeVoucher: true,
+          tipe: true,
+          nominal: true,
+        }
+      });
+
+      if (!voucher) {
+        throw new NotFoundError(`Voucher dengan kode ${kodeVoucher} tidak ditemukan`);
+      }
+
+      return voucher;
+    } catch (error) {
+      logger.error(`Error getting voucher by kode ${kodeVoucher}:`, error);
+      throw error;
+    }
+  }
+  
+  
+
 }
 
 module.exports = new VoucherService();

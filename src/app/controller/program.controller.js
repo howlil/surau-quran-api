@@ -60,22 +60,19 @@ class ProgramController {
   });
 
   getAll = ErrorHandler.asyncHandler(async (req, res) => {
-    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'namaProgram']);
+    const filters = HttpRequest.getQueryParams(req, ['namaProgram']);
     const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-    const result = await programService.getAll(filters);
+    const result = await programService.getAllNoPagination(filters);
     
-    const transformedData = {
-      ...result,
-      data: result.data.map(program => ({
-        programId: program.id,
-        namaProgram: program.namaProgram,
-        deskripsi: program.deskripsi,
-        cover: FileUtils.getImageUrl(baseUrl, program.cover),
-        biayaSpp: Number(program.biayaSpp),
-        createdAt: program.createdAt,
-        updatedAt: program.updatedAt
-      }))
-    };
+    const transformedData = result.map(program => ({
+      programId: program.id,
+      namaProgram: program.namaProgram,
+      deskripsi: program.deskripsi,
+      cover: FileUtils.getImageUrl(baseUrl, program.cover),
+      biayaSpp: Number(program.biayaSpp),
+      createdAt: program.createdAt,
+      updatedAt: program.updatedAt
+    }));
     
     return Http.Response.success(res, transformedData, 'Data program berhasil diambil');
   });

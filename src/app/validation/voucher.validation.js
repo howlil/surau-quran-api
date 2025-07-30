@@ -94,6 +94,16 @@ class VoucherValidation {
     });
   }
 
+  static getVoucherByKode() {
+    return ValidatorFactory.create({
+      kodeVoucher: Joi.string().uppercase().required()
+        .messages({
+          'string.empty': 'Kode voucher tidak boleh kosong',
+          'any.required': 'Kode voucher wajib diisi'
+        })
+    });
+  }
+
 
 }
 

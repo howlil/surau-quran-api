@@ -107,7 +107,7 @@ class ProgramService {
 
   async getAll(filters = {}) {
     try {
-      const { page = 1, limit = 10, namaProgram } = filters;
+      const { page , limit , namaProgram } = filters;
 
       const where = {};
       
@@ -134,6 +134,34 @@ class ProgramService {
       });
     } catch (error) {
       logger.error('Error getting all programs:', error);
+      throw error;
+    }
+  }
+
+  async getAllNoPagination(filters = {}) {
+    try {
+      const { namaProgram } = filters;
+      const where = {};
+      if (namaProgram) {
+        where.namaProgram = {
+          contains: namaProgram
+        };
+      }
+      return await prisma.program.findMany({
+        where,
+        select: {
+          id: true,
+          namaProgram: true,
+          deskripsi: true,
+          cover: true,
+          biayaSpp: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { namaProgram: 'asc' }
+      });
+    } catch (error) {
+      logger.error('Error getting all programs (no pagination):', error);
       throw error;
     }
   }

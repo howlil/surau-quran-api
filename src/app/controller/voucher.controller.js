@@ -30,5 +30,11 @@ class VoucherController {
     return Http.Response.success(res, result);
   });
 
+  getVoucherByKode = ErrorHandler.asyncHandler(async (req, res) => {
+    const { kodeVoucher } = HttpRequest.getUrlParams(req);
+    const result = await voucherService.getVoucherByKode(kodeVoucher);
+    return Http.Response.success(res, result);
+  });
+
 }
 module.exports = new VoucherController();

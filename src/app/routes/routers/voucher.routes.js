@@ -38,8 +38,11 @@ router.get(
   voucherController.getAll
 );
 
-
-
+router.get(
+  '/v1/voucher/:kodeVoucher',
+  validationMiddleware.validateParams(voucherValidation.getVoucherByKode()),
+  voucherController.getVoucherByKode
+);
 
 
 module.exports = router;
