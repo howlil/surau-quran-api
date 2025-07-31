@@ -44,7 +44,8 @@ class GuruService {
               select: {
                 id: true,
                 email: true,
-                role: true
+                role: true,
+                rfid: true
               }
             }
           }
@@ -73,6 +74,7 @@ class GuruService {
           suratKontrak: guru.suratKontrak,
           user: {
             email: guru.user.email,
+            rfid: guru.user.rfid,
           }
         }
 
@@ -99,7 +101,7 @@ class GuruService {
         throw new NotFoundError(`Guru dengan ID ${id} tidak ditemukan`);
       }
 
-      const { email, password, baseUrl, ...guruData } = data;
+      const { email, password, rfid, baseUrl, ...guruData } = data;
 
       return await PrismaUtils.transaction(async (tx) => {
         if (email && email !== guru.user.email) {
@@ -128,6 +130,28 @@ class GuruService {
           });
         }
 
+        // Update RFID jika disediakan
+        if (rfid !== undefined) {
+          // Check if RFID already exists for another user
+          if (rfid) {
+            const existingRfid = await tx.user.findFirst({
+              where: {
+                rfid: rfid,
+                id: { not: guru.userId }
+              }
+            });
+
+            if (existingRfid) {
+              throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+            }
+          }
+
+          await tx.user.update({
+            where: { id: guru.userId },
+            data: { rfid: rfid }
+          });
+        }
+
         // Update all fields that are provided, including null values
         const updateData = {};
         Object.keys(guruData).forEach(key => {
@@ -144,28 +168,30 @@ class GuruService {
               select: {
                 id: true,
                 email: true,
-                role: true
+                role: true,
+                rfid: true
               }
             }
           }
         });
 
         const schema = {
-          id: guru.id,
-          nama: guru.nama,
-          nip: guru.nip,
-          noWhatsapp: guru.noWhatsapp,
-          alamat: guru.alamat,
-          jenisKelamin: guru.jenisKelamin,
-          tanggalLahir: guru.tanggalLahir,
-          fotoProfile: guru.fotoProfile,
-          keahlian: guru.keahlian,
-          pendidikanTerakhir: guru.pendidikanTerakhir,
-          noRekening: guru.noRekening,
-          namaBank: guru.namaBank,
-          suratKontrak: guru.suratKontrak,
+          id: updated.id,
+          nama: updated.nama,
+          nip: updated.nip,
+          noWhatsapp: updated.noWhatsapp,
+          alamat: updated.alamat,
+          jenisKelamin: updated.jenisKelamin,
+          tanggalLahir: updated.tanggalLahir,
+          fotoProfile: updated.fotoProfile,
+          keahlian: updated.keahlian,
+          pendidikanTerakhir: updated.pendidikanTerakhir,
+          noRekening: updated.noRekening,
+          namaBank: updated.namaBank,
+          suratKontrak: updated.suratKontrak,
           user: {
-            email: guru.user.email,
+            email: updated.user.email,
+            rfid: updated.user.rfid,
           }
         }
 
@@ -252,6 +278,7 @@ class GuruService {
           user: {
             select: {
               email: true,
+              rfid: true,
             }
           }
         },

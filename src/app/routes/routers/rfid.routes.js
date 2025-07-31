@@ -24,14 +24,7 @@ router.get(
 );
 
 
-// Register RFID untuk user
-router.post(
-    '/v1/rfid',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
-    validationMiddleware.validateBody(rfidValidation.registerRfid()),
-    rfidController.registerRfid
-);
+
 
 // Update RFID user
 router.patch(

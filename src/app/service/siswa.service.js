@@ -700,7 +700,8 @@ class SiswaService {
           kelasSekolah: true,
           user: {
             select: {
-              email: true
+              email: true,
+              rfid: true
             }
           },
           programSiswa: {
@@ -808,6 +809,12 @@ class SiswaService {
       const siswa = await prisma.siswa.findUnique({
         where: { userId },
         include: {
+          user: {
+            select: {
+              email: true,
+              rfid: true
+            }
+          },
           programSiswa: {
             orderBy: [
               { status: 'asc' }, // AKTIF akan muncul pertama
@@ -981,6 +988,7 @@ class SiswaService {
         namaSekolah,
         kelasSekolah,
         email,
+        rfid,
         programId,
         programStatus,
         jadwal = []
@@ -1032,6 +1040,28 @@ class SiswaService {
           await tx.user.update({
             where: { id: siswa.userId },
             data: { email: email }
+          });
+        }
+
+        // Update RFID jika disediakan
+        if (rfid !== undefined) {
+          // Check if RFID already exists for another user
+          if (rfid) {
+            const existingRfid = await tx.user.findFirst({
+              where: {
+                rfid: rfid,
+                id: { not: siswa.userId }
+              }
+            });
+
+            if (existingRfid) {
+              throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+            }
+          }
+
+          await tx.user.update({
+            where: { id: siswa.userId },
+            data: { rfid: rfid }
           });
         }
 
@@ -1229,7 +1259,8 @@ class SiswaService {
             user: {
               select: {
                 email: true,
-                role: true
+                role: true,
+                rfid: true
               }
             },
             programSiswa: {

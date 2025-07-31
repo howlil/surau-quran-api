@@ -173,6 +173,12 @@ class SiswaValidation {
           'string.email': 'Format email tidak valid',
           'string.max': 'Email maksimal 191 karakter'
         }),
+      // RFID field
+      rfid: Joi.string().min(8).max(50).optional()
+        .messages({
+          'string.min': 'RFID minimal 8 karakter',
+          'string.max': 'RFID maksimal 50 karakter'
+        }),
 
       // Single program with status
       programId: Joi.string().guid({ version: 'uuidv4' }).optional()
