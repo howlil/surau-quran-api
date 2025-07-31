@@ -704,8 +704,11 @@ class SiswaService {
             }
           },
           programSiswa: {
-            take: 1,
-            orderBy: { createdAt: 'desc' },
+            // Mengambil semua program siswa untuk diproses
+            orderBy: [
+              { status: 'asc' }, // AKTIF akan muncul pertama (ascending)
+              { updatedAt: 'desc' } // Jika status sama, ambil yang terbaru diupdate
+            ],
             select: {
               id: true,
               status: true,
@@ -743,37 +746,46 @@ class SiswaService {
       });
 
       // Transform programSiswa dari array menjadi objek tunggal
-      // Logic: Mengambil program siswa yang TERBARU berdasarkan createdAt DESC
-      // Jika siswa naik kelas atau pindah program, yang ditampilkan adalah program terbaru
-      // Contoh: Siswa dari BTA LVL 1 → BTA LVL 2 → CUTI di BTA LVL 2
-      // Yang ditampilkan: BTA LVL 2 dengan status CUTI
+      // Logic baru: Prioritaskan program AKTIF, jika tidak ada ambil yang terbaru diupdate
       const transformedData = result.data.map(siswa => {
-        const latestProgram = siswa.programSiswa.length > 0 ? siswa.programSiswa[0] : null;
+        let selectedProgram = null;
         
-        // Debug log untuk semua program siswa (untuk tracking)
-        if (siswa.programSiswa.length > 1) {
-          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki ${siswa.programSiswa.length} program. Mengambil yang terbaru: ${latestProgram?.program?.namaProgram} (${latestProgram?.status})`);
+        if (siswa.programSiswa.length > 0) {
+          // Cari program yang AKTIF terlebih dahulu
+          const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
           
-          // Log semua program untuk debugging
-          siswa.programSiswa.forEach((program, index) => {
-            logger.info(`  Program ${index + 1}: ${program.program?.namaProgram} - Status: ${program.status} - Created: ${program.createdAt}`);
-          });
+          if (activeProgram) {
+            selectedProgram = activeProgram;
+            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
+          } else {
+            // Jika tidak ada yang AKTIF, ambil yang terbaru diupdate (sudah diurutkan di query)
+            selectedProgram = siswa.programSiswa[0];
+            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) tidak memiliki program AKTIF, menggunakan yang terbaru: ${selectedProgram.program?.namaProgram} (${selectedProgram.status})`);
+          }
+          
+          // Debug log untuk semua program siswa (untuk tracking)
+          if (siswa.programSiswa.length > 1) {
+            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki ${siswa.programSiswa.length} program:`);
+            siswa.programSiswa.forEach((program, index) => {
+              logger.info(`  Program ${index + 1}: ${program.program?.namaProgram} - Status: ${program.status} - Updated: ${program.updatedAt}`);
+            });
+          }
         }
         
         const transformedSiswa = {
           ...siswa,
-          programSiswa: latestProgram ? {
-            ...latestProgram,
-            statusProgram: latestProgram.status, // Menambahkan status program
-            isActive: latestProgram.status === 'AKTIF', // Flag untuk status aktif
-            createdAt: latestProgram.createdAt, // Tambahkan createdAt untuk tracking
-            updatedAt: latestProgram.updatedAt // Tambahkan updatedAt untuk tracking
+          programSiswa: selectedProgram ? {
+            ...selectedProgram,
+            statusProgram: selectedProgram.status, // Menambahkan status program
+            isActive: selectedProgram.status === 'AKTIF', // Flag untuk status aktif
+            createdAt: selectedProgram.createdAt, // Tambahkan createdAt untuk tracking
+            updatedAt: selectedProgram.updatedAt // Tambahkan updatedAt untuk tracking
           } : null
         };
 
         // Debug log untuk siswa yang statusnya CUTI
-        if (latestProgram && latestProgram.status === 'CUTI') {
-          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki status program: ${latestProgram.status} pada program: ${latestProgram.program?.namaProgram}`);
+        if (selectedProgram && selectedProgram.status === 'CUTI') {
+          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki status program: ${selectedProgram.status} pada program: ${selectedProgram.program?.namaProgram}`);
         }
 
         return transformedSiswa;
@@ -797,6 +809,10 @@ class SiswaService {
         where: { userId },
         include: {
           programSiswa: {
+            orderBy: [
+              { status: 'asc' }, // AKTIF akan muncul pertama
+              { updatedAt: 'desc' } // Jika status sama, ambil yang terbaru diupdate
+            ],
             include: {
               program: true,
               JadwalProgramSiswa: {
@@ -814,6 +830,19 @@ class SiswaService {
 
       if (!siswa) {
         throw new NotFoundError('Profil siswa tidak ditemukan');
+      }
+
+      // Pilih program yang akan ditampilkan (prioritaskan AKTIF)
+      let selectedProgramSiswa = null;
+      if (siswa.programSiswa.length > 0) {
+        const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
+        if (activeProgram) {
+          selectedProgramSiswa = activeProgram;
+          logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
+        } else {
+          selectedProgramSiswa = siswa.programSiswa[0];
+          logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) tidak memiliki program AKTIF, menggunakan yang terbaru: ${selectedProgramSiswa.program?.namaProgram} (${selectedProgramSiswa.status})`);
+        }
       }
 
       // Build absensi query filter
@@ -878,54 +907,28 @@ class SiswaService {
       const tidakHadir = allAbsensi.filter(a => a.statusKehadiran === 'TIDAK_HADIR').length;
       const total = allAbsensi.length;
 
-      // Format the jadwal (schedule) data
-      const jadwal = [];
-      let currentProgram = null;
+      // Transform data untuk konsistensi dengan getAll
+      const transformedSiswa = {
+        ...siswa,
+        programSiswa: selectedProgramSiswa ? {
+          ...selectedProgramSiswa,
+          statusProgram: selectedProgramSiswa.status,
+          isActive: selectedProgramSiswa.status === 'AKTIF'
+        } : null
+      };
 
-      // Get the active program (assuming one program per student)
-      const activeProgramSiswa = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
-
-      if (activeProgramSiswa) {
-        currentProgram = {
-          namaProgram: activeProgramSiswa.program.namaProgram,
-          status: activeProgramSiswa.status
-        };
-
-        // Get jadwal for the active program
-        activeProgramSiswa.JadwalProgramSiswa.forEach(j => {
-          jadwal.push({
-            hari: j.hari,
-            urutan: j.urutan,
-            jam: `${j.jamMengajar.jamMulai} - ${j.jamMengajar.jamSelesai}`
-          });
-        });
-      }
-
-      // Format the attendance data
-      const absensiFormatted = absensi.map(a => ({
-        hari: this.getDayFromDate(a.tanggal),
-        kelas: a.kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
-        program: a.kelasProgram.program.namaProgram,
-        tanggal: a.tanggal,
-        status: a.statusKehadiran
-      }));
-
-      // Build the response object
-      const result = {
-        namaSiswa: siswa.namaMurid,
-        nis: siswa.nis,
-        program: currentProgram, // Single object instead of array
-        jadwal: jadwal,
+      return {
+        siswa: transformedSiswa,
         absensi: {
-          data: absensiFormatted,
+          data: absensi,
           pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            totalItems: totalAbsensi,
-            totalPages: totalPages
+            total: totalAbsensi,
+            limit,
+            page,
+            totalPages
           }
         },
-        countAbsensi: {
+        statistik: {
           hadir,
           sakit,
           izin,
@@ -933,10 +936,8 @@ class SiswaService {
           total
         }
       };
-
-      return result;
     } catch (error) {
-      logger.error(`Error getting siswa profile for user ${userId}:`, error);
+      logger.error('Error getting profile siswa:', error);
       throw error;
     }
   }
@@ -1109,11 +1110,20 @@ class SiswaService {
 
           logger.info(`Current jadwal count: ${currentJadwals.length}, New jadwal count: ${jadwal.length}`);
 
-          // Count new schedules to be added (excluding deleted ones)
-          const newSchedules = jadwal.filter(j => !j.id && !j.isDeleted);
-          const totalSchedules = currentJadwals.length + newSchedules.length;
+          // Count schedules properly:
+          // - Existing schedules that will be updated (with id)
+          // - New schedules to be added (without id and not deleted)
+          // - Schedules to be deleted (with isDeleted flag)
+          const schedulesToUpdate = jadwal.filter(j => j.id && !j.isDeleted);
+          const schedulesToAdd = jadwal.filter(j => !j.id && !j.isDeleted);
+          const schedulesToDelete = jadwal.filter(j => j.isDeleted && j.id);
+          
+          // Calculate final count: current - deleted + added
+          const finalScheduleCount = currentJadwals.length - schedulesToDelete.length + schedulesToAdd.length;
 
-          if (totalSchedules > 2) {
+          logger.info(`Schedules to update: ${schedulesToUpdate.length}, to add: ${schedulesToAdd.length}, to delete: ${schedulesToDelete.length}, final count: ${finalScheduleCount}`);
+
+          if (finalScheduleCount > 2) {
             throw new BadRequestError('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
           }
 

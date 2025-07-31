@@ -11,10 +11,11 @@ class PrismaConfig {
   constructor() {
     this.#client = new PrismaClient({
       log: [
-        { level: 'query', emit: 'event' },
         { level: 'error', emit: 'event' },
         { level: 'info', emit: 'event' },
-        { level: 'warn', emit: 'event' }
+        { level: 'warn', emit: 'event' },
+        // Only enable query logging in development
+        ...(process.env.NODE_ENV === 'development' ? [{ level: 'query', emit: 'event' }] : [])
       ],
       errorFormat: process.env.NODE_ENV === 'production' ? 'minimal' : 'pretty'
     });
@@ -23,10 +24,13 @@ class PrismaConfig {
   }
 
   #setupLogging() {
-    this.#client.$on('query', e => {
-      logger.debug(`Query: ${e.query}`);
-      logger.debug(`Duration: ${e.duration}ms`);
-    });
+    // Only setup query logging in development
+    if (process.env.NODE_ENV === 'development') {
+      this.#client.$on('query', e => {
+        logger.debug(`Query: ${e.query}`);
+        logger.debug(`Duration: ${e.duration}ms`);
+      });
+    }
 
     this.#client.$on('error', e => {
       logger.error('Prisma Client error:', e);
