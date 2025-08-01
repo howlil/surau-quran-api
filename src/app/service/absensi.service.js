@@ -5,7 +5,7 @@ const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
-const todayDate = moment().format(DATE_FORMATS.DEFAULT);
+// todayDate akan dihitung di dalam setiap fungsi yang membutuhkannya
 class AbsensiService {
 
     async getAbsensiSiswaForAdmin(filters = {}) {
@@ -513,7 +513,7 @@ class AbsensiService {
 
     async updateAbsensiSiswa(kelasProgramId, siswaId, guruId, statusKehadiran) {
         try {
-            const tanggal = todayDate;
+            const tanggal = moment().format(DATE_FORMATS.DEFAULT);
 
             // Cek apakah siswa ada di kelas pengganti untuk kelas program ini
             const kelasPengganti = await prisma.kelasPengganti.findFirst({
@@ -866,7 +866,7 @@ class AbsensiService {
     async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId, tanggal = null) {
         try {
             // Use provided date or default to today's date
-            const targetDate = tanggal || todayDate;
+            const targetDate = tanggal || moment().format(DATE_FORMATS.DEFAULT);
 
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
@@ -1561,7 +1561,7 @@ class AbsensiService {
 
     async getAbsensiGuruTodayPublic(baseUrl) {
         try {
-            const tanggal = todayDate;
+            const tanggal = moment().format(DATE_FORMATS.DEFAULT);
 
             // Parse tanggal untuk mendapatkan hari
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
