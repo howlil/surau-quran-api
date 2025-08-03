@@ -386,7 +386,6 @@ class FakerSeeder {
                         tipe,
                         nominal,
                         isActive: Math.random() > 0.2,
-                        jumlahPenggunaan: faker.number.int({ min: 0, max: 100 }),
                         createdAt: new Date(),
                         updatedAt: new Date()
                     }

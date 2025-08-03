@@ -207,6 +207,11 @@ class WhatsAppUtils {
         return await this.sendMessage(phoneNumber, message);
     }
 
+    static async sendPaymentSuccessWhatsApp(phoneNumber, paymentData) {
+        const message = this.generatePaymentSuccessMessage(paymentData);
+        return await this.sendMessage(phoneNumber, message);
+    }
+
     static generateSppReminderMessage(sppData) {
         const {
             namaSiswa,
@@ -249,6 +254,58 @@ Terima kasih atas perhatiannya 🙏
 *Surau Quran*
 📞 Admin: ${process.env.ADMIN_PHONE || '08123456789'}
 📧 Email: ${process.env.ADMIN_EMAIL || 'admin@surauquran.com'}`;
+    }
+
+    static generatePaymentSuccessMessage(paymentData) {
+        const {
+            namaSiswa,
+            namaProgram,
+            jumlahTagihan,
+            tanggalPembayaran,
+            metodePembayaran,
+            invoiceId,
+            periode
+        } = paymentData;
+
+        const formattedDate = new Date(tanggalPembayaran).toLocaleDateString('id-ID', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        return `Assalamu'alaikum Warrahmatullahi Wabarakatuh
+
+Halo ${namaSiswa} 👋
+
+Alhamdulillah, pembayaran Anda telah berhasil diproses! 🎉
+
+📋 *Detail Pembayaran:*
+• Program: ${namaProgram}
+${periode ? `• Periode: ${periode}` : ''}
+• Jumlah: ${jumlahTagihan}
+• Tanggal: ${formattedDate}
+• Metode: ${metodePembayaran || 'Online Payment'}
+• Invoice ID: ${invoiceId}
+
+✅ *Status: Pembayaran Berhasil*
+
+Terima kasih atas kepercayaan Anda kepada Surau Quran. Pembayaran Anda telah kami terima dan diproses dengan baik.
+
+📚 *Informasi Kelas:*
+• Kelas akan berjalan sesuai jadwal yang telah ditentukan
+• Silakan cek aplikasi untuk informasi jadwal terbaru
+• Hubungi guru jika ada pertanyaan tentang materi
+
+🙏 *Doa:*
+Semoga Allah SWT memberikan keberkahan dalam belajar dan mengamalkan ilmu yang diperoleh.
+
+*Surau Quran*
+📞 Admin: ${process.env.ADMIN_PHONE || '08123456789'}
+📧 Email: ${process.env.ADMIN_EMAIL || 'admin@surauquran.com'}
+🌐 Website: ${process.env.FRONTEND_URL || 'https://surauquran.com'}`;
     }
 }
 

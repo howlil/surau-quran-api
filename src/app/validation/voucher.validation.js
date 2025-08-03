@@ -28,13 +28,6 @@ class VoucherValidation {
       isActive: Joi.boolean().default(true)
         .messages({
           'boolean.base': 'Status aktif harus berupa boolean'
-        }),
-      jumlahPenggunaan: Joi.number().integer().positive().required()
-        .messages({
-          'number.base': 'Jumlah penggunaan harus berupa angka',
-          'number.integer': 'Jumlah penggunaan harus berupa bilangan bulat',
-          'number.positive': 'Jumlah penggunaan harus lebih dari 0',
-          'any.required': 'Jumlah penggunaan wajib diisi'
         })
     });
   }
@@ -61,12 +54,6 @@ class VoucherValidation {
       isActive: Joi.boolean().optional()
         .messages({
           'boolean.base': 'Status aktif harus berupa boolean'
-        }),
-      jumlahPenggunaan: Joi.number().integer().positive().optional()
-        .messages({
-          'number.base': 'Jumlah penggunaan harus berupa angka',
-          'number.integer': 'Jumlah penggunaan harus berupa bilangan bulat',
-          'number.positive': 'Jumlah penggunaan harus lebih dari 0'
         })
     });
   }

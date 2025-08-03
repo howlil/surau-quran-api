@@ -125,9 +125,7 @@ class SiswaService {
           throw new NotFoundError(`Voucher ${kodeVoucher} tidak valid atau tidak aktif`);
         }
 
-        if (voucher.jumlahPenggunaan <= 0) {
-          throw new BadRequestError(`Voucher ${kodeVoucher} sudah habis digunakan`);
-        }
+
 
         voucherId = voucher.id;
 
@@ -747,21 +745,36 @@ class SiswaService {
       });
 
       // Transform programSiswa dari array menjadi objek tunggal
-      // Logic baru: Prioritaskan program AKTIF, jika tidak ada ambil yang terbaru diupdate
+      // Logic: Prioritaskan AKTIF -> CUTI -> TIDAK_AKTIF (yang terbaru diupdate)
       const transformedData = result.data.map(siswa => {
         let selectedProgram = null;
         
         if (siswa.programSiswa.length > 0) {
-          // Cari program yang AKTIF terlebih dahulu
+          // 1. Prioritas pertama: program yang AKTIF
           const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
           
           if (activeProgram) {
             selectedProgram = activeProgram;
             logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
           } else {
-            // Jika tidak ada yang AKTIF, ambil yang terbaru diupdate (sudah diurutkan di query)
-            selectedProgram = siswa.programSiswa[0];
-            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) tidak memiliki program AKTIF, menggunakan yang terbaru: ${selectedProgram.program?.namaProgram} (${selectedProgram.status})`);
+            // 2. Prioritas kedua: program yang CUTI (yang terbaru diupdate)
+            const cutiProgram = siswa.programSiswa
+              .filter(ps => ps.status === 'CUTI')
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+            
+            if (cutiProgram) {
+              selectedProgram = cutiProgram;
+              logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
+            } else {
+              // 3. Prioritas ketiga: program TIDAK_AKTIF yang terbaru diupdate
+              selectedProgram = siswa.programSiswa
+                .filter(ps => ps.status === 'TIDAK_AKTIF')
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+              
+              if (selectedProgram) {
+                logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgram.program?.namaProgram}`);
+              }
+            }
           }
           
           // Debug log untuk semua program siswa (untuk tracking)
@@ -839,16 +852,34 @@ class SiswaService {
         throw new NotFoundError('Profil siswa tidak ditemukan');
       }
 
-      // Pilih program yang akan ditampilkan (prioritaskan AKTIF)
+      // Pilih program yang akan ditampilkan (prioritaskan AKTIF -> CUTI -> TIDAK_AKTIF)
       let selectedProgramSiswa = null;
       if (siswa.programSiswa.length > 0) {
+        // 1. Prioritas pertama: program yang AKTIF
         const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
+        
         if (activeProgram) {
           selectedProgramSiswa = activeProgram;
           logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
         } else {
-          selectedProgramSiswa = siswa.programSiswa[0];
-          logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) tidak memiliki program AKTIF, menggunakan yang terbaru: ${selectedProgramSiswa.program?.namaProgram} (${selectedProgramSiswa.status})`);
+          // 2. Prioritas kedua: program yang CUTI (yang terbaru diupdate)
+          const cutiProgram = siswa.programSiswa
+            .filter(ps => ps.status === 'CUTI')
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+          
+          if (cutiProgram) {
+            selectedProgramSiswa = cutiProgram;
+            logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
+          } else {
+            // 3. Prioritas ketiga: program TIDAK_AKTIF yang terbaru diupdate
+            selectedProgramSiswa = siswa.programSiswa
+              .filter(ps => ps.status === 'TIDAK_AKTIF')
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+            
+            if (selectedProgramSiswa) {
+              logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgramSiswa.program?.namaProgram}`);
+            }
+          }
         }
       }
 

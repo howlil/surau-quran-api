@@ -7,9 +7,26 @@ class AbsensiValidation {
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
                 .required()
+                .custom((value, helpers) => {
+                    const moment = require('moment');
+                    const dateObj = moment(value, 'DD-MM-YYYY');
+                    
+                    if (!dateObj.isValid()) {
+                        return helpers.error('custom.invalidDate');
+                    }
+                    
+                    // Check if date falls on Sunday (day() === 0)
+                    if (dateObj.day() === 0) {
+                        return helpers.error('custom.sundayNotAllowed');
+                    }
+                    
+                    return value;
+                })
                 .messages({
                     'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
-                    'any.required': 'Parameter tanggal wajib diisi'
+                    'any.required': 'Parameter tanggal wajib diisi',
+                    'custom.invalidDate': 'Format tanggal tidak valid',
+                    'custom.sundayNotAllowed': 'Tidak ada jadwal kelas pada hari Minggu'
                 }),
         });
     }
@@ -19,9 +36,26 @@ class AbsensiValidation {
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
                 .required()
+                .custom((value, helpers) => {
+                    const moment = require('moment');
+                    const dateObj = moment(value, 'DD-MM-YYYY');
+                    
+                    if (!dateObj.isValid()) {
+                        return helpers.error('custom.invalidDate');
+                    }
+                    
+                    // Check if date falls on Sunday (day() === 0)
+                    if (dateObj.day() === 0) {
+                        return helpers.error('custom.sundayNotAllowed');
+                    }
+                    
+                    return value;
+                })
                 .messages({
                     'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
-                    'any.required': 'Parameter tanggal wajib diisi'
+                    'any.required': 'Parameter tanggal wajib diisi',
+                    'custom.invalidDate': 'Format tanggal tidak valid',
+                    'custom.sundayNotAllowed': 'Tidak ada jadwal kelas pada hari Minggu'
                 }),
             page: Joi.number().integer().min(1).default(1)
                 .messages({
@@ -137,8 +171,28 @@ class AbsensiValidation {
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
                 .optional()
+                .custom((value, helpers) => {
+                    // If no value provided, it's optional so return as is
+                    if (!value) return value;
+                    
+                    const moment = require('moment');
+                    const dateObj = moment(value, 'DD-MM-YYYY');
+                    
+                    if (!dateObj.isValid()) {
+                        return helpers.error('custom.invalidDate');
+                    }
+                    
+                    // Check if date falls on Sunday (day() === 0)
+                    if (dateObj.day() === 0) {
+                        return helpers.error('custom.sundayNotAllowed');
+                    }
+                    
+                    return value;
+                })
                 .messages({
-                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'custom.invalidDate': 'Format tanggal tidak valid',
+                    'custom.sundayNotAllowed': 'Tidak ada jadwal kelas pada hari Minggu'
                 }),
         });
     }
@@ -153,9 +207,26 @@ class AbsensiValidation {
             tanggal: Joi.string()
                 .regex(/^\d{2}-\d{2}-\d{4}$/)
                 .required()
+                .custom((value, helpers) => {
+                    const moment = require('moment');
+                    const dateObj = moment(value, 'DD-MM-YYYY');
+                    
+                    if (!dateObj.isValid()) {
+                        return helpers.error('custom.invalidDate');
+                    }
+                    
+                    // Check if date falls on Sunday (day() === 0)
+                    if (dateObj.day() === 0) {
+                        return helpers.error('custom.sundayNotAllowed');
+                    }
+                    
+                    return value;
+                })
                 .messages({
                     'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
-                    'any.required': 'Tanggal wajib diisi'
+                    'any.required': 'Tanggal wajib diisi',
+                    'custom.invalidDate': 'Format tanggal tidak valid',
+                    'custom.sundayNotAllowed': 'Tidak ada jadwal kelas pada hari Minggu'
                 })
         });
     }
@@ -166,10 +237,30 @@ class AbsensiValidation {
                 'string.empty': 'RFID tidak boleh kosong',
                 'any.required': 'RFID wajib diisi'
             }),
-            tanggal: Joi.string().regex(/^\d{2}-\d{2}-\d{4}$/).required().messages({
-                'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
-                'any.required': 'Tanggal wajib diisi'
-            }),
+            tanggal: Joi.string()
+                .regex(/^\d{2}-\d{2}-\d{4}$/)
+                .required()
+                .custom((value, helpers) => {
+                    const moment = require('moment');
+                    const dateObj = moment(value, 'DD-MM-YYYY');
+                    
+                    if (!dateObj.isValid()) {
+                        return helpers.error('custom.invalidDate');
+                    }
+                    
+                    // Check if date falls on Sunday (day() === 0)
+                    if (dateObj.day() === 0) {
+                        return helpers.error('custom.sundayNotAllowed');
+                    }
+                    
+                    return value;
+                })
+                .messages({
+                    'string.pattern.base': 'Format tanggal harus DD-MM-YYYY',
+                    'any.required': 'Tanggal wajib diisi',
+                    'custom.invalidDate': 'Format tanggal tidak valid',
+                    'custom.sundayNotAllowed': 'Tidak ada jadwal kelas pada hari Minggu'
+                }),
             jam: Joi.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).required().messages({
                 'string.pattern.base': 'Format jam harus HH:MM (24 jam)',
                 'any.required': 'Jam wajib diisi'

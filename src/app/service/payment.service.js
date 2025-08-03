@@ -7,6 +7,7 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const WhatsAppUtils = require('../../lib/utils/whatsapp.utils');
 const SppService = require('./spp.service');
 const financeService = require('./finance.service');
 const moment = require('moment');
@@ -163,14 +164,7 @@ class PaymentService {
           });
         }
 
-        if (voucherId) {
-          await tx.voucher.update({
-            where: { id: voucherId },
-            data: {
-              jumlahPenggunaan: { decrement: 1 }
-            }
-          });
-        }
+
 
         return {
           pembayaranId: pembayaran.id,
@@ -406,6 +400,20 @@ class PaymentService {
           });
         }
 
+        // Send WhatsApp notification for successful payment
+        if (processedData.status === 'PAID') {
+          try {
+            await this.sendPaymentSuccessNotification(updatedPayment, processedData, tx);
+          } catch (notificationError) {
+            // Log error but don't fail the main payment processing
+            logger.error('Failed to send payment success notification:', {
+              paymentId: updatedPayment.id,
+              error: notificationError.message,
+              stack: notificationError.stack
+            });
+          }
+        }
+
         logger.info(`Successfully processed payment callback for ID: ${xenditPayment.pembayaranId}`);
         return updatedPayment;
       });
@@ -446,6 +454,138 @@ class PaymentService {
       };
     } catch (error) {
       logger.error('Error processing paid SPP:', error);
+      throw error;
+    }
+  }
+
+  async sendPaymentSuccessNotification(payment, processedData, tx) {
+    try {
+      let siswa = null;
+      let program = null;
+      let periode = null;
+
+      // Get student and program information based on payment type
+      if (payment.tipePembayaran === 'PENDAFTARAN') {
+        const pendaftaran = await tx.pendaftaran.findUnique({
+          where: { pembayaranId: payment.id },
+          include: {
+            siswa: {
+              include: {
+                user: {
+                  select: {
+                    email: true
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        if (pendaftaran) {
+          siswa = pendaftaran.siswa;
+          // For pendaftaran, get program from programSiswa
+          const programSiswa = await tx.programSiswa.findFirst({
+            where: { siswaId: siswa.id },
+            include: {
+              program: true
+            }
+          });
+          if (programSiswa) {
+            program = programSiswa.program;
+          }
+        }
+      } else if (payment.tipePembayaran === 'SPP') {
+        const periodeSpp = await tx.periodeSpp.findFirst({
+          where: { pembayaranId: payment.id },
+          include: {
+            programSiswa: {
+              include: {
+                siswa: {
+                  include: {
+                    user: {
+                      select: {
+                        email: true
+                      }
+                    }
+                  }
+                },
+                program: true
+              }
+            }
+          }
+        });
+
+        if (periodeSpp) {
+          siswa = periodeSpp.programSiswa.siswa;
+          program = periodeSpp.programSiswa.program;
+          periode = `${periodeSpp.bulan} ${periodeSpp.tahun}`;
+        }
+      }
+
+      if (!siswa || !program) {
+        logger.warn(`Could not find student or program data for payment ${payment.id}`);
+        return;
+      }
+
+      // Format amount
+      const formattedAmount = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR'
+      }).format(payment.jumlahTagihan);
+
+      // Prepare payment data for WhatsApp
+      const paymentData = {
+        namaSiswa: siswa.namaMurid,
+        namaProgram: program.namaProgram,
+        jumlahTagihan: formattedAmount,
+        tanggalPembayaran: payment.tanggalPembayaran,
+        metodePembayaran: payment.metodePembayaran,
+        invoiceId: processedData.xenditInvoiceId,
+        periode: periode
+      };
+
+      // Send WhatsApp notification if phone number is available
+      if (siswa.noWhatsapp) {
+        if (!WhatsAppUtils.validatePhoneNumber(siswa.noWhatsapp)) {
+          logger.warn(`Invalid WhatsApp number format for siswa ${siswa.id}: ${siswa.noWhatsapp}`);
+          return;
+        }
+
+        const result = await WhatsAppUtils.sendPaymentSuccessWhatsApp(siswa.noWhatsapp, paymentData);
+
+        if (result.success) {
+          logger.info(`Payment success WhatsApp notification sent to ${siswa.noWhatsapp} for payment ${payment.id}`, {
+            messageSid: result.messageSid,
+            status: result.status,
+            paymentType: payment.tipePembayaran
+          });
+        } else {
+          logger.error(`Failed to send payment success WhatsApp notification to ${siswa.noWhatsapp} for payment ${payment.id}:`, {
+            error: result.error,
+            code: result.code
+          });
+        }
+      } else {
+        logger.info(`No WhatsApp number available for siswa ${siswa.id}, skipping WhatsApp notification`);
+      }
+
+      // Send email notification as fallback
+      if (siswa.user?.email) {
+        try {
+          await EmailUtils.sendPaymentSuccess({
+            email: siswa.user.email,
+            name: siswa.namaMurid,
+            amount: payment.jumlahTagihan,
+            paymentDate: payment.tanggalPembayaran
+          });
+          logger.info(`Payment success email sent to ${siswa.user.email} for payment ${payment.id}`);
+        } catch (emailError) {
+          logger.error(`Failed to send payment success email to ${siswa.user.email} for payment ${payment.id}:`, emailError);
+        }
+      }
+
+    } catch (error) {
+      logger.error(`Error sending payment success notification for payment ${payment.id}:`, error);
       throw error;
     }
   }

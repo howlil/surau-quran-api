@@ -287,9 +287,7 @@ class SppService {
                     throw new NotFoundError('Voucher tidak valid atau tidak aktif');
                 }
 
-                if (voucher.jumlahPenggunaan <= 0) {
-                    throw new BadRequestError('Voucher sudah habis digunakan');
-                }
+
 
                 voucherId = voucher.id;
 

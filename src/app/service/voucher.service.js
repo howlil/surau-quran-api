@@ -115,8 +115,7 @@ class VoucherService {
           namaVoucher: true,
           tipe: true,
           nominal: true,
-          isActive: true,
-          jumlahPenggunaan: true
+          isActive: true
         },
         orderBy: {
           createdAt: 'desc'

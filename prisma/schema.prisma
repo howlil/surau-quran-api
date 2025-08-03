@@ -345,7 +345,6 @@ model Voucher {
   tipe             TipeVoucher
   nominal          Decimal     @db.Decimal(10, 2)
   isActive         Boolean     @default(true)
-  jumlahPenggunaan Int
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
