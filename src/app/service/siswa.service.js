@@ -10,6 +10,7 @@ const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
 const SppService = require('./spp.service');
 const { DATE_FORMATS } = require('../../lib/constants');
+
 class SiswaService {
 
   async createPendaftaran(pendaftaranData) {
@@ -1403,6 +1404,80 @@ class SiswaService {
     }
   }
 
+  async getSppThisMonthStatus(siswaId) {
+    try {
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1; // 1-12
+      const currentYear = currentDate.getFullYear();
+      
+      // Get month name in Indonesian
+      const monthNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const currentMonthName = monthNames[currentMonth - 1];
+
+      // Get active program siswa
+      const activeProgramSiswa = await prisma.programSiswa.findFirst({
+        where: {
+          siswaId: siswaId,
+          status: 'AKTIF'
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (!activeProgramSiswa) {
+        // If no active program, return default values
+        return {
+          spp: false,
+          charge: 0
+        };
+      }
+
+      // Check for SPP this month
+      const sppThisMonth = await prisma.periodeSpp.findFirst({
+        where: {
+          programSiswaId: activeProgramSiswa.id,
+          bulan: currentMonthName,
+          tahun: currentYear
+        },
+        include: {
+          pembayaran: {
+            select: {
+              statusPembayaran: true
+            }
+          }
+        }
+      });
+
+      if (!sppThisMonth) {
+        // If no SPP record for this month, return default values
+        return {
+          spp: false,
+          charge: 0
+        };
+      }
+
+      // Check if payment is completed
+      const isPaid = sppThisMonth.pembayaran && 
+                    ['PAID', 'SETTLED'].includes(sppThisMonth.pembayaran.statusPembayaran);
+
+      return {
+        spp: !isPaid, // true if not paid, false if paid
+        charge: isPaid ? 0 : 250000 // 250.000 if not paid, 0 if paid
+      };
+    } catch (error) {
+      logger.error(`Error getting SPP this month status for siswa ${siswaId}:`, error);
+      // Return default values on error
+      return {
+        spp: false,
+        charge: 0
+      };
+    }
+  }
+
   async getJadwalSiswa(rfid) {
     try {
       let siswa;
@@ -1480,6 +1555,9 @@ class SiswaService {
         throw new BadRequestError('Parameter RFID wajib diisi');
       }
 
+      // Get SPP status for this month
+      const sppThisMonth = await this.getSppThisMonthStatus(siswa.id);
+
       // Format response
       const schedules = [];
 
@@ -1516,7 +1594,7 @@ class SiswaService {
           kelasPrograms.set(kp.id, scheduleEntry);
         }
 
-        // Add from JadwalProgramSiswa (additional schedules)
+        // Add from JadwalProgramSiswa (additional schedules) - avoid duplicates
         logger.info(`Found ${programSiswa.JadwalProgramSiswa.length} jadwal program siswa`);
         
         for (const jadwal of programSiswa.JadwalProgramSiswa) {
@@ -1557,13 +1635,26 @@ class SiswaService {
               });
             }
 
-            // Add jam mengajar
-            kelasPrograms.get(kelasProgram.id).jamMengajar.push({
-              jamMengajarId: jadwal.jamMengajar.id,
-              Hari: jadwal.hari,
-              jamMulai: jadwal.jamMengajar.jamMulai,
-              jamSelesai: jadwal.jamMengajar.jamSelesai
-            });
+            // Check if this jadwal already exists in the kelas program to avoid duplicates
+            const existingSchedule = kelasPrograms.get(kelasProgram.id).jamMengajar.find(
+              existing => existing.jamMengajarId === jadwal.jamMengajar.id && 
+                         existing.Hari === jadwal.hari &&
+                         existing.jamMulai === jadwal.jamMengajar.jamMulai &&
+                         existing.jamSelesai === jadwal.jamMengajar.jamSelesai
+            );
+
+            if (!existingSchedule) {
+              // Add jam mengajar only if it doesn't already exist
+              kelasPrograms.get(kelasProgram.id).jamMengajar.push({
+                jamMengajarId: jadwal.jamMengajar.id,
+                Hari: jadwal.hari,
+                jamMulai: jadwal.jamMengajar.jamMulai,
+                jamSelesai: jadwal.jamMengajar.jamSelesai
+              });
+              logger.info(`Added unique jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
+            } else {
+              logger.info(`Skipped duplicate jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
+            }
           } else {
             logger.warn(`No matching kelas program found for jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
           }
@@ -1616,6 +1707,22 @@ class SiswaService {
           }
         }
 
+        // Sort jamMengajar by hari and jamMulai for each kelas program
+        for (const [kelasProgramId, schedule] of kelasPrograms) {
+          schedule.jamMengajar.sort((a, b) => {
+            const hariOrder = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+            const hariA = hariOrder.indexOf(a.Hari);
+            const hariB = hariOrder.indexOf(b.Hari);
+            
+            if (hariA !== hariB) {
+              return hariA - hariB;
+            }
+            
+            // If same day, sort by jamMulai
+            return a.jamMulai.localeCompare(b.jamMulai);
+          });
+        }
+
         // Add to schedules
         schedules.push(...Array.from(kelasPrograms.values()));
       }
@@ -1625,7 +1732,8 @@ class SiswaService {
         nis: siswa.nis,
         strataPendidikan: siswa.strataPendidikan,
         kelasSekolah: siswa.kelasSekolah,
-        schedules: schedules
+        schedules: schedules,
+        SPPThisMonth: sppThisMonth
       };
 
       logger.info(`Retrieved jadwal for siswa with RFID: ${rfid}, found ${schedules.length} schedules`);

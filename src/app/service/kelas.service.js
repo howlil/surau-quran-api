@@ -1,9 +1,58 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
+const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class KelasService {
+
+    // Helper method untuk mengecek konflik jadwal guru
+    async checkGuruScheduleConflict(tx, guruId, hari, jamMengajarId, excludeKelasProgramId = null) {
+        if (!guruId) return false;
+
+        const whereClause = {
+            guruId,
+            hari,
+            jamMengajarId
+        };
+
+        // Exclude kelas program yang sedang diupdate (untuk patch operation)
+        if (excludeKelasProgramId) {
+            whereClause.id = { not: excludeKelasProgramId };
+        }
+
+        const conflictingSchedule = await tx.kelasProgram.findFirst({
+            where: whereClause,
+            include: {
+                program: {
+                    select: { namaProgram: true }
+                },
+                kelas: {
+                    select: { namaKelas: true }
+                },
+                jamMengajar: {
+                    select: { jamMulai: true, jamSelesai: true }
+                }
+            }
+        });
+
+        if (conflictingSchedule) {
+            const conflictInfo = {
+                program: conflictingSchedule.program.namaProgram,
+                kelas: conflictingSchedule.kelas?.namaKelas || 'Tidak Ada Kelas',
+                jam: `${conflictingSchedule.jamMengajar.jamMulai} - ${conflictingSchedule.jamMengajar.jamSelesai}`,
+                hari: conflictingSchedule.hari
+            };
+            
+            throw new ConflictError(
+                `Guru sudah memiliki jadwal mengajar pada ${conflictInfo.hari} jam ${conflictInfo.jam} ` +
+                `untuk program ${conflictInfo.program} di kelas ${conflictInfo.kelas}. ` +
+                `Satu guru tidak dapat mengajar di jam yang sama pada hari yang sama.`
+            );
+        }
+
+        return false;
+    }
+
     async create(data) {
         try {
             const existing = await prisma.kelas.findFirst({
@@ -237,6 +286,18 @@ class KelasService {
                 if (jamMengajarId) updateData.jamMengajarId = jamMengajarId;
                 if (guruId) updateData.guruId = guruId;
 
+                // Check for guru schedule conflict before updating
+                if (guruId || hari || jamMengajarId) {
+                    const checkHari = hari || existingKelasProgram.hari;
+                    const checkJamMengajarId = jamMengajarId || existingKelasProgram.jamMengajarId;
+                    const checkGuruId = guruId || existingKelasProgram.guruId;
+                    
+                    // Only check for conflict if we have all required fields
+                    if (checkGuruId && checkHari && checkJamMengajarId) {
+                        await this.checkGuruScheduleConflict(tx, checkGuruId, checkHari, checkJamMengajarId, kelasProgramId);
+                    }
+                }
+
                 let updatedKelasProgram = existingKelasProgram;
                 if (Object.keys(updateData).length > 0) {
                     updatedKelasProgram = await tx.kelasProgram.update({
@@ -465,6 +526,9 @@ class KelasService {
                 if (existingKelasProgram) {
                     throw new ConflictError('Kelas program dengan kombinasi ini sudah ada');
                 }
+
+                // Check for guru schedule conflict
+                await this.checkGuruScheduleConflict(tx, guruId, hari, jamMengajarId);
 
                 // Create the kelas program
                 const kelasProgram = await tx.kelasProgram.create({
