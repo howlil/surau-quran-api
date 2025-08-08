@@ -19,7 +19,7 @@ router.get(
 router.post(
     '/v1/testimoni',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadFotoUrlMiddleware,
     (req, res, next) => {
         // Validate that file was uploaded
@@ -39,7 +39,7 @@ router.post(
 router.patch(
     '/v1/testimoni/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadFotoUrlMiddleware,
     validationMiddleware.validateBody(TestimoniValidation.update()),
     TestimoniController.update
@@ -49,7 +49,7 @@ router.patch(
 router.delete(
     '/v1/testimoni/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     TestimoniController.delete
 );
 

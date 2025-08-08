@@ -10,7 +10,7 @@ const FinanceValidation = require('../../validation/finance.validation');
 router.get(
     '/v1/finance',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorizeModule('finance'),
     validationMiddleware.validateQuery(FinanceValidation.getFinanceQuery()),
     FinanceController.getAll
 );
@@ -19,7 +19,7 @@ router.get(
 router.post(
     '/v1/finance',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorizeModule('finance'),
     uploadEvidenceMiddleware,
     validationMiddleware.validateBody(FinanceValidation.create()),
     FinanceController.create
@@ -29,7 +29,7 @@ router.post(
 router.patch(
     '/v1/finance/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorizeModule('finance'),
     uploadEvidenceMiddleware,
     validationMiddleware.validateBody(FinanceValidation.update()),
     FinanceController.update
@@ -39,7 +39,7 @@ router.patch(
 router.delete(
     '/v1/finance/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorizeModule('finance'),
     FinanceController.delete
 );
 

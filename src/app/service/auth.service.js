@@ -296,8 +296,8 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'ADMIN') {
-                throw new ForbiddenError('Hanya admin yang dapat membuat akun admin');
+            if (!requestUser || !['SUPER_ADMIN'].includes(requestUser.role)) {
+                throw new ForbiddenError('Hanya SUPER_ADMIN yang dapat membuat akun admin');
             }
 
             const existingUser = await prisma.user.findUnique({
@@ -310,12 +310,15 @@ class AuthService {
 
             const hashedPassword = await PasswordUtils.hash(userData.password);
 
+            // Hanya bisa membuat role ADMIN
+            const role = 'ADMIN';
+
             const result = await prisma.$transaction(async (tx) => {
                 const user = await tx.user.create({
                     data: {
                         email: userData.email,
                         password: hashedPassword,
-                        role: 'ADMIN',
+                        role: role,
                     }
                 });
 
@@ -333,9 +336,20 @@ class AuthService {
                 id: result.admin.id,
                 email: result.user.email,
                 nama: result.admin.nama,
+                role: result.user.role
             };
         } catch (error) {
             logger.error('Create admin error:', error);
+            throw handlePrismaError(error);
+        }
+    }
+
+    async getAvailableRoles() {
+        try {
+            // Hanya return role ADMIN untuk create admin
+            return ['ADMIN'];
+        } catch (error) {
+            logger.error('Get available roles error:', error);
             throw handlePrismaError(error);
         }
     }

@@ -480,6 +480,8 @@ enum HARI {
 }
 
 enum Role {
+  SUPER_ADMIN
+  ADMIN_SURAU
   ADMIN
   SISWA
   GURU

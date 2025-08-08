@@ -9,7 +9,7 @@ const ProgramValidation = require('../../validation/program.validation');
 router.post(
     '/v1/program',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadCoverMiddleware,
     (req, res, next) => {
         if (!req.file) {
@@ -27,7 +27,7 @@ router.post(
 router.patch(
     '/v1/program/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadCoverMiddleware,
     validationMiddleware.validateBody(ProgramValidation.update()),
     ProgramController.update
@@ -36,7 +36,7 @@ router.patch(
 router.delete(
     '/v1/program/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     ProgramController.delete
 );
 
@@ -49,7 +49,7 @@ router.get(
 router.get(
     '/v1/program/:programId/siswa',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     ProgramController.getProgramStudents
 );
 

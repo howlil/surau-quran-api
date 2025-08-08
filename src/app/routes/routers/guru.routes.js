@@ -45,7 +45,7 @@ const handleFileUpload = (req, res, next) => {
 router.post(
   '/v1/guru',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   handleFileUpload,
   validationMiddleware.validateBody(guruValidation.create()),
   guruController.create
@@ -54,7 +54,7 @@ router.post(
 router.patch(
   '/v1/guru/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   handleFileUpload,
   validationMiddleware.validateBody(guruValidation.update()),
   guruController.update
@@ -63,14 +63,14 @@ router.patch(
 router.delete(
   '/v1/guru/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   guruController.delete
 );
 
 router.get(
   '/v1/guru',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateQuery(guruValidation.getGuruQuery()),
   guruController.getAll
 );
@@ -79,7 +79,7 @@ router.get(
 router.get(
   '/v1/guru/jadwal',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateQuery(guruValidation.getJadwalGuruQuery()),
   guruController.getAllWithSchedules
 );

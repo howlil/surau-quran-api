@@ -4,6 +4,8 @@ const AUTH = {
   JWT_EXPIRES: '30d',
   SALT_ROUNDS: 10,
   ROLES: {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    ADMIN_SURAU: 'ADMIN_SURAU',
     ADMIN: 'ADMIN',
     GURU: 'GURU',
     SISWA: 'SISWA'

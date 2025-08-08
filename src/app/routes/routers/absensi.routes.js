@@ -9,21 +9,21 @@ const uploadMiddleware = require('../../middleware/upload.middleware');
 
 router.get('/v1/absensi/siswa/:kelasId',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateQuery(absensiValidation.tanggal()),
     absensiController.getAbsensiSiswaForAdmin
 );
 
 router.get('/v1/absensi/guru',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateQuery(absensiValidation.getAbsensiGuru()),
     absensiController.getAbsensiGuruByDate
 );
 
 router.patch('/v1/absensi/guru/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadMiddleware.uploadSuratIzinMiddleware,
     validationMiddleware.validateBody(absensiValidation.updateAbsensiGuru()),
     absensiController.updateAbsensiGuru

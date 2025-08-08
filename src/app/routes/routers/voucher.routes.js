@@ -8,7 +8,7 @@ const voucherValidation = require('../../validation/voucher.validation');
 router.post(
   '/v1/voucher',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateBody(voucherValidation.create()),
   voucherController.create
 );
@@ -16,7 +16,7 @@ router.post(
 router.patch(
   '/v1/voucher/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateBody(voucherValidation.update()),
   voucherController.update
 );
@@ -24,7 +24,7 @@ router.patch(
 router.delete(
   '/v1/voucher/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   voucherController.delete
 );
 
@@ -33,7 +33,7 @@ router.delete(
 router.get(
   '/v1/voucher',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateQuery(voucherValidation.getVoucherQuery()),
   voucherController.getAll
 );

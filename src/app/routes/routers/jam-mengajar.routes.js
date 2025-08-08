@@ -8,7 +8,7 @@ const jamMengajarValidation = require('../../validation/jam-mengajar.validation'
 router.post(
     '/v1/jam',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(jamMengajarValidation.create()),
     jamMengajarController.create
 );
@@ -16,7 +16,7 @@ router.post(
 router.patch(
     '/v1/jam/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(jamMengajarValidation.update()),
     jamMengajarController.update
 );
@@ -24,7 +24,7 @@ router.patch(
 router.delete(
     '/v1/jam/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     jamMengajarController.delete
 );
 

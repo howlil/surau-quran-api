@@ -8,7 +8,7 @@ const siswaValidation = require('../../validation/siswa.validation');
 router.get(
   '/v1/siswa',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN', 'GURU']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN', 'GURU']),
   validationMiddleware.validateQuery(siswaValidation.getAllSiswa()),
   siswaController.getAll
 );
@@ -24,7 +24,7 @@ router.get(
 router.patch(
   '/v1/siswa/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateBody(siswaValidation.adminUpdateSiswa()),
   siswaController.adminUpdateSiswa
 );
@@ -32,7 +32,7 @@ router.patch(
 router.patch(
   '/v1/siswa/:id/status',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateBody(siswaValidation.updateStatusSiswa()),
   siswaController.updateStatusSiswa
 );
@@ -46,7 +46,7 @@ router.post(
 router.get(
   '/v1/pendaftaran/invoice',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateQuery(siswaValidation.getPendaftaranInvoiceQuery()),
   siswaController.getPendaftaranInvoice
 )
@@ -60,7 +60,7 @@ router.get(
 router.patch(
   '/v1/siswa/:id/pindah-program',
   authMiddleware.authenticate,
-  authMiddleware.authorize(['ADMIN']),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
   validationMiddleware.validateBody(siswaValidation.pindahProgram()),
   siswaController.pindahProgram
 );

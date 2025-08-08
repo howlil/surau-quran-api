@@ -19,7 +19,7 @@ router.get(
 router.post(
     '/v1/galeri',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadCoverGaleriMiddleware,
     validationMiddleware.validateBody(GaleriValidation.create()),
     GaleriController.create
@@ -29,7 +29,7 @@ router.post(
 router.patch(
     '/v1/galeri/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadCoverGaleriMiddleware,
     validationMiddleware.validateBody(GaleriValidation.update()),
     GaleriController.update
@@ -39,7 +39,7 @@ router.patch(
 router.delete(
     '/v1/galeri/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     GaleriController.delete
 );
 

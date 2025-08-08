@@ -7,20 +7,20 @@ const kelasValidation = require('../../validation/kelas.validation');
 
 router.post('/v1/kelas',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(kelasValidation.create()),
     kelasController.create
 );
 
 router.put('/v1/kelas/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(kelasValidation.update()),
     kelasController.update
 );
 router.delete('/v1/kelas/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     kelasController.delete
 );
 
@@ -33,7 +33,7 @@ router.get('/v1/kelas',
 
 router.get('/v1/kelas/initial-student',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateQuery(kelasValidation.getInitialStudentQuery()),
     kelasController.getInitialStudentIntoClass
 );
@@ -42,7 +42,7 @@ router.get('/v1/kelas/initial-student',
 router.patch(
     '/v1/kelas-program/:kelasProgramId/initial-student',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(kelasValidation.patchInitialStudentIntoClass()),
     kelasController.patchInitialStudentIntoClass
 );
@@ -50,7 +50,7 @@ router.patch(
 router.post(
     '/v1/kelas-program',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(kelasValidation.createKelasProgram()),
     kelasController.createKelasProgram
 );
@@ -58,7 +58,7 @@ router.post(
 router.delete(
     '/v1/kelas-program/:kelasProgramId',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     kelasController.deleteKelasProgram
 );
 

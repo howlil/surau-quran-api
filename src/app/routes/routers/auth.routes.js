@@ -16,15 +16,17 @@ router.post('/v1/logout',
   authController.logout
 );
 
-// Admin management routes - only accessible by admins
+// Admin management routes - only accessible by SUPER_ADMIN
 router.post('/v1/admin',
   authMiddleware.authenticate,
+  authMiddleware.authorizeModule('admin_management'),
   validationMiddleware.validateBody(authValidation.createAdmin()),
   authController.createAdmin
 );
 
 router.get('/v1/admin',
   authMiddleware.authenticate,
+  authMiddleware.authorizeModule('admin_management'),
   validationMiddleware.validateQuery(authValidation.getAdminQuery()),
   authController.getAllAdmins
 );
@@ -32,12 +34,14 @@ router.get('/v1/admin',
 
 router.patch('/v1/admin/:id',
   authMiddleware.authenticate,
+  authMiddleware.authorizeModule('admin_management'),
   validationMiddleware.validateBody(authValidation.updateAdmin()),
   authController.updateAdmin
 );
 
 router.delete('/v1/admin/:id',
   authMiddleware.authenticate,
+  authMiddleware.authorizeModule('admin_management'),
   authController.deleteAdmin
 );
 

@@ -9,7 +9,7 @@ const rfidValidation = require('../../validation/rfid.validation');
 router.get(
     '/v1/rfid/search',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateQuery(rfidValidation.searchUser()),
     rfidController.searchUser
 );
@@ -18,7 +18,7 @@ router.get(
 router.get(
     '/v1/rfid',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateQuery(rfidValidation.getRfidList()),
     rfidController.getRfidList
 );
@@ -30,7 +30,7 @@ router.get(
 router.patch(
     '/v1/rfid/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     validationMiddleware.validateBody(rfidValidation.updateRfid()),
     rfidController.updateRfid
 );
@@ -39,7 +39,7 @@ router.patch(
 router.delete(
     '/v1/rfid/:id',
     authMiddleware.authenticate,
-    authMiddleware.authorize(['ADMIN']),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     rfidController.deleteRfid
 );
 
