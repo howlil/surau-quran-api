@@ -1432,7 +1432,8 @@ class SiswaService {
         // If no active program, return default values
         return {
           spp: false,
-          charge: 0
+          charge: 0,
+          paymentLink: null
         };
       }
 
@@ -1445,8 +1446,8 @@ class SiswaService {
         },
         include: {
           pembayaran: {
-            select: {
-              statusPembayaran: true
+            include: {
+              xenditPayment: true
             }
           }
         }
@@ -1456,7 +1457,8 @@ class SiswaService {
         // If no SPP record for this month, return default values
         return {
           spp: false,
-          charge: 0
+          charge: 0,
+          paymentLink: null
         };
       }
 
@@ -1464,16 +1466,32 @@ class SiswaService {
       const isPaid = sppThisMonth.pembayaran && 
                     ['PAID', 'SETTLED'].includes(sppThisMonth.pembayaran.statusPembayaran);
 
+      // Get payment link if exists and payment is not completed
+      let paymentLink = null;
+      if (!isPaid && sppThisMonth.pembayaran?.xenditPayment) {
+        const xenditPayment = sppThisMonth.pembayaran.xenditPayment;
+        // Only return payment link if status is PENDING and not expired
+        if (xenditPayment.xenditStatus === 'PENDING') {
+          const expireDate = new Date(xenditPayment.xenditExpireDate);
+          const now = new Date();
+          if (expireDate > now) {
+            paymentLink = xenditPayment.xenditPaymentUrl;
+          }
+        }
+      }
+
       return {
         spp: !isPaid, // true if not paid, false if paid
-        charge: isPaid ? 0 : 250000 // 250.000 if not paid, 0 if paid
+        charge: isPaid ? 0 : 250000, // 250.000 if not paid, 0 if paid
+        paymentLink: paymentLink
       };
     } catch (error) {
       logger.error(`Error getting SPP this month status for siswa ${siswaId}:`, error);
       // Return default values on error
       return {
         spp: false,
-        charge: 0
+        charge: 0,
+        paymentLink: null
       };
     }
   }

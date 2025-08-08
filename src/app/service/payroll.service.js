@@ -153,6 +153,7 @@ class PayrollService {
               status: 'TIDAK_ADA_DATA',
               paymentStatus: null,
               tanggalKalkulasi: null,
+              catatan: null,
               gajiBersih: 0,
               detail: {
                 mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
@@ -185,6 +186,7 @@ class PayrollService {
           status: payroll.status,
           paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
           tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
+          catatan: payroll.catatan,
           gajiBersih: totalMengajar + totalInsentif - totalPotongan,
           detail: {
             mengajar: {
@@ -363,7 +365,7 @@ class PayrollService {
         throw new BadRequestError('Payroll yang sudah selesai tidak dapat diubah');
       }
 
-      const { tanggalKalkulasi, bulan, detail } = data;
+      const { tanggalKalkulasi, bulan, detail, catatan } = data;
       const updateData = {};
 
       if (tanggalKalkulasi !== undefined) {
@@ -371,6 +373,9 @@ class PayrollService {
       }
       if (bulan !== undefined) {
         updateData.bulan = bulan;
+      }
+      if (catatan !== undefined) {
+        updateData.catatan = catatan;
       }
 
       let jumlahSKS, jumlahInsentif, jumlahTelat, jumlahIzin, jumlahDLL;
@@ -672,6 +677,7 @@ class PayrollService {
             status: 'BELUM_DIHITUNG',
             paymentStatus: null,
             tanggalKalkulasi: null,
+            catatan: null,
             gajiBersih: 0,
             detail: {
               mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
@@ -697,6 +703,7 @@ class PayrollService {
             status: 'TIDAK_ADA_DATA',
             paymentStatus: null,
             tanggalKalkulasi: null,
+            catatan: null,
             gajiBersih: 0,
             detail: {
               mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
@@ -730,6 +737,7 @@ class PayrollService {
             status: payroll.status,
             paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
             tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
+            catatan: payroll.catatan,
             gajiBersih: totalMengajar + totalInsentif - totalPotongan,
             detail: {
               mengajar: {

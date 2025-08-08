@@ -34,6 +34,10 @@ class PayrollValidation {
                 .messages({
                     'string.pattern.base': 'Bulan harus dalam format MM (01-12)'
                 }),
+            catatan: Joi.string().max(500).optional()
+                .messages({
+                    'string.max': 'Catatan maksimal 500 karakter'
+                }),
             detail: Joi.object({
                 mengajar: Joi.object({
                     jumlah: Joi.number().integer().min(0).optional(),
