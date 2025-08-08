@@ -3,7 +3,7 @@ const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { prisma } = require('../../lib/config/prisma.config');
-const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const {  BadRequestError } = require('../../lib/http/errors.http');
 const { logger } = require('../../lib/config/logger.config');
 const { xenditConfig } = require('../../lib/config/xendit.config');
 

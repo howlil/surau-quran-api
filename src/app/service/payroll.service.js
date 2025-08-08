@@ -1,7 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const { logger } = require('../../lib/config/logger.config');
 const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
 const financeService = require('./finance.service');
 const moment = require('moment');
 const axios = require('axios');
@@ -128,6 +127,7 @@ class PayrollService {
               status: 'BELUM_DIHITUNG',
               paymentStatus: null,
               tanggalKalkulasi: null,
+              catatan: null,
               gajiBersih: 0,
               detail: {
                 mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
