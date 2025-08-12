@@ -30,7 +30,7 @@ jobs:
       - name: Create deployment package
         run: |
           # Buat zip (lebih stabil daripada tar)
-            zip -r build.zip . -x "node_modules/*" ".git/*" ".github/*" ".env.*"
+          zip -r build.zip . -x "node_modules/*" ".git/*" ".github/*" ".env.*"
           
           # Verifikasi
           ls -la build.zip
@@ -44,6 +44,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
           passphrase: ${{ secrets.SSH_PASSPHRASE_PROD }}
           script: |
+            mkdir -p /home/surauqur/api
             chmod 755 /home/surauqur/api
             
       - name: Deploy files to cPanel
