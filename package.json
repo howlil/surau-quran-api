@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed": "node src/database/seeders/index.js"
+    "seed": "node src/database/seeders/index.js",
+    "seed:prod": "node src/database/seeders/production-index.js"
   },
   "keywords": [
     "school",
