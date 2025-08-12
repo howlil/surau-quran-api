@@ -2,7 +2,7 @@ name: Deploy Express API with Prisma to cPanel
 
 on:
   push:
-    branches: [staging]
+    branches: [main]
 
 jobs:
   build-and-deploy:
@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.18'
+          node-version: '18.20'
           cache: 'npm'
           
       - name: Install dependencies
@@ -24,13 +24,13 @@ jobs:
       - name: Generate Prisma
         run: npx prisma generate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
       
       # Gunakan zip daripada tar
       - name: Create deployment package
         run: |
           # Buat zip (lebih stabil daripada tar)
-          zip -r build.zip . -x "node_modules/*" ".git/*" ".github/*" ".env"
+            zip -r build.zip . -x "node_modules/*" ".git/*" ".github/*" ".env.*"
           
           # Verifikasi
           ls -la build.zip
@@ -38,42 +38,42 @@ jobs:
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          host: ${{ secrets.HOST_PROD }}
+          username: ${{ secrets.USERNAME_PROD }}
           port: ${{ secrets.PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }} 
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_PROD }} 
           source: "build.zip"
-          target: "/home/metrosof/api/surau-quran-staging-api"
+          target: "/home/surauqur/api"
           
       - name: Deploy on cPanel
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          host: ${{ secrets.HOST_PROD }}
+          username: ${{ secrets.USERNAME_PROD }}
           port: ${{ secrets.PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }} 
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_PROD }}
           script: |
-            cd /home/metrosof/api/surau-quran-staging-api
+            cd /home/surauqur/api
             
             # Backup .env dan node_modules
-            if [ -f .env ]; then
-              cp .env .env.backup
+            if [ -f .env.production ]; then
+              cp .env.production .env.backup
             fi
             if [ -d node_modules ]; then
               mv node_modules node_modules_backup
             fi
             
-            # Unzip file
+            # Unzip files
             unzip -o build.zip
             
-            # Restore .env
+            # Restore .env_production
             if [ -f .env.backup ]; then
-              cp .env.backup .env
+              cp .env.backup .env_production
               rm .env.backup
             else
-              echo "DATABASE_URL='${{ secrets.DATABASE_URL }}'" > .env
+              echo "DATABASE_URL_PROD='${{ secrets.DATABASE_URL_PROD }}'" > .env_production
             fi
             
             # Restore node_modules atau install dependencies
@@ -87,8 +87,8 @@ jobs:
               fi
               export NVM_DIR="$HOME/.nvm"
               [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-              nvm install 18.18
-              nvm use 18.18
+              nvm install 18.20
+              nvm use 18.20
               
               # Install dependencies
               npm install
@@ -98,7 +98,7 @@ jobs:
             # Generate Prisma
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm use 18.18
+            nvm use 18.20
             npx prisma generate
             
             # Setup PM2
@@ -121,7 +121,7 @@ jobs:
                   NODE_ENV: "production",
                   PORT: 8080
                 },
-                interpreter: "$HOME/.nvm/versions/node/v18.18.0/bin/node"
+                interpreter: "$HOME/.nvm/versions/node/v18.20.0/bin/node"
               }]
             };
             EOL

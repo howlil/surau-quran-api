@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "surau-quran-api",
+    name: "api",
     script: "./index.js",
     exec_mode: "fork",
     instances: 1,

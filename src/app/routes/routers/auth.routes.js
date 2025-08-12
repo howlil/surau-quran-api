@@ -16,7 +16,6 @@ router.post('/v1/logout',
   authController.logout
 );
 
-// Admin management routes - only accessible by SUPER_ADMIN
 router.post('/v1/admin',
   authMiddleware.authenticate,
   authMiddleware.authorizeModule('admin_management'),

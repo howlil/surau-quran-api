@@ -1,4 +1,4 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/metrosof/api/surau-quran-staging-api
+    - export DEPLOYPATH=/home/surauqur/api
     - /bin/cp -R * $DEPLOYPATH
