@@ -35,6 +35,17 @@ jobs:
           # Verifikasi
           ls -la build.zip
           
+      - name: Create directory on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST_PROD }}
+          username: ${{ secrets.USERNAME_PROD }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE_PROD }}
+          script: |
+            chmod 755 /home/surauqur/api
+            
       - name: Deploy files to cPanel
         uses: appleboy/scp-action@master
         with:
@@ -57,10 +68,7 @@ jobs:
           script: |
             cd /home/surauqur/api
             
-            # Backup .env dan node_modules
-            if [ -f .env.production ]; then
-              cp .env.production .env.backup
-            fi
+            # Backup node_modules saja (jangan backup .env agar bisa update)
             if [ -d node_modules ]; then
               mv node_modules node_modules_backup
             fi
@@ -68,20 +76,19 @@ jobs:
             # Unzip files
             unzip -o build.zip
             
-            # Restore .env_production
-            if [ -f .env.backup ]; then
-              cp .env.backup .env_production
-              rm .env.backup
-            else
-              echo "DATABASE_URL_PROD='${{ secrets.DATABASE_URL_PROD }}'" > .env_production
-            fi
+            # Buat .env baru dari secrets (ini akan selalu update)
+            cat > .env << EOL
+            DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}
+            NODE_ENV=production
+            PORT=8080
+            EOL
             
             # Restore node_modules atau install dependencies
             if [ -d node_modules_backup ]; then
               rm -rf node_modules
               mv node_modules_backup node_modules
             else
-              # Setup NVM dan Node.js 18.18
+              # Setup NVM dan Node.js 18.20
               if [ ! -d "$HOME/.nvm" ]; then
                 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
               fi
@@ -92,7 +99,6 @@ jobs:
               
               # Install dependencies
               npm install
-              npm install dotenv --save
             fi
             
             # Generate Prisma
@@ -129,7 +135,7 @@ jobs:
             # Start app
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm use 18.18
+            nvm use 18.20
             if pm2 list | grep -q "surau-quran-api"; then
               pm2 delete surau-quran-api
             fi
@@ -144,3 +150,5 @@ jobs:
             ls -la
             echo "Src directory contents:"
             ls -la src
+            echo ".env contents (first few lines):"
+            head -5 .env
