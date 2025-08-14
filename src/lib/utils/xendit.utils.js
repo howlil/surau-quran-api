@@ -4,6 +4,11 @@ const { logger } = require('../config/logger.config');
 class XenditUtils {
   static async createInvoice(data) {
     try {
+      const { xendit } = require('../config/xendit.config');
+      
+      if (!xendit) {
+        throw new Error('Xendit client not initialized. Check XENDIT_SECRET_KEY environment variable.');
+      }
 
       if (!data) {
         throw new Error('Invoice data is required');

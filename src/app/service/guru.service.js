@@ -10,7 +10,7 @@ class GuruService {
   //create guru 
   async create(data) {
     try {
-      const { email, baseUrl, ...guruData } = data;
+      const { email, baseUrl, rfid, ...guruData } = data;
 
       return await PrismaUtils.transaction(async (tx) => {
         const existingUser = await tx.user.findUnique({
@@ -21,6 +21,16 @@ class GuruService {
           throw new ConflictError(`User dengan email ${email} sudah ada`);
         }
 
+        if (rfid) {
+          const existingRfid = await tx.user.findUnique({
+            where: { rfid }
+          });
+
+          if (existingRfid) {
+            throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+          }
+        }
+
         const NIP = Math.floor(Math.random() * 1000000);
         const plainPassword = "@Test123";
         const hashedPassword = await PasswordUtils.hash(plainPassword);
@@ -29,7 +39,8 @@ class GuruService {
           data: {
             email,
             password: hashedPassword,
-            role: 'GURU'
+            role: 'GURU',
+            rfid: rfid || null
           }
         });
 

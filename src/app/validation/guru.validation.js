@@ -35,7 +35,12 @@ class GuruValidation {
           'string.pattern.base': 'Nomor rekening hanya boleh berisi angka'
         }),
       namaBank: Joi.string().optional(),
-      suratKontrak: Joi.any().optional()
+      suratKontrak: Joi.any().optional(),
+      rfid: Joi.string().min(8).max(50).optional()
+        .messages({
+          'string.min': 'RFID minimal 8 karakter',
+          'string.max': 'RFID maksimal 50 karakter'
+        })
     });
   }
 

@@ -77,9 +77,13 @@ jobs:
           script: |
             cd ~/api
             
-            # Backup node_modules saja (jangan backup .env agar bisa update)
+            # Backup node_modules dan .env
             if [ -d node_modules ]; then
               mv node_modules node_modules_backup
+            fi
+            
+            if [ -f .env ]; then
+              cp .env .env_backup
             fi
             
             # Unzip files
@@ -89,7 +93,7 @@ jobs:
             cat > .env << EOL
             DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}
             NODE_ENV=production
-            PORT=8080
+            PORT=5000
             EOL
             
             # Restore node_modules atau install dependencies
@@ -109,6 +113,12 @@ jobs:
               # Install dependencies
               npm install
             fi
+            
+            # Restore .env backup jika ada masalah dengan .env baru
+            # Uncomment baris di bawah jika perlu restore .env lama
+            # if [ -f .env_backup ]; then
+            #   cp .env_backup .env
+            # fi
             
             # Generate Prisma
             export NVM_DIR="$HOME/.nvm"

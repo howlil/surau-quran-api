@@ -6,11 +6,11 @@ require('dotenv').config();
 let xenditClient;
 
 try {
-  const secretKey = process.env.XENDIT_SECRET_KEY;
+  const secretKey = process.env.XENDIT_SECRET_KEY_ || process.env.XENDIT_SECRET_KEY;
   const callbackToken = process.env.XENDIT_CALLBACK_TOKEN;
 
   if (!secretKey) {
-    throw new Error('XENDIT_SECRET_KEY environment variable is required');
+    throw new Error('XENDIT_SECRET_KEY_ or XENDIT_SECRET_KEY environment variable is required');
   }
 
   if (!callbackToken) {
