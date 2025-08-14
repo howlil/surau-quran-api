@@ -296,10 +296,9 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || !['SUPER_ADMIN'].includes(requestUser.role)) {
-                throw new ForbiddenError('Hanya SUPER_ADMIN yang dapat membuat akun admin');
+            if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
+                throw new ForbiddenError('Hanya admin yang dapat membuat akun admin');
             }
-
             const existingUser = await prisma.user.findUnique({
                 where: { email: userData.email }
             });
@@ -363,7 +362,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
+            if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
                 throw new ForbiddenError('Hanya admin yang dapat melihat daftar admin');
             }
 
@@ -402,7 +401,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
+            if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
                 throw new ForbiddenError('Hanya admin yang dapat mengubah data admin');
             }
 
@@ -480,7 +479,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
+            if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
                 throw new ForbiddenError('Hanya admin yang dapat menghapus akun admin');
             }
 

@@ -28,6 +28,13 @@ const ADMIN_USER = {
     role: 'ADMIN_SURAU'
 };
 
+
+const SUPER_ADMIN_USER = {
+    email: 'superadmin@gmail.com',
+    password: 'Padangp@sir7',
+    role: 'SUPER_ADMIN'
+};
+
 class ProductionSeeder {
     constructor() {
         this.data = {
@@ -46,11 +53,11 @@ class ProductionSeeder {
             console.log('✅ Admin user created');
 
             // Step 2: Create Programs
-            await this.createPrograms();
+            // await this.createPrograms();
             console.log('✅ Programs created');
 
             // Step 3: Create Kelas
-            await this.createKelas();
+            // await this.createKelas();
             console.log('✅ Kelas created');
 
             console.log('🎉 Production seeding completed successfully!');
@@ -88,10 +95,62 @@ class ProductionSeeder {
                 }
             });
 
+            await prismaClient.admin.create({
+                data: {
+                    id: uuidv4(),
+                    userId: adminUser.id,
+                    nama: 'Admin Surau'
+                }
+            });
+
             this.data.adminUser = adminUser;
             console.log(`👤 Admin user created: ${adminUser.email}`);
         } catch (error) {
             console.error('❌ Failed to create admin user:', error.message);
+            throw error;
+        }
+    }
+
+    async createSuperAdminUser() {
+        try {
+            const existingSuperAdmin = await prismaClient.user.findFirst({
+                where: {
+                    email: SUPER_ADMIN_USER.email
+                }
+            });
+
+            if (existingSuperAdmin) {
+                console.log('⚠️ Super admin user already exists, skipping...');
+                this.data.superAdminUser = existingSuperAdmin;
+                return;
+            }
+
+            const hashedPassword = await bcrypt.hash(SUPER_ADMIN_USER.password, 10);
+
+            const superAdminUser = await prismaClient.user.create({
+                data: {
+                    id: uuidv4(),
+                    email: SUPER_ADMIN_USER.email,
+                    password: hashedPassword,
+                    role: SUPER_ADMIN_USER.role
+                }
+            });
+
+            this.data.superAdminUser = superAdminUser;
+            console.log(`👤 Super admin user created: ${superAdminUser.email}`);
+
+            await prismaClient.admin.create({
+                data: {
+                    id: uuidv4(),
+                    userId: superAdminUser.id,
+                    nama: 'Super Admin'
+                }
+            });
+
+            console.log(`👤 Super admin user created: ${superAdminUser.email}`);
+            
+        } catch (error) {
+            console.error('❌ Failed to create super admin user:', error.message);
             throw error;
         }
     }
