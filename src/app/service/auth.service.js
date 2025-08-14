@@ -261,6 +261,10 @@ class AuthService {
                 nama = user.guru.nama;
             } else if (user.role === 'ADMIN' && user.admin) {
                 nama = user.admin.nama;
+            } else if (user.role === 'SUPER_ADMIN') {
+                nama = 'Super Admin';
+            } else if (user.role === 'ADMIN_SURAU') {
+                nama = 'Admin Surau';
             }
 
             const token = await TokenUtils.generateToken(user.id);
@@ -383,6 +387,7 @@ class AuthService {
                         select: {
                             id: true,
                             email: true,
+                            role: true
                         }
                     }
                 },

@@ -36,11 +36,13 @@ class AuthController {
     
     const transformedData = {
       ...result,
-      data: result.data.map(admin => ({
-        id: admin.id,
-        nama: admin.nama,
-        email: admin.user.email,
-      }))
+      data: result.data
+        .filter(admin => admin.user.role === 'ADMIN')
+        .map(admin => ({
+          id: admin.id,
+          nama: admin.nama,
+          email: admin.user.email,
+        }))
     };
     
     return Http.Response.success(res, transformedData, 'Daftar admin berhasil diambil');
