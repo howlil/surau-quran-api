@@ -274,19 +274,17 @@ class PayrollService {
 
       // Get payroll data for all gurus in the specified month
       // Coba cari dengan format bulan angka (08) dan nama bulan (August)
+      
       const namaBulan = this.getNamaBulan(parseInt(bulan));
+
+      // Cari berdasarkan format yang ada di database (English month name)
+      const englishMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const englishMonth = englishMonths[parseInt(bulan) - 1];
+
       const payrollData = await prisma.payroll.findMany({
         where: {
-          OR: [
-            {
-              bulan: bulan,
-              tahun: tahun
-            },
-            {
-              bulan: namaBulan,
-              tahun: tahun
-            }
-          ],
+          bulan: englishMonth,
+          tahun: tahun,
           guruId: {
             in: gurus.map(guru => guru.id)
           }
@@ -333,6 +331,8 @@ class PayrollService {
       payrollData.forEach(payroll => {
         payrollMap.set(payroll.guruId, payroll);
       });
+      
+
 
       // Check if current date is before the 25th of the month
       const currentDate = moment();
@@ -351,7 +351,7 @@ class PayrollService {
             return {
               id: null,
               namaGuru: guru.nama,
-              idGuru: guru.nip || guru.id,
+              nipGuru: guru.nip ,
               bulan: this.getNamaBulan(parseInt(bulan)),
               bulanAngka: parseInt(bulan),
               tahun: parseInt(tahun),
@@ -377,7 +377,7 @@ class PayrollService {
             return {
               id: null,
               namaGuru: guru.nama,
-              idGuru: guru.nip || guru.id,
+              nipGuru: guru.nip ,
               bulan: this.getNamaBulan(parseInt(bulan)),
               bulanAngka: parseInt(bulan),
               tahun: parseInt(tahun),
@@ -507,7 +507,7 @@ class PayrollService {
         return {
           id: payroll.id,
           namaGuru: guru.nama,
-          idGuru: guru.nip || guru.id,
+          nipGuru: guru.nip ,
           bulan: this.getNamaBulan(bulanAngka),
           bulanAngka: bulanAngka,
           tahun: payroll.tahun,
