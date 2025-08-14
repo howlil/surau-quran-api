@@ -9,7 +9,7 @@ const sppValidation = require('../../validation/spp.validation');
 router.get(
     '/v1/spp',
     authMiddleware.authenticate,
-    authMiddleware.authorizeModule('spp'),
+    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
     validationMiddleware.validateQuery(sppValidation.getSppForAdmin()),
     sppController.getSppForAdmin
 );

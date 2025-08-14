@@ -7,7 +7,7 @@ const SppReminderController = require('../../controller/spp-reminder.controller'
 router.post(
     '/v1/spp-reminder/send',
     authMiddleware.authenticate,
-    authMiddleware.authorizeModule('spp'),
+    authMiddleware.authorize(['SUPER_ADMIN']),
     SppReminderController.sendSppReminders
 );
 

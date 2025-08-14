@@ -8,7 +8,7 @@ const payrollValidation = require('../../validation/payroll.validation');
 router.patch(
   '/v1/payroll/:id',
   authMiddleware.authenticate,
-  authMiddleware.authorizeModule('payroll'),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
   validationMiddleware.validateBody(payrollValidation.updatePayroll()),
   payrollController.updatePayroll
 );
@@ -16,7 +16,7 @@ router.patch(
 router.get(
   '/v1/payroll',
   authMiddleware.authenticate,
-  authMiddleware.authorizeModule('payroll'),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
   validationMiddleware.validateQuery(payrollValidation.getAllPayrollsForAdmin()),
   payrollController.getAllPayrollsForAdmin
 );
@@ -32,7 +32,7 @@ router.get(
 router.post(
   '/v1/payroll/batch',
   authMiddleware.authenticate,
-  authMiddleware.authorizeModule('payroll'),
+  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
   validationMiddleware.validateBody(payrollValidation.batchPayrollDisbursement()),
   payrollController.batchPayrollDisbursement
 );

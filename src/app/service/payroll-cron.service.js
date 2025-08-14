@@ -6,23 +6,6 @@ const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
 
 class PayrollCronService {
-  static init() {
-    logger.info('Initializing payroll cron jobs...');
-
-    this.scheduleMonthlyPayrollGeneration();
-
-    logger.info('Payroll cron jobs scheduled successfully');
-  }
-
-  static scheduleMonthlyPayrollGeneration() {
-    // Run at 00:00 (midnight) on the 25th of every month
-    cron.schedule('0 0 25 * *', async () => {
-      logger.info('Starting monthly payroll generation...');
-      await this.generateMonthlyPayroll();
-    }, {
-      timezone: 'Asia/Jakarta'
-    });
-  }
 
   static async generateMonthlyPayroll() {
     try {
