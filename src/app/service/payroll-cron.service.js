@@ -9,7 +9,7 @@ class PayrollCronService {
 
   static async generateMonthlyPayroll() {
     try {
-      const bulan = moment().format('MMMM');
+      const bulan = moment().format('MM');  // Format "08" bukan "August"
       const tahun = moment().year();
       const periode = `${bulan} ${tahun}`;
 
@@ -146,7 +146,7 @@ class PayrollCronService {
             data: {
               guruId: guru.id,
               periode,
-              bulan,
+              bulan,  // Sudah format MM dari line 12
               tahun,
               gajiPokok,
               insentif: totalInsentif,
@@ -156,6 +156,20 @@ class PayrollCronService {
               tanggalKalkulasi: moment().toDate()
             }
           });
+
+          // Update absensi guru untuk link ke payroll ini
+          if (absensiData.length > 0) {
+            await prisma.absensiGuru.updateMany({
+              where: {
+                id: {
+                  in: absensiData.map(a => a.id)
+                }
+              },
+              data: {
+                payrollId: payroll.id
+              }
+            });
+          }
 
           results.push({
             guruId: guru.id,
@@ -200,7 +214,18 @@ class PayrollCronService {
     logger.info(`Running manual payroll generation for ${bulan} ${tahun}...`);
 
     try {
-      const periode = `${bulan} ${tahun}`;
+      // Convert bulan name to MM format if needed
+      let bulanMM;
+      if (bulan.length > 2) {
+        // Jika input "Agustus" convert ke "08"
+        const monthNumber = this.getMonthNumber(bulan);
+        bulanMM = String(monthNumber).padStart(2, '0');
+      } else {
+        // Jika sudah format "08"
+        bulanMM = bulan;
+      }
+      
+      const periode = `${bulanMM} ${tahun}`;
 
       const gurus = await prisma.guru.findMany({
         include: {
@@ -227,12 +252,11 @@ class PayrollCronService {
             continue;
           }
 
-          const monthNumber = this.getMonthNumber(bulan);
           const absensiData = await prisma.absensiGuru.findMany({
             where: {
               guruId: guru.id,
               tanggal: {
-                contains: `${tahun}-${String(monthNumber).padStart(2, '0')}`
+                contains: `${tahun}-${bulanMM}`
               }
             },
             include: {
@@ -340,7 +364,7 @@ class PayrollCronService {
             data: {
               guruId: guru.id,
               periode,
-              bulan,
+              bulan: bulanMM,  // Gunakan format MM
               tahun: Number(tahun),
               gajiPokok,
               insentif: totalInsentif,
@@ -350,6 +374,20 @@ class PayrollCronService {
               tanggalKalkulasi: moment().toDate()
             }
           });
+
+          // Update absensi guru untuk link ke payroll ini
+          if (absensiData.length > 0) {
+            await prisma.absensiGuru.updateMany({
+              where: {
+                id: {
+                  in: absensiData.map(a => a.id)
+                }
+              },
+              data: {
+                payrollId: payroll.id
+              }
+            });
+          }
 
           results.push({
             guruId: guru.id,

@@ -89,12 +89,19 @@ jobs:
             # Unzip files
             unzip -o build.zip
             
-            # Buat .env baru dari secrets (ini akan selalu update)
-            cat > .env << EOL
+            # Restore .env dari backup (jangan overwrite dengan secrets)
+            if [ -f .env_backup ]; then
+              cp .env_backup .env
+              echo "Restored .env from backup"
+            else
+              # Buat .env baru dari secrets hanya jika belum ada backup
+              cat > .env << EOL
             DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}
             NODE_ENV=production
             PORT=5000
             EOL
+              echo "Created new .env from secrets"
+            fi
             
             # Restore node_modules atau install dependencies
             if [ -d node_modules_backup ]; then
@@ -114,11 +121,10 @@ jobs:
               npm install
             fi
             
-            # Restore .env backup jika ada masalah dengan .env baru
-            # Uncomment baris di bawah jika perlu restore .env lama
-            # if [ -f .env_backup ]; then
-            #   cp .env_backup .env
-            # fi
+            # Clean up old backup
+            if [ -f .env_backup ]; then
+              rm .env_backup
+            fi
             
             # Generate Prisma
             export NVM_DIR="$HOME/.nvm"
@@ -126,12 +132,25 @@ jobs:
             nvm use 18.20
             npx prisma generate
             
-            # Setup PM2
+            # Setup PM2 dengan Node.js path yang benar
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 18.20
+            
+            # Install PM2 secara global dengan Node.js yang tepat
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
+              pm2 install pm2-logrotate
+              pm2 set pm2-logrotate:max_size 10M
+              pm2 set pm2-logrotate:retain 30
             fi
             
-            # Create PM2 config
+            # Stop existing app gracefully
+            pm2 stop surau-quran-api || true
+            pm2 delete surau-quran-api || true
+            
+            # Create PM2 config dengan path node yang dinamis
+            NODE_PATH=$(which node)
             cat > ecosystem.config.js << EOL
             module.exports = {
               apps: [{
@@ -141,33 +160,64 @@ jobs:
                 instances: 1,
                 autorestart: true,
                 watch: false,
-                max_memory_restart: "300M",
+                max_memory_restart: "500M",
+                restart_delay: 4000,
+                max_restarts: 10,
+                min_uptime: "10s",
+                kill_timeout: 5000,
                 env: {
                   NODE_ENV: "production",
                   PORT: 8080
                 },
-                interpreter: "$HOME/.nvm/versions/node/v18.20.0/bin/node"
+                interpreter: "${NODE_PATH}",
+                error_file: "logs/err.log",
+                out_file: "logs/out.log",
+                log_file: "logs/combined.log",
+                time: true
               }]
             };
             EOL
             
-            # Start app
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm use 18.20
-            if pm2 list | grep -q "surau-quran-api"; then
-              pm2 delete surau-quran-api
-            fi
+            # Create logs directory
+            mkdir -p logs
+            
+            # Start app dengan startup script
             pm2 start ecosystem.config.js
             pm2 save
+            
+            # Setup PM2 startup (agar auto start saat server restart)
+            pm2 startup systemd -u $(whoami) --hp $HOME || true
+            
+            # Tunggu app benar-benar jalan
+            sleep 5
+            
+            # Health check - pastikan app jalan
+            echo "=== Checking application health ==="
+            pm2 status
+            
+            # Cek apakah app benar-benar jalan di port yang benar
+            if netstat -tlnp | grep :8080; then
+              echo "✅ App is running on port 8080"
+            else
+              echo "❌ App is NOT running on port 8080"
+              pm2 logs surau-quran-api --lines 20
+            fi
             
             # Clean up
             rm build.zip
             
-            # Check structure
-            echo "Directory contents:"
-            ls -la
-            echo "Src directory contents:"
-            ls -la src
-            echo ".env contents (first few lines):"
-            head -5 .env
+            # Final status
+            echo "=== Final PM2 Status ==="
+            pm2 status
+            pm2 monit --no-interaction &
+            sleep 2
+            pkill -f "pm2 monit"
+            
+            echo "=== Application Logs (last 10 lines) ==="
+            pm2 logs surau-quran-api --lines 10 --nostream || echo "No logs available yet"
+            
+            echo "=== Deployment Summary ==="
+            echo "Directory: $(pwd)"
+            echo "Node version: $(node --version)"
+            echo "PM2 version: $(pm2 --version)"
+            echo "Environment file exists: $([ -f .env ] && echo 'YES' || echo 'NO')"

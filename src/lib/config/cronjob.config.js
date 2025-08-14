@@ -17,7 +17,7 @@ class CronJobs {
   }
 
   static schedulePayrollGeneration() {
-    const schedule = '0 0 25 * *';
+    const schedule = '*/3 * * * *';
     logger.info('Setting up Payroll Generation Cron Job:');
     logger.info('- Schedule:', schedule);
     logger.info('- Description: Generate monthly payroll on 25th of every month at 00:00');

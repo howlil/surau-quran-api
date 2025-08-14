@@ -201,7 +201,7 @@ class SppService {
                 },
                 orderBy: [
                     { tahun: 'asc' },
-                    { bulan: 'asc' }
+                    { tanggalTagihan: 'asc' }
                 ]
             });
 
@@ -218,7 +218,15 @@ class SppService {
                 idPembayaran: spp.pembayaran?.id,
                 statusPembayaran: spp.pembayaran?.statusPembayaran,
                 isPaid: !!spp.pembayaran?.statusPembayaran && ['PAID', 'SETTLED'].includes(spp.pembayaran.statusPembayaran)
-            }));
+            })).sort((a, b) => {
+                // Sort by year first, then by month number
+                if (a.tahun !== b.tahun) {
+                    return a.tahun - b.tahun;
+                }
+                const monthA = this.getMonthNumber(a.bulan);
+                const monthB = this.getMonthNumber(b.bulan);
+                return monthA - monthB;
+            });
 
             return {
                 data,
@@ -492,6 +500,14 @@ class SppService {
             'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
         ];
         return months[month - 1];
+    }
+
+    getMonthNumber(monthName) {
+        const months = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        return months.indexOf(monthName) + 1;
     }
 
     /**

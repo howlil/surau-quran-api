@@ -273,17 +273,11 @@ class PayrollService {
       logger.info(`Found ${gurus.length} active gurus`);
 
       // Get payroll data for all gurus in the specified month
-      // Coba cari dengan format bulan angka (08) dan nama bulan (August)
+      // Hanya gunakan format bulan MM (misal: "08")
       
-      const namaBulan = this.getNamaBulan(parseInt(bulan));
-
-      // Cari berdasarkan format yang ada di database (English month name)
-      const englishMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const englishMonth = englishMonths[parseInt(bulan) - 1];
-
       const payrollData = await prisma.payroll.findMany({
         where: {
-          bulan: englishMonth,
+          bulan: bulan,  // Format MM: "08"
           tahun: tahun,
           guruId: {
             in: gurus.map(guru => guru.id)
@@ -292,9 +286,19 @@ class PayrollService {
         include: {
           absensiGuru: {
             where: {
+              OR: [
+                {
               tanggal: {
                 contains: `-${bulan}-${tahun}`
               }
+                },
+                {
+                  payrollId: null,
+                  tanggal: {
+                    contains: `-${bulan}-${tahun}`
+                  }
+                }
+              ]
             },
             select: {
               id: true,
@@ -341,7 +345,7 @@ class PayrollService {
       const isCurrentMonth = currentDate.format('MM-YYYY') === `${bulan}-${tahun}`;
 
       // Build response data for all gurus
-      const allGuruData = gurus.map(guru => {
+      const allGuruData = await Promise.all(gurus.map(async (guru) => {
         const payroll = payrollMap.get(guru.id);
         
         if (!payroll) {
@@ -411,8 +415,35 @@ class PayrollService {
           totalInsentif = Number(payroll.insentif || 0);
           totalPotongan = Number(payroll.potongan);
           
-          // Hitung detail dari absensi untuk informasi tambahan
-          const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
+          const realAbsensiData = await prisma.absensiGuru.findMany({
+            where: {
+              guruId: guru.id,
+              tanggal: {
+                gte: `${tahun}-${bulan.padStart(2, '0')}-01`,
+                lte: `${tahun}-${bulan.padStart(2, '0')}-31`
+              }
+            },
+            select: {
+              id: true,
+              tanggal: true,
+              statusKehadiran: true,
+              sks: true,
+              potonganTerlambat: true,
+              potonganTanpaKabar: true,
+              potonganTanpaSuratIzin: true,
+              insentifKehadiran: true,
+              kelasProgram: {
+                select: {
+                  tipeKelas: true
+                }
+              }
+            }
+          });
+          
+
+          
+          // Hitung detail dari absensi real
+          const absensiStats = this.calculateDetailedAbsensiStats(realAbsensiData);
           
           detailData = {
             mengajar: {
@@ -446,7 +477,7 @@ class PayrollService {
           };
         } else {
           // Hitung ulang dari absensi jika data belum ada
-          const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
+        const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
           totalMengajar = absensiStats.totalSKS * 35000;
           totalInsentif = absensiStats.totalInsentif;
           totalPotongan = absensiStats.potonganTelat + absensiStats.potonganIzin + absensiStats.potonganLainnya;
@@ -483,26 +514,8 @@ class PayrollService {
           };
         }
 
-        // Tentukan bulanAngka berdasarkan format bulan di database
-        let bulanAngka;
-        if (isNaN(parseInt(payroll.bulan))) {
-          // Jika bulan berupa nama (August), konversi ke angka
-          const namaBulanArray = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-          const englishBulanArray = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-          
-          const indonesiaIndex = namaBulanArray.findIndex(nama => nama.toLowerCase() === payroll.bulan.toLowerCase());
-          const englishIndex = englishBulanArray.findIndex(nama => nama.toLowerCase() === payroll.bulan.toLowerCase());
-          
-          if (indonesiaIndex !== -1) {
-            bulanAngka = indonesiaIndex + 1;
-          } else if (englishIndex !== -1) {
-            bulanAngka = englishIndex + 1;
-          } else {
-            bulanAngka = parseInt(bulan); // fallback ke bulan dari filter
-          }
-        } else {
-          bulanAngka = parseInt(payroll.bulan);
-        }
+        // Bulan sudah dalam format MM, langsung parse ke integer
+        const bulanAngka = parseInt(payroll.bulan);
 
         return {
           id: payroll.id,
@@ -518,7 +531,7 @@ class PayrollService {
           gajiBersih: totalMengajar + totalInsentif - totalPotongan,
           detail: detailData
         };
-      });
+      }));
 
       // Apply pagination
       const startIndex = (page - 1) * limit;
@@ -670,9 +683,10 @@ class PayrollService {
       if (tanggalKalkulasi !== undefined) {
         updateData.tanggalKalkulasi = FormatUtils.parseDate(tanggalKalkulasi);
       }
-      if (bulan !== undefined) {
-        updateData.bulan = bulan;
-      }
+      // Jangan update bulan untuk menghindari inconsistency format
+      // if (bulan !== undefined) {
+      //   updateData.bulan = bulan;
+      // }
       if (catatan !== undefined) {
         updateData.catatan = catatan;
       }
@@ -916,7 +930,7 @@ class PayrollService {
       const payrollData = await prisma.payroll.findMany({
         where: {
           guruId,
-          bulan,
+          bulan,  // Format MM: "08"
           tahun
         },
         include: {
