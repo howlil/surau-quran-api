@@ -284,38 +284,6 @@ class PayrollService {
           }
         },
         include: {
-          absensiGuru: {
-            where: {
-              OR: [
-                {
-              tanggal: {
-                contains: `-${bulan}-${tahun}`
-              }
-                },
-                {
-                  payrollId: null,
-                  tanggal: {
-                    contains: `-${bulan}-${tahun}`
-                  }
-                }
-              ]
-            },
-            select: {
-              id: true,
-              tanggal: true,
-              statusKehadiran: true,
-              sks: true,
-              potonganTerlambat: true,
-              potonganTanpaKabar: true,
-              potonganTanpaSuratIzin: true,
-              insentifKehadiran: true,
-              kelasProgram: {
-                select: {
-                  tipeKelas: true
-                }
-              }
-            }
-          },
           payrollDisbursement: {
             include: {
               xenditDisbursement: {
@@ -329,6 +297,11 @@ class PayrollService {
       });
 
       logger.info(`Found ${payrollData.length} payroll records for ${bulan}-${tahun}`);
+      
+      // Debug: Log payroll data yang ditemukan
+      payrollData.forEach(payroll => {
+        logger.info(`Payroll found for guru ${payroll.guruId}: status ${payroll.status}`);
+      });
 
       // Create a map of guru payroll data for quick lookup
       const payrollMap = new Map();
@@ -405,114 +378,87 @@ class PayrollService {
           }
         }
 
-        // Payroll data exists - use existing data or calculate from absensi
-        let totalMengajar, totalInsentif, totalPotongan, detailData;
+        // Payroll data exists - always calculate from fresh absensi data
+        // Get absensi data for this guru and month regardless of payroll link
+        const realAbsensiData = await prisma.absensiGuru.findMany({
+          where: {
+            guruId: guru.id,
+            tanggal: {
+              contains: `-${bulan}-${tahun}`
+            }
+          },
+          select: {
+            id: true,
+            tanggal: true,
+            statusKehadiran: true,
+            sks: true,
+            potonganTerlambat: true,
+            potonganTanpaKabar: true,
+            potonganTanpaSuratIzin: true,
+            insentifKehadiran: true,
+            kelasProgram: {
+              select: {
+                tipeKelas: true
+              }
+            }
+          }
+        });
         
-        // Cek apakah ada data gajiPokok, insentif, potongan yang sudah dihitung
+        logger.info(`Real absensi data for guru ${guru.nama} (${guru.id}):`, {
+          count: realAbsensiData.length,
+          absensiIds: realAbsensiData.map(a => a.id),
+          statusList: realAbsensiData.map(a => ({ id: a.id, status: a.statusKehadiran, sks: a.sks }))
+        });
+        
+        const absensiStats = this.calculateDetailedAbsensiStats(realAbsensiData);
+        
+        logger.info(`Calculated absensi stats for guru ${guru.nama}:`, absensiStats);
+        
+        // Use saved values if available, otherwise calculate from absensi
+        let totalMengajar, totalInsentif, totalPotongan;
+        
         if (payroll.gajiPokok && payroll.insentif !== null && payroll.potongan !== null) {
-          // Gunakan data yang sudah ada di database
+          // Use saved values
           totalMengajar = Number(payroll.gajiPokok);
           totalInsentif = Number(payroll.insentif || 0);
           totalPotongan = Number(payroll.potongan);
-          
-          const realAbsensiData = await prisma.absensiGuru.findMany({
-            where: {
-              guruId: guru.id,
-              tanggal: {
-                gte: `${tahun}-${bulan.padStart(2, '0')}-01`,
-                lte: `${tahun}-${bulan.padStart(2, '0')}-31`
-              }
-            },
-            select: {
-              id: true,
-              tanggal: true,
-              statusKehadiran: true,
-              sks: true,
-              potonganTerlambat: true,
-              potonganTanpaKabar: true,
-              potonganTanpaSuratIzin: true,
-              insentifKehadiran: true,
-              kelasProgram: {
-                select: {
-                  tipeKelas: true
-                }
-              }
-            }
-          });
-          
-
-          
-          // Hitung detail dari absensi real
-          const absensiStats = this.calculateDetailedAbsensiStats(realAbsensiData);
-          
-          detailData = {
-            mengajar: {
-              jumlah: absensiStats.totalSKS,
-              sksRate: 35000,
-              total: totalMengajar
-            },
-            insentif: {
-              jumlah: absensiStats.totalKehadiran,
-              rate: 10000,
-              total: totalInsentif
-            },
-            potongan: {
-              telat: {
-                jumlah: absensiStats.jumlahTelat,
-                rate: 10000,
-                total: absensiStats.potonganTelat
-              },
-              izin: {
-                jumlah: absensiStats.jumlahIzin,
-                rate: 10000,
-                total: absensiStats.potonganIzin
-              },
-              dll: {
-                jumlah: absensiStats.jumlahTidakHadir,
-                rate: 10000,
-                total: absensiStats.potonganLainnya
-              },
-              totalPotongan: totalPotongan
-            }
-          };
         } else {
-          // Hitung ulang dari absensi jika data belum ada
-        const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
+          // Calculate from absensi
           totalMengajar = absensiStats.totalSKS * 35000;
           totalInsentif = absensiStats.totalInsentif;
           totalPotongan = absensiStats.potonganTelat + absensiStats.potonganIzin + absensiStats.potonganLainnya;
-          
-          detailData = {
-            mengajar: {
-              jumlah: absensiStats.totalSKS,
-              sksRate: 35000,
-              total: totalMengajar
-            },
-            insentif: {
-              jumlah: absensiStats.totalKehadiran,
-              rate: 10000,
-              total: totalInsentif
-            },
-            potongan: {
-              telat: {
-                jumlah: absensiStats.jumlahTelat,
-                rate: 10000,
-                total: absensiStats.potonganTelat
-              },
-              izin: {
-                jumlah: absensiStats.jumlahIzin,
-                rate: 10000,
-                total: absensiStats.potonganIzin
-              },
-              dll: {
-                jumlah: absensiStats.jumlahTidakHadir,
-                rate: 10000,
-                total: absensiStats.potonganLainnya
-              },
-              totalPotongan: totalPotongan
-            }
-          };
         }
+        
+        const detailData = {
+          mengajar: {
+            jumlah: absensiStats.totalSKS,
+            sksRate: 35000,
+            total: totalMengajar
+          },
+          insentif: {
+            jumlah: absensiStats.totalKehadiran,
+            rate: 10000,
+            total: totalInsentif
+          },
+          potongan: {
+            telat: {
+              jumlah: absensiStats.jumlahTelat,
+              rate: 10000,
+              total: absensiStats.potonganTelat
+            },
+            izin: {
+              jumlah: absensiStats.jumlahIzin,
+              rate: 10000,
+              total: absensiStats.potonganIzin
+            },
+            dll: {
+              jumlah: absensiStats.jumlahTidakHadir,
+              rate: 10000,
+              total: absensiStats.potonganLainnya
+            },
+            totalPotongan: totalPotongan
+          }
+        };
 
         // Bulan sudah dalam format MM, langsung parse ke integer
         const bulanAngka = parseInt(payroll.bulan);
@@ -583,7 +529,7 @@ class PayrollService {
       return stats;
     }
 
-    absensiList.forEach(absensi => {
+    absensiList.forEach((absensi, index) => {
       // Convert string values to numbers
       const sks = Number(absensi.sks) || 0;
       const potonganTerlambat = Number(absensi.potonganTerlambat) || 0;
@@ -591,11 +537,20 @@ class PayrollService {
       const potonganTanpaSuratIzin = Number(absensi.potonganTanpaSuratIzin) || 0;
       const insentifKehadiran = Number(absensi.insentifKehadiran) || 0;
 
+      logger.info(`Processing absensi ${index + 1}:`, {
+        id: absensi.id,
+        tanggal: absensi.tanggal,
+        status: absensi.statusKehadiran,
+        sks: sks,
+        originalSks: absensi.sks
+      });
+
       switch (absensi.statusKehadiran) {
         case 'HADIR':
           stats.totalKehadiran++;
           stats.totalSKS += sks;
-          stats.totalInsentif += insentifKehadiran;
+          // Insentif kehadiran: 10000 per hari hadir (tidak dari field insentifKehadiran)
+          stats.totalInsentif += 10000;
           // Jika ada potongan terlambat meskipun status HADIR
           if (potonganTerlambat > 0) {
             stats.jumlahTelat++;
@@ -606,7 +561,8 @@ class PayrollService {
         case 'TERLAMBAT':
           stats.totalKehadiran++;
           stats.totalSKS += sks;
-          stats.totalInsentif += insentifKehadiran;
+          // Insentif kehadiran: 10000 per hari hadir (meskipun terlambat)
+          stats.totalInsentif += 10000;
           // Status TERLAMBAT otomatis ada potongan
           stats.jumlahTelat++;
           stats.potonganTelat += potonganTerlambat > 0 ? potonganTerlambat : 10000; // Default Rp 10.000

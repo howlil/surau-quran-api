@@ -363,7 +363,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'ADMIN') {
+            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
                 throw new ForbiddenError('Hanya admin yang dapat melihat daftar admin');
             }
 
@@ -402,7 +402,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'ADMIN') {
+            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
                 throw new ForbiddenError('Hanya admin yang dapat mengubah data admin');
             }
 
@@ -480,7 +480,7 @@ class AuthService {
                 include: { admin: true }
             });
 
-            if (!requestUser || requestUser.role !== 'ADMIN') {
+            if (!requestUser || requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU') {
                 throw new ForbiddenError('Hanya admin yang dapat menghapus akun admin');
             }
 

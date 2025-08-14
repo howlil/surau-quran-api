@@ -89,7 +89,10 @@ class SppService {
                         }
                     }
                 },
-                orderBy: { updatedAt: 'desc' }
+                orderBy: [
+                    { tahun: 'asc' },
+                    { tanggalTagihan: 'asc' }
+                ]
             });
 
             const formattedData = result.data.map(spp => ({
