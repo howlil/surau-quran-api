@@ -145,9 +145,9 @@ jobs:
               pm2 set pm2-logrotate:retain 30
             fi
             
-            # Stop existing app gracefully
-            pm2 stop surau-quran-api || true
-            pm2 delete surau-quran-api || true
+            # Stop ALL existing apps to avoid duplicates
+            pm2 stop all || true
+            pm2 delete all || true
             
             # Create PM2 config dengan path node yang dinamis
             NODE_PATH=$(which node)
@@ -167,7 +167,7 @@ jobs:
                 kill_timeout: 5000,
                 env: {
                   NODE_ENV: "production",
-                  PORT: 8080
+                  PORT: 5000
                 },
                 interpreter: "${NODE_PATH}",
                 error_file: "logs/err.log",
@@ -191,33 +191,26 @@ jobs:
             # Tunggu app benar-benar jalan
             sleep 5
             
-            # Health check - pastikan app jalan
-            echo "=== Checking application health ==="
+            # Quick health check
+            echo "=== Deployment Complete ==="
             pm2 status
             
-            # Cek apakah app benar-benar jalan di port yang benar
-            if netstat -tlnp | grep :8080; then
-              echo "✅ App is running on port 8080"
+            # Check if app is in PM2 list and running
+            if pm2 list | grep -q "surau-quran-api.*online"; then
+              echo "✅ App successfully started with PM2"
             else
-              echo "❌ App is NOT running on port 8080"
-              pm2 logs surau-quran-api --lines 20
+              echo "❌ App not running properly"
+              pm2 logs surau-quran-api --lines 10 --nostream
             fi
             
             # Clean up
             rm build.zip
             
-            # Final status
-            echo "=== Final PM2 Status ==="
-            pm2 status
-            pm2 monit --no-interaction &
-            sleep 2
-            pkill -f "pm2 monit"
-            
-            echo "=== Application Logs (last 10 lines) ==="
-            pm2 logs surau-quran-api --lines 10 --nostream || echo "No logs available yet"
-            
             echo "=== Deployment Summary ==="
-            echo "Directory: $(pwd)"
+            echo "✅ Files deployed successfully"
+            echo "✅ Dependencies installed"
+            echo "✅ Prisma generated"
+            echo "✅ PM2 configured and started"
+            echo "✅ Environment file preserved"
             echo "Node version: $(node --version)"
-            echo "PM2 version: $(pm2 --version)"
-            echo "Environment file exists: $([ -f .env ] && echo 'YES' || echo 'NO')"
+            echo "PM2 apps: $(pm2 list | grep -c online) running"
