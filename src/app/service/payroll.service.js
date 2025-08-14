@@ -284,6 +284,23 @@ class PayrollService {
           }
         },
         include: {
+          absensiGuru: {
+            select: {
+              id: true,
+              tanggal: true,
+              statusKehadiran: true,
+              sks: true,
+              potonganTerlambat: true,
+              potonganTanpaKabar: true,
+              potonganTanpaSuratIzin: true,
+              insentifKehadiran: true,
+              kelasProgram: {
+                select: {
+                  tipeKelas: true
+                }
+              }
+            }
+          },
           payrollDisbursement: {
             include: {
               xenditDisbursement: {
@@ -378,39 +395,14 @@ class PayrollService {
           }
         }
 
-        // Payroll data exists - always calculate from fresh absensi data
-        // Get absensi data for this guru and month regardless of payroll link
-        const realAbsensiData = await prisma.absensiGuru.findMany({
-          where: {
-            guruId: guru.id,
-            tanggal: {
-              contains: `-${bulan}-${tahun}`
-            }
-          },
-          select: {
-            id: true,
-            tanggal: true,
-            statusKehadiran: true,
-            sks: true,
-            potonganTerlambat: true,
-            potonganTanpaKabar: true,
-            potonganTanpaSuratIzin: true,
-            insentifKehadiran: true,
-            kelasProgram: {
-              select: {
-                tipeKelas: true
-              }
-            }
-          }
+        // Payroll data exists - use linked absensi data
+        logger.info(`Linked absensi data for guru ${guru.nama} (${guru.id}):`, {
+          count: payroll.absensiGuru.length,
+          absensiIds: payroll.absensiGuru.map(a => a.id),
+          statusList: payroll.absensiGuru.map(a => ({ id: a.id, status: a.statusKehadiran, sks: a.sks }))
         });
         
-        logger.info(`Real absensi data for guru ${guru.nama} (${guru.id}):`, {
-          count: realAbsensiData.length,
-          absensiIds: realAbsensiData.map(a => a.id),
-          statusList: realAbsensiData.map(a => ({ id: a.id, status: a.statusKehadiran, sks: a.sks }))
-        });
-        
-        const absensiStats = this.calculateDetailedAbsensiStats(realAbsensiData);
+        const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
         
         logger.info(`Calculated absensi stats for guru ${guru.nama}:`, absensiStats);
         
@@ -647,22 +639,84 @@ class PayrollService {
         updateData.catatan = catatan;
       }
 
+      // Get actual absensi data untuk validasi
+      const absensiData = await prisma.absensiGuru.findMany({
+        where: {
+          guruId: payroll.guruId,
+          tanggal: {
+            contains: `-${payroll.bulan}-${payroll.tahun}`
+          }
+        },
+        select: {
+          id: true,
+          tanggal: true,
+          statusKehadiran: true,
+          sks: true,
+          potonganTerlambat: true,
+          potonganTanpaKabar: true,
+          potonganTanpaSuratIzin: true,
+          insentifKehadiran: true
+        }
+      });
+
+      const absensiStats = this.calculateDetailedAbsensiStats(absensiData);
+      
+      logger.info(`Absensi stats for validation:`, {
+        totalSKS: absensiStats.totalSKS,
+        totalKehadiran: absensiStats.totalKehadiran,
+        jumlahTelat: absensiStats.jumlahTelat,
+        jumlahIzin: absensiStats.jumlahIzin,
+        jumlahTidakHadir: absensiStats.jumlahTidakHadir
+      });
+
       let jumlahSKS, jumlahInsentif, jumlahTelat, jumlahIzin, jumlahDLL;
       let rateSKS = 35000, rateInsentif = 10000, rateTelat = 10000, rateIzin = 10000, rateDLL = 10000;
+      
       if (detail) {
-        jumlahSKS = detail?.mengajar?.jumlah ?? 0;
-        jumlahInsentif = detail?.insentif?.jumlah ?? 0;
-        jumlahTelat = detail?.potongan?.telat?.jumlah ?? 0;
-        jumlahIzin = detail?.potongan?.izin?.jumlah ?? 0;
-        jumlahDLL = detail?.potongan?.dll?.jumlah ?? 0;
+        // Validasi input sesuai dengan data absensi
+        const inputSKS = detail?.mengajar?.jumlah ?? 0;
+        const inputInsentif = detail?.insentif?.jumlah ?? 0;
+        const inputTelat = detail?.potongan?.telat?.jumlah ?? 0;
+        const inputIzin = detail?.potongan?.izin?.jumlah ?? 0;
+        const inputDLL = detail?.potongan?.dll?.jumlah ?? 0;
+
+        // Validasi SKS tidak boleh melebihi total SKS dari absensi
+        if (inputSKS > absensiStats.totalSKS) {
+          throw new BadRequestError(`Jumlah SKS mengajar (${inputSKS}) tidak boleh melebihi total SKS dari absensi (${absensiStats.totalSKS})`);
+        }
+
+        // Validasi insentif tidak boleh melebihi total kehadiran
+        if (inputInsentif > absensiStats.totalKehadiran) {
+          throw new BadRequestError(`Jumlah hari insentif (${inputInsentif}) tidak boleh melebihi total kehadiran dari absensi (${absensiStats.totalKehadiran})`);
+        }
+
+        // Validasi potongan terlambat tidak boleh melebihi data absensi
+        if (inputTelat > absensiStats.jumlahTelat) {
+          throw new BadRequestError(`Jumlah potongan terlambat (${inputTelat}) tidak boleh melebihi data terlambat dari absensi (${absensiStats.jumlahTelat})`);
+        }
+
+        // Validasi potongan izin tidak boleh melebihi data absensi
+        if (inputIzin > absensiStats.jumlahIzin) {
+          throw new BadRequestError(`Jumlah potongan izin (${inputIzin}) tidak boleh melebihi data izin dari absensi (${absensiStats.jumlahIzin})`);
+        }
+
+        // Validasi potongan lainnya tidak boleh melebihi data absensi
+        if (inputDLL > absensiStats.jumlahTidakHadir) {
+          throw new BadRequestError(`Jumlah potongan lainnya (${inputDLL}) tidak boleh melebihi data tidak hadir dari absensi (${absensiStats.jumlahTidakHadir})`);
+        }
+
+        jumlahSKS = inputSKS;
+        jumlahInsentif = inputInsentif;
+        jumlahTelat = inputTelat;
+        jumlahIzin = inputIzin;
+        jumlahDLL = inputDLL;
         rateSKS = detail?.mengajar?.rate ?? 35000;
         rateInsentif = detail?.insentif?.rate ?? 10000;
         rateTelat = detail?.potongan?.telat?.rate ?? 10000;
         rateIzin = detail?.potongan?.izin?.rate ?? 10000;
         rateDLL = detail?.potongan?.dll?.rate ?? 10000;
       } else {
-        // fallback ke absensi
-        const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
+        // Gunakan data dari absensi
         jumlahSKS = absensiStats.totalSKS;
         jumlahInsentif = absensiStats.totalKehadiran;
         jumlahTelat = absensiStats.jumlahTelat;
@@ -719,42 +773,64 @@ class PayrollService {
       updateData.potongan = safePotongan;
       updateData.totalGaji = safeTotalGaji;
 
-      const updated = await prisma.payroll.update({
-        where: { id },
-        data: updateData,
-        include: {
-          guru: {
-            select: {
-              nama: true,
-              nip: true,
-              noRekening: true,
-              namaBank: true
-            }
-          },
-          absensiGuru: {
-            where: {
-              tanggal: {
-                contains: `-${bulan || payroll.bulan}-${payroll.tahun}`
+      const updated = await prisma.$transaction(async (tx) => {
+        // Update payroll data
+        const updatedPayroll = await tx.payroll.update({
+          where: { id },
+          data: updateData,
+          include: {
+            guru: {
+              select: {
+                nama: true,
+                nip: true,
+                noRekening: true,
+                namaBank: true
               }
             },
-            select: {
-              id: true,
-              tanggal: true,
-              statusKehadiran: true,
-              sks: true,
-              potonganTerlambat: true,
-              potonganTanpaKabar: true,
-              potonganTanpaSuratIzin: true,
-              insentifKehadiran: true,
-              kelasProgram: {
-                select: {
-                  tipeKelas: true
-                }
+            payrollDisbursement: true
+          }
+        });
+
+        // Link absensi guru ke payroll ini untuk bulan yang sama
+        await tx.absensiGuru.updateMany({
+          where: {
+            guruId: updatedPayroll.guruId,
+            tanggal: {
+              contains: `-${updatedPayroll.bulan}-${updatedPayroll.tahun}`
+            },
+            payrollId: null // Hanya update yang belum ter-link
+          },
+          data: {
+            payrollId: updatedPayroll.id
+          }
+        });
+
+        // Get updated absensi data
+        const absensiGuru = await tx.absensiGuru.findMany({
+          where: {
+            payrollId: updatedPayroll.id
+          },
+          select: {
+            id: true,
+            tanggal: true,
+            statusKehadiran: true,
+            sks: true,
+            potonganTerlambat: true,
+            potonganTanpaKabar: true,
+            potonganTanpaSuratIzin: true,
+            insentifKehadiran: true,
+            kelasProgram: {
+              select: {
+                tipeKelas: true
               }
             }
-          },
-          payrollDisbursement: true
-        }
+          }
+        });
+
+        return {
+          ...updatedPayroll,
+          absensiGuru
+        };
       });
 
       logger.info(`Updated payroll with ID: ${id}`);
