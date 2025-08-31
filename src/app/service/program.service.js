@@ -107,10 +107,10 @@ class ProgramService {
 
   async getAll(filters = {}) {
     try {
-      const { page , limit , namaProgram } = filters;
+      const { page, limit, namaProgram } = filters;
 
       const where = {};
-      
+
       if (namaProgram) {
         where.namaProgram = {
           contains: namaProgram
@@ -125,6 +125,7 @@ class ProgramService {
           id: true,
           namaProgram: true,
           deskripsi: true,
+          tipeProgram: true,
           cover: true,
           biayaSpp: true,
           createdAt: true,
@@ -153,6 +154,7 @@ class ProgramService {
           id: true,
           namaProgram: true,
           deskripsi: true,
+          tipeProgram: true,
           cover: true,
           biayaSpp: true,
           createdAt: true,
@@ -173,6 +175,7 @@ class ProgramService {
           id: true,
           namaProgram: true,
           deskripsi: true,
+          tipeProgram: true,
           cover: true
         },
         orderBy: { namaProgram: 'asc' }

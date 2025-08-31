@@ -2,14 +2,14 @@ const { prisma } = require('../config/prisma.config');
 const { logger } = require('../config/logger.config');
 
 class PrismaUtils {
-  static async transaction(callback) {
+  static async transaction(callback, options = {}) {
     try {
       return await prisma.$transaction(async (tx) => {
         return await callback(tx);
       }, {
-        maxWait: 5000,
-        timeout: 10000,
-        isolationLevel: 'ReadCommitted'
+        maxWait: options.maxWait || 10000,
+        timeout: options.timeout || 30000,
+        isolationLevel: options.isolationLevel || 'ReadCommitted'
       });
     } catch (error) {
       logger.error('Transaction failed:', error);

@@ -1,7 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
 
-// Define the dependency order for tables based on foreign key relationships
-// This helps ensure we delete and seed in the correct order
+
 const TABLE_ORDER = {
     delete: [
         // Child tables first
@@ -57,20 +56,13 @@ const TABLE_ORDER = {
     ]
 };
 
-/**
- * Get all table names from the Prisma client
- * @returns {string[]} Array of table names
- */
+
 function getAllTables() {
     return Object.keys(prisma)
         .filter(key => !key.startsWith('_') && key !== 'disconnect' && key !== 'connect');
 }
 
-/**
- * Get tables in the correct order for deletion or seeding
- * @param {string} operation 'delete' or 'seed'
- * @returns {string[]} Array of table names in the correct order
- */
+
 function getTablesInOrder(operation) {
     const allTables = getAllTables();
     const orderedTables = TABLE_ORDER[operation] || [];

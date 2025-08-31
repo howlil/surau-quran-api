@@ -29,228 +29,7 @@ class PayrollService {
       tahun: tahun
     };
   }
-  // async getAllPayrollsForAdmin(filters = {}) {
-  //   try {
-  //     const { page = 1, limit = 10, monthYear } = filters;
-  //     const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
 
-  //     logger.info(`Payroll filter - monthYear: ${monthYear}, parsed bulan: ${bulan}, tahun: ${tahun}`);
-
-  //     // Get all active gurus first
-  //     const gurus = await prisma.guru.findMany({
-  //       select: {
-  //         id: true,
-  //         nama: true,
-  //         nip: true,
-  //         noRekening: true,
-  //         namaBank: true
-  //       },
-  //       orderBy: { nama: 'asc' }
-  //     });
-
-  //     logger.info(`Found ${gurus.length} active gurus`);
-
-  //     // Get payroll data for all gurus in the specified month
-  //     const payrollData = await prisma.payroll.findMany({
-  //       where: {
-  //         bulan,
-  //         tahun,
-  //         guruId: {
-  //           in: gurus.map(guru => guru.id)
-  //         }
-  //       },
-  //       include: {
-  //         absensiGuru: {
-  //           where: {
-  //             tanggal: {
-  //               contains: `-${bulan}-${tahun}`
-  //             }
-  //           },
-  //           select: {
-  //             id: true,
-  //             tanggal: true,
-  //             statusKehadiran: true,
-  //             sks: true,
-  //             potonganTerlambat: true,
-  //             potonganTanpaKabar: true,
-  //             potonganTanpaSuratIzin: true,
-  //             insentifKehadiran: true,
-  //             kelasProgram: {
-  //               select: {
-  //                 tipeKelas: true
-  //               }
-  //             }
-  //           }
-  //         },
-  //         payrollDisbursement: {
-  //           include: {
-  //             xenditDisbursement: {
-  //               select: {
-  //                 xenditStatus: true,
-  //               }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     });
-
-  //     logger.info(`Found ${payrollData.length} payroll records for ${bulan}-${tahun}`);
-
-  //     // Create a map of guru payroll data for quick lookup
-  //     const payrollMap = new Map();
-  //     payrollData.forEach(payroll => {
-  //       payrollMap.set(payroll.guruId, payroll);
-  //     });
-
-  //     // Check if current date is before the 25th of the month
-  //     const currentDate = moment();
-  //     const targetMonth = moment(`${tahun}-${bulan}-01`);
-  //     const isBefore25th = currentDate.isBefore(targetMonth.clone().date(25));
-  //     const isCurrentMonth = currentDate.format('MM-YYYY') === `${bulan}-${tahun}`;
-
-  //     // Build response data for all gurus
-  //     const allGuruData = gurus.map(guru => {
-  //       const payroll = payrollMap.get(guru.id);
-        
-  //       if (!payroll) {
-  //         // No payroll data exists for this guru
-  //         if (isCurrentMonth && isBefore25th) {
-  //           // Before 25th of current month - payroll not calculated yet
-  //           return {
-  //             id: null,
-  //             namaGuru: guru.nama,
-  //             idGuru: guru.nip || guru.id,
-  //             bulan: this.getNamaBulan(parseInt(bulan)),
-  //             bulanAngka: parseInt(bulan),
-  //             tahun: parseInt(tahun),
-  //             status: 'BELUM_DIHITUNG',
-  //             paymentStatus: null,
-  //             tanggalKalkulasi: null,
-  //             catatan: null,
-  //             gajiBersih: 0,
-  //             detail: {
-  //               mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
-  //               insentif: { jumlah: 0, rate: 10000, total: 0 },
-  //               potongan: {
-  //                 telat: { jumlah: 0, rate: 10000, total: 0 },
-  //                 izin: { jumlah: 0, rate: 10000, total: 0 },
-  //                 dll: { jumlah: 0, rate: 10000, total: 0 },
-  //                 totalPotongan: 0
-  //               }
-  //             },
-  //             message: 'Payroll akan dihitung otomatis pada tanggal 25'
-  //           };
-  //         } else {
-  //           // Past month or after 25th - no payroll data
-  //           return {
-  //             id: null,
-  //             namaGuru: guru.nama,
-  //             idGuru: guru.nip || guru.id,
-  //             bulan: this.getNamaBulan(parseInt(bulan)),
-  //             bulanAngka: parseInt(bulan),
-  //             tahun: parseInt(tahun),
-  //             status: 'TIDAK_ADA_DATA',
-  //             paymentStatus: null,
-  //             tanggalKalkulasi: null,
-  //             catatan: null,
-  //             gajiBersih: 0,
-  //             detail: {
-  //               mengajar: { jumlah: 0, sksRate: 35000, total: 0 },
-  //               insentif: { jumlah: 0, rate: 10000, total: 0 },
-  //               potongan: {
-  //                 telat: { jumlah: 0, rate: 10000, total: 0 },
-  //                 izin: { jumlah: 0, rate: 10000, total: 0 },
-  //                 dll: { jumlah: 0, rate: 10000, total: 0 },
-  //                 totalPotongan: 0
-  //               }
-  //             },
-  //             message: 'Tidak ada data payroll untuk periode ini'
-  //           };
-  //         }
-  //       }
-
-  //       // Payroll data exists - calculate as before
-  //       const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
-  //       const totalMengajar = absensiStats.totalSKS * 35000;
-  //       const totalInsentif = absensiStats.totalInsentif;
-  //       const totalPotongan = absensiStats.potonganTelat + absensiStats.potonganIzin + absensiStats.potonganLainnya;
-
-  //       return {
-  //         id: payroll.id,
-  //         namaGuru: guru.nama,
-  //         idGuru: guru.nip || guru.id,
-  //         bulan: this.getNamaBulan(parseInt(payroll.bulan)),
-  //         bulanAngka: parseInt(payroll.bulan),
-  //         tahun: payroll.tahun,
-  //         status: payroll.status,
-  //         paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-  //         tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
-  //         catatan: payroll.catatan,
-  //         gajiBersih: totalMengajar + totalInsentif - totalPotongan,
-  //         detail: {
-  //           mengajar: {
-  //             jumlah: absensiStats.totalSKS,
-  //             sksRate: 35000,
-  //             total: totalMengajar
-  //           },
-  //           insentif: {
-  //             jumlah: absensiStats.totalKehadiran,
-  //             rate: 10000,
-  //             total: totalInsentif
-  //           },
-  //           potongan: {
-  //             telat: {
-  //               jumlah: absensiStats.jumlahTelat,
-  //               rate: 10000,
-  //               total: absensiStats.potonganTelat
-  //             },
-  //             izin: {
-  //               jumlah: absensiStats.jumlahIzin,
-  //               rate: 10000,
-  //               total: absensiStats.potonganIzin
-  //             },
-  //             dll: {
-  //               jumlah: absensiStats.jumlahTidakHadir,
-  //               rate: 10000,
-  //               total: absensiStats.potonganLainnya
-  //             },
-  //             totalPotongan: totalPotongan
-  //           }
-  //         }
-  //       };
-  //     });
-
-  //     // Apply pagination
-  //     const startIndex = (page - 1) * limit;
-  //     const endIndex = startIndex + limit;
-  //     const paginatedData = allGuruData.slice(startIndex, endIndex);
-
-  //     const totalItems = allGuruData.length;
-  //     const totalPages = Math.ceil(totalItems / limit);
-
-  //     return {
-  //       data: paginatedData,
-  //       pagination: {
-  //         page: parseInt(page),
-  //         limit: parseInt(limit),
-  //         totalItems,
-  //         totalPages,
-  //         hasNextPage: page < totalPages,
-  //         hasPrevPage: page > 1
-  //       },
-  //       summary: {
-  //         totalGurus: gurus.length,
-  //         totalPayrollData: payrollData.length,
-  //         bulan: this.getNamaBulan(parseInt(bulan)),
-  //         tahun: parseInt(tahun),
-  //         isBefore25th: isCurrentMonth && isBefore25th
-  //       }
-  //     };
-  //   } catch (error) {
-  //     logger.error('Error getting all payrolls for admin:', error);
-  //     throw error;
-  //   }
-  // }
   async getAllPayrollsForAdmin(filters = {}) {
     try {
       const { page = 1, limit = 10, monthYear } = filters;
@@ -274,7 +53,7 @@ class PayrollService {
 
       // Get payroll data for all gurus in the specified month
       // Hanya gunakan format bulan MM (misal: "08")
-      
+
       const payrollData = await prisma.payroll.findMany({
         where: {
           bulan: bulan,  // Format MM: "08"
@@ -296,7 +75,7 @@ class PayrollService {
               insentifKehadiran: true,
               kelasProgram: {
                 select: {
-                  tipeKelas: true
+                  id: true
                 }
               }
             }
@@ -314,7 +93,7 @@ class PayrollService {
       });
 
       logger.info(`Found ${payrollData.length} payroll records for ${bulan}-${tahun}`);
-      
+
       // Debug: Log payroll data yang ditemukan
       payrollData.forEach(payroll => {
         logger.info(`Payroll found for guru ${payroll.guruId}: status ${payroll.status}`);
@@ -325,7 +104,7 @@ class PayrollService {
       payrollData.forEach(payroll => {
         payrollMap.set(payroll.guruId, payroll);
       });
-      
+
 
 
       // Check if current date is before the 25th of the month
@@ -337,7 +116,7 @@ class PayrollService {
       // Build response data for all gurus
       const allGuruData = await Promise.all(gurus.map(async (guru) => {
         const payroll = payrollMap.get(guru.id);
-        
+
         if (!payroll) {
           // No payroll data exists for this guru
           if (isCurrentMonth && isBefore25th) {
@@ -345,7 +124,7 @@ class PayrollService {
             return {
               id: null,
               namaGuru: guru.nama,
-              nipGuru: guru.nip ,
+              nipGuru: guru.nip,
               bulan: this.getNamaBulan(parseInt(bulan)),
               bulanAngka: parseInt(bulan),
               tahun: parseInt(tahun),
@@ -371,7 +150,7 @@ class PayrollService {
             return {
               id: null,
               namaGuru: guru.nama,
-              nipGuru: guru.nip ,
+              nipGuru: guru.nip,
               bulan: this.getNamaBulan(parseInt(bulan)),
               bulanAngka: parseInt(bulan),
               tahun: parseInt(tahun),
@@ -401,14 +180,14 @@ class PayrollService {
           absensiIds: payroll.absensiGuru.map(a => a.id),
           statusList: payroll.absensiGuru.map(a => ({ id: a.id, status: a.statusKehadiran, sks: a.sks }))
         });
-        
+
         const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
-        
+
         logger.info(`Calculated absensi stats for guru ${guru.nama}:`, absensiStats);
-        
+
         // Use saved values if available, otherwise calculate from absensi
         let totalMengajar, totalInsentif, totalPotongan;
-        
+
         if (payroll.gajiPokok && payroll.insentif !== null && payroll.potongan !== null) {
           // Use saved values
           totalMengajar = Number(payroll.gajiPokok);
@@ -420,7 +199,7 @@ class PayrollService {
           totalInsentif = absensiStats.totalInsentif;
           totalPotongan = absensiStats.potonganTelat + absensiStats.potonganIzin + absensiStats.potonganLainnya;
         }
-        
+
         const detailData = {
           mengajar: {
             jumlah: absensiStats.totalSKS,
@@ -458,7 +237,7 @@ class PayrollService {
         return {
           id: payroll.id,
           namaGuru: guru.nama,
-          nipGuru: guru.nip ,
+          nipGuru: guru.nip,
           bulan: this.getNamaBulan(bulanAngka),
           bulanAngka: bulanAngka,
           tahun: payroll.tahun,
@@ -660,7 +439,7 @@ class PayrollService {
       });
 
       const absensiStats = this.calculateDetailedAbsensiStats(absensiData);
-      
+
       logger.info(`Absensi stats for validation:`, {
         totalSKS: absensiStats.totalSKS,
         totalKehadiran: absensiStats.totalKehadiran,
@@ -671,7 +450,7 @@ class PayrollService {
 
       let jumlahSKS, jumlahInsentif, jumlahTelat, jumlahIzin, jumlahDLL;
       let rateSKS = 35000, rateInsentif = 10000, rateTelat = 10000, rateIzin = 10000, rateDLL = 10000;
-      
+
       if (detail) {
         // Validasi input sesuai dengan data absensi
         const inputSKS = detail?.mengajar?.jumlah ?? 0;
@@ -821,7 +600,7 @@ class PayrollService {
             insentifKehadiran: true,
             kelasProgram: {
               select: {
-                tipeKelas: true
+                id: true
               }
             }
           }
@@ -868,12 +647,7 @@ class PayrollService {
       totalSKS: 0,
       totalInsentif: 0,
       totalPotongan: 0,
-      rincianKelas: {
-        GROUP: { sks: 0, honor: 0 },
-        PRIVATE: { sks: 0, honor: 0 },
-        SUBSTITUTE: { sks: 0, honor: 0 },
-        ONLINE: { sks: 0, honor: 0 }
-      },
+      totalHonor: 0,
       rincianKehadiran: {
         hadir: 0,
         terlambat: 0,
@@ -884,12 +658,7 @@ class PayrollService {
       }
     };
 
-    const HONOR_RATES = {
-      GROUP: 35000,
-      PRIVATE: 35000,
-      SUBSTITUTE: 25000,
-      ONLINE: 25000
-    };
+    // Honor per SKS tetap (tidak lagi berdasarkan tipe kelas)
 
     absensiList.forEach(absensi => {
       // Update rincian kehadiran berdasarkan status
@@ -903,11 +672,9 @@ class PayrollService {
         stats.totalKehadiran++;
         stats.totalSKS += absensi.sks;
 
-        const tipeKelas = absensi.kelasProgram.tipeKelas;
-        if (stats.rincianKelas[tipeKelas]) {
-          stats.rincianKelas[tipeKelas].sks += absensi.sks;
-          stats.rincianKelas[tipeKelas].honor += absensi.sks * HONOR_RATES[tipeKelas];
-        }
+        // Honor per SKS tetap (tidak lagi berdasarkan tipe kelas)
+        const honorPerSKS = 35000;
+        stats.totalHonor += absensi.sks * honorPerSKS;
 
         if (absensi.insentifKehadiran) {
           stats.totalInsentif += Number(absensi.insentifKehadiran);
@@ -986,7 +753,7 @@ class PayrollService {
               insentifKehadiran: true,
               kelasProgram: {
                 select: {
-                  tipeKelas: true
+                  id: true
                 }
               }
             }

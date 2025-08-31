@@ -6,11 +6,16 @@ const prismaClient = new PrismaClient();
 
 // Production data constants
 const PRODUCTION_PROGRAMS = [
-    'PRA BTA',
-    'BTA LVL 1',
-    'BTA LVL 2 & PRA Tahsin',
-    'TAHSIN',
-    'TAHFIDZ'
+    // Group Programs
+    { name: 'PRA BTA', type: 'GROUP', spp: 250000 },
+    { name: 'BTA LVL 1', type: 'GROUP', spp: 250000 },
+    { name: 'BTA LVL 2 & PRA Tahsin', type: 'GROUP', spp: 250000 },
+    { name: 'TAHSIN', type: 'GROUP', spp: 250000 },
+    { name: 'TAHFIDZ', type: 'GROUP', spp: 250000 },
+    // Private Programs
+    { name: 'Private Mandiri', type: 'PRIVATE', spp: 640000 },
+    { name: 'Private Bersaudara', type: 'PRIVATE', spp: 640000 },
+    { name: 'Private Sharing', type: 'PRIVATE', spp: 640000 }
 ];
 
 const PRODUCTION_KELAS = [
@@ -52,12 +57,16 @@ class ProductionSeeder {
             await this.createAdminUser();
             console.log('✅ Admin user created');
 
-            // Step 2: Create Programs
-            // await this.createPrograms();
+            // Step 2: Create Super Admin User
+            await this.createSuperAdminUser();
+            console.log('✅ Super Admin user created');
+
+            // Step 3: Create Programs
+            await this.createPrograms();
             console.log('✅ Programs created');
 
-            // Step 3: Create Kelas
-            // await this.createKelas();
+            // Step 4: Create Kelas
+            await this.createKelas();
             console.log('✅ Kelas created');
 
             console.log('🎉 Production seeding completed successfully!');
@@ -148,7 +157,7 @@ class ProductionSeeder {
             });
 
             console.log(`👤 Super admin user created: ${superAdminUser.email}`);
-            
+
         } catch (error) {
             console.error('❌ Failed to create super admin user:', error.message);
             throw error;
@@ -157,16 +166,16 @@ class ProductionSeeder {
 
     async createPrograms() {
         try {
-            for (const programName of PRODUCTION_PROGRAMS) {
+            for (const programData of PRODUCTION_PROGRAMS) {
                 // Check if program already exists
                 const existingProgram = await prismaClient.program.findFirst({
                     where: {
-                        namaProgram: programName
+                        namaProgram: programData.name
                     }
                 });
 
                 if (existingProgram) {
-                    console.log(`⚠️ Program "${programName}" already exists, skipping...`);
+                    console.log(`⚠️ Program "${programData.name}" already exists, skipping...`);
                     this.data.programs.push(existingProgram);
                     continue;
                 }
@@ -175,13 +184,17 @@ class ProductionSeeder {
                 const program = await prismaClient.program.create({
                     data: {
                         id: uuidv4(),
-                        namaProgram: programName,
-                        deskripsi: `Program ${programName} - Surau Quran Center`
+                        namaProgram: programData.name,
+                        deskripsi: `Program ${programData.name} - Surau Quran Center`,
+                        biayaSpp: programData.spp,
+                        tipeProgram: programData.type,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
                     }
                 });
 
                 this.data.programs.push(program);
-                console.log(`📚 Program created: ${program.namaProgram}`);
+                console.log(`📚 Program created: ${program.namaProgram} (${program.tipeProgram})`);
             }
         } catch (error) {
             console.error('❌ Failed to create programs:', error.message);
@@ -214,7 +227,9 @@ class ProductionSeeder {
                     data: {
                         id: uuidv4(),
                         namaKelas: kelasName,
-                        ipAddressHikvision: ipAddressHikvision
+                        ipAddressHikvision: ipAddressHikvision,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
                     }
                 });
 

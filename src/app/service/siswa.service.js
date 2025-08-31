@@ -5,6 +5,8 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const paymentService = require('./payment.service');
+const bcrypt = require('bcrypt');
+const XenditUtils = require('../../lib/utils/xendit.utils');
 const financeService = require('./finance.service');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
@@ -205,192 +207,9 @@ class SiswaService {
     }
   }
 
-  async processPaidPendaftaran(pembayaranId) {
-    try {
-      logger.info(`Starting pendaftaran process for payment ID: ${pembayaranId}`);
-
-      const existingPendaftaran = await prisma.pendaftaran.findUnique({
-        where: { pembayaranId },
-        include: {
-          siswa: {
-            include: {
-              user: true
-            }
-          }
-        }
-      });
-
-      if (existingPendaftaran) {
-        logger.info(`Payment ID ${pembayaranId} has already been processed. Student: ${existingPendaftaran.siswa.namaMurid} (${existingPendaftaran.siswa.user.email})`);
-        return existingPendaftaran.siswa;
-      }
-
-      const pembayaran = await prisma.pembayaran.findUnique({
-        where: { id: pembayaranId },
-        include: {
-          xenditPayment: true
-        }
-      });
-
-      if (!pembayaran) {
-        logger.error(`Payment not found for ID: ${pembayaranId}`);
-        throw new NotFoundError('Payment not found');
-      }
-
-      // Get pendaftaranTemp data directly
-      const pendaftaranTemp = await prisma.pendaftaranTemp.findFirst({
-        where: { pembayaranId }
-      });
-
-      if (!pendaftaranTemp) {
-        // Check if this might be a duplicate callback for an already processed payment
-        logger.error(`PendaftaranTemp not found for payment ID: ${pembayaranId}`);
-
-        // Check one more time if the pendaftaran exists (in case race condition)
-        const finalCheck = await prisma.pendaftaran.findUnique({
-          where: { pembayaranId },
-          include: {
-            siswa: true
-          }
-        });
-
-        if (finalCheck) {
-          logger.info(`Found existing pendaftaran record for payment ID ${pembayaranId} on final check. Already processed.`);
-          return finalCheck.siswa;
-        }
-
-        throw new NotFoundError('Pendaftaran temporary data not found');
-      }
-
-      logger.info(`Found pendaftaran temp data for email: ${pendaftaranTemp.email}`);
-
-      if (pembayaran.statusPembayaran !== 'PAID') {
-        logger.error(`Payment status is not PAID for payment ID: ${pembayaranId}, current status: ${pembayaran.statusPembayaran}`);
-        throw new Error('Payment is not completed');
-      }
-
-      // Generate a secure password for the user
-      const generatedPassword = DataGeneratorUtils.generatePassword();
-      const hashedPassword = await PasswordUtils.hash(generatedPassword);
-
-      // Create user account
-      const user = await prisma.user.create({
-        data: {
-          email: pendaftaranTemp.email,
-          password: hashedPassword,
-          role: 'SISWA'
-        }
-      });
-
-      // Generate NIS
-      const currentYear = new Date().getFullYear();
-      const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      const nis = `${currentYear}${randomNumber}`;
-
-      // Create siswa record
-      const siswa = await prisma.siswa.create({
-        data: {
-          userId: user.id,
-          namaMurid: pendaftaranTemp.namaMurid,
-          namaPanggilan: pendaftaranTemp.namaPanggilan,
-          tanggalLahir: pendaftaranTemp.tanggalLahir,
-          jenisKelamin: pendaftaranTemp.jenisKelamin,
-          alamat: pendaftaranTemp.alamat,
-          strataPendidikan: pendaftaranTemp.strataPendidikan,
-          kelasSekolah: pendaftaranTemp.kelasSekolah,
-          namaSekolah: pendaftaranTemp.namaSekolah,
-          namaOrangTua: pendaftaranTemp.namaOrangTua,
-          namaPenjemput: pendaftaranTemp.namaPenjemput,
-          noWhatsapp: pendaftaranTemp.noWhatsapp,
-          isRegistered: true,
-          nis: nis
-        }
-      });
-
-      // Create program siswa record
-      const programSiswa = await prisma.programSiswa.create({
-        data: {
-          siswaId: siswa.id,
-          programId: pendaftaranTemp.programId,
-          status: 'AKTIF',
-        }
-      });
-
-      // Create pendaftaran record
-      await prisma.pendaftaran.create({
-        data: {
-          siswaId: siswa.id,
-          pembayaranId: pembayaranId,
-          biayaPendaftaran: pendaftaranTemp.biayaPendaftaran,
-          diskon: pendaftaranTemp.diskon,
-          totalBiaya: pendaftaranTemp.totalBiaya,
-          voucher_id: pendaftaranTemp.voucherId,
-          tanggalDaftar: moment().format(DATE_FORMATS.DEFAULT)
-        }
-      });
-
-      // Delete temporary registration data
-      await prisma.pendaftaranTemp.delete({
-        where: { id: pendaftaranTemp.id }
-      });
-
-      // Generate SPP untuk 5 bulan ke depan
-      try {
-        const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
-        const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
-        logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
-      } catch (sppError) {
-        logger.error(`Failed to generate SPP for siswa ${siswa.namaMurid}:`, {
-          error: sppError.message,
-          stack: sppError.stack
-        });
-      }
-
-      // Send welcome email with credentials - but don't let email failure block the process
-      try {
-        await EmailUtils.sendWelcomeEmail({
-          email: user.email,
-          name: siswa.namaMurid,
-          password: generatedPassword
-        });
-        logger.info(`Welcome email sent successfully to: ${user.email}`);
-      } catch (emailError) {
-        // Log the error but don't throw it
-        logger.error(`Failed to send welcome email to ${user.email}:`, {
-          error: emailError.message,
-          stack: emailError.stack
-        });
-        logger.info(`Registration completed successfully for ${user.email}, but welcome email could not be sent`);
-      }
-
-      // Auto-sync to Finance when enrollment payment is successful
-      try {
-        await financeService.createFromEnrollmentPayment({
-          id: pembayaranId,
-          jumlahTagihan: pendaftaranTemp.totalBiaya,
-          tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
-        });
-        logger.info(`Auto-created finance record for enrollment payment ID: ${pembayaranId}, Amount: ${pendaftaranTemp.totalBiaya}`);
-      } catch (financeError) {
-        // Log error but don't fail the main enrollment processing
-        logger.error('Failed to auto-sync enrollment payment to finance:', {
-          pembayaranId,
-          amount: pendaftaranTemp.totalBiaya,
-          error: financeError.message
-        });
-      }
-
-      logger.info(`Successfully completed pendaftaran process for siswa: ${siswa.namaMurid} (ID: ${siswa.id})`);
-      return siswa;
-    } catch (error) {
-      logger.error('Error processing paid pendaftaran:', {
-        error: error.message,
-        stack: error.stack,
-        pembayaranId
-      });
-      throw error;
-    }
-  }
+  // Method processPaidPendaftaran telah dipindahkan ke payment.service.js
+  // untuk menghindari duplikasi logic dan memastikan konsistensi data
+  // Semua logic pendaftaran sekarang dihandle oleh payment.service.js dalam method handleXenditCallback
 
 
   async getPendaftaranInvoice(invoices, filters = {}) {
@@ -503,7 +322,7 @@ class SiswaService {
         });
         const siswa = pendaftaran?.siswa;
         const programAktif = siswa?.programSiswa?.find(p => p.status === 'AKTIF');
-        
+
         data.student = siswa
           ? {
             id: siswa.id,
@@ -533,7 +352,7 @@ class SiswaService {
             tanggalDaftar: pendaftaran.tanggalDaftar,
           }
           : null;
-        
+
         // Add program information
         if (programAktif) {
           data.program = {
@@ -599,7 +418,7 @@ class SiswaService {
             tanggalDaftar: null,
           }
           : null;
-        
+
         // Try to get program information from pendaftaranTemp
         if (pendaftaranTemp?.programId) {
           const program = await prisma.program.findUnique({
@@ -609,7 +428,7 @@ class SiswaService {
               namaProgram: true
             }
           });
-          
+
           if (program) {
             data.program = {
               programId: program.id,
@@ -749,11 +568,11 @@ class SiswaService {
       // Logic: Prioritaskan AKTIF -> CUTI -> TIDAK_AKTIF (yang terbaru diupdate)
       const transformedData = result.data.map(siswa => {
         let selectedProgram = null;
-        
+
         if (siswa.programSiswa.length > 0) {
           // 1. Prioritas pertama: program yang AKTIF
           const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
-          
+
           if (activeProgram) {
             selectedProgram = activeProgram;
             logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
@@ -762,7 +581,7 @@ class SiswaService {
             const cutiProgram = siswa.programSiswa
               .filter(ps => ps.status === 'CUTI')
               .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-            
+
             if (cutiProgram) {
               selectedProgram = cutiProgram;
               logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
@@ -771,13 +590,13 @@ class SiswaService {
               selectedProgram = siswa.programSiswa
                 .filter(ps => ps.status === 'TIDAK_AKTIF')
                 .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-              
+
               if (selectedProgram) {
                 logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgram.program?.namaProgram}`);
               }
             }
           }
-          
+
           // Debug log untuk semua program siswa (untuk tracking)
           if (siswa.programSiswa.length > 1) {
             logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki ${siswa.programSiswa.length} program:`);
@@ -786,7 +605,7 @@ class SiswaService {
             });
           }
         }
-        
+
         const transformedSiswa = {
           ...siswa,
           programSiswa: selectedProgram ? {
@@ -858,7 +677,7 @@ class SiswaService {
       if (siswa.programSiswa.length > 0) {
         // 1. Prioritas pertama: program yang AKTIF
         const activeProgram = siswa.programSiswa.find(ps => ps.status === 'AKTIF');
-        
+
         if (activeProgram) {
           selectedProgramSiswa = activeProgram;
           logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
@@ -867,7 +686,7 @@ class SiswaService {
           const cutiProgram = siswa.programSiswa
             .filter(ps => ps.status === 'CUTI')
             .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-          
+
           if (cutiProgram) {
             selectedProgramSiswa = cutiProgram;
             logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
@@ -876,7 +695,7 @@ class SiswaService {
             selectedProgramSiswa = siswa.programSiswa
               .filter(ps => ps.status === 'TIDAK_AKTIF')
               .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-            
+
             if (selectedProgramSiswa) {
               logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgramSiswa.program?.namaProgram}`);
             }
@@ -1099,7 +918,7 @@ class SiswaService {
 
         // Proses program dan jadwal
         let programSiswaInstance;
-        
+
         // Handle program update
         if (programId) {
           // Find ALL active programs for this student (to handle multiple active programs)
@@ -1179,7 +998,7 @@ class SiswaService {
           const schedulesToUpdate = jadwal.filter(j => j.id && !j.isDeleted);
           const schedulesToAdd = jadwal.filter(j => !j.id && !j.isDeleted);
           const schedulesToDelete = jadwal.filter(j => j.isDeleted && j.id);
-          
+
           // Calculate final count: current - deleted + added
           const finalScheduleCount = currentJadwals.length - schedulesToDelete.length + schedulesToAdd.length;
 
@@ -1409,7 +1228,7 @@ class SiswaService {
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1; // 1-12
       const currentYear = currentDate.getFullYear();
-      
+
       // Get month name in Indonesian
       const monthNames = [
         'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -1463,8 +1282,8 @@ class SiswaService {
       }
 
       // Check if payment is completed
-      const isPaid = sppThisMonth.pembayaran && 
-                    ['PAID', 'SETTLED'].includes(sppThisMonth.pembayaran.statusPembayaran);
+      const isPaid = sppThisMonth.pembayaran &&
+        ['PAID', 'SETTLED'].includes(sppThisMonth.pembayaran.statusPembayaran);
 
       // Get periodeSppId if payment is not completed
       let periodeSppId = null;
@@ -1574,7 +1393,7 @@ class SiswaService {
       // Process each active program
       for (const programSiswa of siswa.programSiswa) {
         logger.info(`Processing program ${programSiswa.program.namaProgram} for siswa ${siswa.namaMurid}`);
-        
+
         // Group jadwal by kelas program
         const kelasPrograms = new Map();
 
@@ -1582,7 +1401,7 @@ class SiswaService {
         if (programSiswa.kelasProgram) {
           const kp = programSiswa.kelasProgram;
           logger.info(`Found kelas program: ${kp.kelas?.namaKelas} for program: ${kp.program.namaProgram}`);
-          
+
           const scheduleEntry = {
             kelasProgramId: kp.id,
             namaKelas: kp.kelas?.namaKelas || 'Tidak Ada Kelas',
@@ -1606,10 +1425,10 @@ class SiswaService {
 
         // Add from JadwalProgramSiswa (additional schedules) - avoid duplicates
         logger.info(`Found ${programSiswa.JadwalProgramSiswa.length} jadwal program siswa`);
-        
+
         for (const jadwal of programSiswa.JadwalProgramSiswa) {
           logger.info(`Processing jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
-          
+
           // Find or create kelasProgram entry
           const kelasProgram = await prisma.kelasProgram.findFirst({
             where: {
@@ -1635,7 +1454,7 @@ class SiswaService {
 
           if (kelasProgram) {
             logger.info(`Found matching kelas program: ${kelasProgram.kelas?.namaKelas}`);
-            
+
             if (!kelasPrograms.has(kelasProgram.id)) {
               kelasPrograms.set(kelasProgram.id, {
                 kelasProgramId: kelasProgram.id,
@@ -1647,10 +1466,10 @@ class SiswaService {
 
             // Check if this jadwal already exists in the kelas program to avoid duplicates
             const existingSchedule = kelasPrograms.get(kelasProgram.id).jamMengajar.find(
-              existing => existing.jamMengajarId === jadwal.jamMengajar.id && 
-                         existing.Hari === jadwal.hari &&
-                         existing.jamMulai === jadwal.jamMengajar.jamMulai &&
-                         existing.jamSelesai === jadwal.jamMengajar.jamSelesai
+              existing => existing.jamMengajarId === jadwal.jamMengajar.id &&
+                existing.Hari === jadwal.hari &&
+                existing.jamMulai === jadwal.jamMengajar.jamMulai &&
+                existing.jamSelesai === jadwal.jamMengajar.jamSelesai
             );
 
             if (!existingSchedule) {
@@ -1673,7 +1492,7 @@ class SiswaService {
         // If no schedules found from either source, create a basic entry
         if (kelasPrograms.size === 0) {
           logger.warn(`No schedules found for program ${programSiswa.program.namaProgram}, creating basic entry`);
-          
+
           // Try to find any kelas program for this program
           const anyKelasProgram = await prisma.kelasProgram.findFirst({
             where: {
@@ -1723,11 +1542,11 @@ class SiswaService {
             const hariOrder = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
             const hariA = hariOrder.indexOf(a.Hari);
             const hariB = hariOrder.indexOf(b.Hari);
-            
+
             if (hariA !== hariB) {
               return hariA - hariB;
             }
-            
+
             // If same day, sort by jamMulai
             return a.jamMulai.localeCompare(b.jamMulai);
           });
@@ -1753,6 +1572,550 @@ class SiswaService {
       throw error;
     }
   }
+
+  // Pendaftaran V2 dengan support untuk private program
+  async createPendaftaranV2(data, kartuKeluargaFile) {
+    try {
+      const { siswa, programId, biayaPendaftaran, isFamily, hubunganKeluarga, kodeVoucher, totalBiaya } = data;
+
+      // Validate required fields
+      if (!programId) {
+        throw new BadRequestError('Program ID wajib diisi');
+      }
+
+      if (!siswa || !Array.isArray(siswa) || siswa.length === 0) {
+        throw new BadRequestError('Data siswa wajib diisi');
+      }
+
+      // Validate each student's email to prevent duplicate registrations
+      for (const student of siswa) {
+        const email = student.email;
+
+        // Check if email exists in user table
+        const existingUser = await prisma.user.findUnique({
+          where: { email }
+        });
+
+        if (existingUser) {
+          throw new ConflictError(`Email ${email} sudah terdaftar sebagai user`);
+        }
+
+        // Check if email exists in siswa table through pendaftaranTemp
+        const existingPendaftaranTemp = await prisma.pendaftaranTemp.findFirst({
+          where: { email }
+        });
+
+        if (existingPendaftaranTemp) {
+          // Get the associated payment
+          const existingPayment = await prisma.pembayaran.findUnique({
+            where: { id: existingPendaftaranTemp.pembayaranId }
+          });
+
+          // If there's an expired or failed registration, delete it
+          if (existingPayment && ['EXPIRED', 'FAILED'].includes(existingPayment.statusPembayaran)) {
+            logger.info(`Found expired/failed registration for email ${email}, cleaning up...`);
+            await prisma.$transaction(async (tx) => {
+              // Delete the payment record first
+              await tx.pembayaran.delete({
+                where: { id: existingPendaftaranTemp.pembayaranId }
+              });
+              // Then delete the temporary registration
+              await tx.pendaftaranTemp.delete({
+                where: { id: existingPendaftaranTemp.id }
+              });
+            }, { timeout: 15000, maxWait: 5000 });
+            logger.info(`Successfully cleaned up expired/failed registration for email ${email}`);
+          } else if (existingPayment && existingPayment.statusPembayaran === 'PENDING') {
+            throw new ConflictError(`Email ${email} sedang dalam proses pendaftaran`);
+          }
+        }
+
+        // Check if email exists in siswa table
+        const existingSiswa = await prisma.siswa.findFirst({
+          where: {
+            user: { email }
+          },
+          include: {
+            programSiswa: {
+              where: { status: 'AKTIF' }
+            }
+          }
+        });
+
+        if (existingSiswa) {
+          if (existingSiswa.programSiswa.length > 0) {
+            throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
+          }
+          throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa`);
+        }
+
+        // Check if email exists in siswaPrivateTemp table
+        const existingSiswaPrivateTemp = await prisma.siswaPrivateTemp.findFirst({
+          where: { email }
+        });
+
+        if (existingSiswaPrivateTemp) {
+          throw new ConflictError(`Email ${email} sedang dalam proses pendaftaran private`);
+        }
+      }
+
+      // Validate program exists and get program details
+      const program = await prisma.program.findUnique({
+        where: { id: programId },
+        select: {
+          id: true,
+          namaProgram: true,
+          biayaSpp: true
+        }
+      });
+
+      if (!program) {
+        throw new NotFoundError('Program tidak ditemukan');
+      }
+
+      // Determine program type based on name
+      const programType = this.getProgramType(program.namaProgram);
+      const subType = this.getPrivateSubType(program.namaProgram);
+
+      // Validate student count based on program type
+      this.validateStudentCount(siswa.length, programType, subType);
+
+      // Validate kartu keluarga for family programs
+      if (isFamily && subType === 'BERSAUDARA' && !kartuKeluargaFile) {
+        throw new BadRequestError('Kartu keluarga wajib diupload untuk program Private Bersaudara (isFamily: true)');
+      }
+
+      // Validate hubungan keluarga for non-family programs
+      if (!isFamily && subType === 'BERSAUDARA' && !hubunganKeluarga) {
+        throw new BadRequestError('Hubungan keluarga wajib diisi untuk program Private Bersaudara (isFamily: false)');
+      }
+
+      // Calculate registration fees for each student
+      const calculatedFees = this.calculateRegistrationFees(siswa, programType, subType, biayaPendaftaran);
+
+      // Validate total biaya matches calculated total
+      const calculatedTotal = calculatedFees.reduce((sum, fee) => sum + fee.totalBiaya, 0);
+
+      // Log perhitungan untuk debugging
+      logger.info('Registration fees calculation:', {
+        programName: program.namaProgram,
+        programType,
+        subType,
+        studentCount: siswa.length,
+        biayaPendaftaran,
+        calculatedFees: calculatedFees.map((fee, index) => ({
+          student: siswa[index].namaMurid,
+          biayaPendaftaran: fee.biayaPendaftaran,
+          diskon: fee.diskon,
+          totalBiaya: fee.totalBiaya
+        })),
+        calculatedTotal,
+        providedTotalBiaya: totalBiaya
+      });
+
+      if (Math.abs(calculatedTotal - totalBiaya) > 1) {
+        throw new BadRequestError(`Total biaya tidak sesuai. Expected: ${calculatedTotal}, Got: ${totalBiaya}. Program: ${program.namaProgram}, Type: ${programType}, SubType: ${subType}`);
+      }
+
+      // Process voucher if provided
+      let voucher = null;
+      let totalDiskon = 0;
+      if (kodeVoucher) {
+        // Log voucher query untuk debugging
+        logger.info('Voucher query:', {
+          kodeVoucher: kodeVoucher.toUpperCase(),
+          isActive: true
+        });
+
+        // Clear cache dan ambil voucher dengan query yang lebih spesifik
+        voucher = await prisma.voucher.findFirst({
+          where: {
+            kodeVoucher: kodeVoucher.toUpperCase(),
+            isActive: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+
+        if (!voucher) {
+          throw new NotFoundError('Voucher tidak valid atau tidak aktif');
+        }
+
+        // Cek apakah ada multiple voucher dengan kode yang sama
+        const allVouchersWithSameCode = await prisma.voucher.findMany({
+          where: {
+            kodeVoucher: kodeVoucher.toUpperCase()
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+
+        if (allVouchersWithSameCode.length > 1) {
+          logger.warn(`Found ${allVouchersWithSameCode.length} vouchers with same code:`, {
+            kodeVoucher: kodeVoucher.toUpperCase(),
+            vouchers: allVouchersWithSameCode.map(v => ({
+              id: v.id,
+              tipe: v.tipe,
+              nominal: v.nominal,
+              isActive: v.isActive,
+              createdAt: v.createdAt
+            }))
+          });
+        }
+
+        // Log voucher data yang ditemukan
+        logger.info('Voucher found:', {
+          id: voucher.id,
+          kodeVoucher: voucher.kodeVoucher,
+          tipe: voucher.tipe,
+          nominal: voucher.nominal,
+          isActive: voucher.isActive,
+          createdAt: voucher.createdAt,
+          updatedAt: voucher.updatedAt
+        });
+
+        // Calculate voucher discount on total
+        logger.info('Calculating voucher discount:', {
+          voucherTipe: voucher.tipe,
+          voucherNominal: voucher.nominal,
+          voucherNominalNumber: Number(voucher.nominal),
+          calculatedTotal
+        });
+
+        if (voucher.tipe === 'PERSENTASE') {
+          totalDiskon = calculatedTotal * (Number(voucher.nominal) / 100);
+          logger.info('PERSENTASE calculation:', {
+            percentage: Number(voucher.nominal) / 100,
+            totalDiskon
+          });
+        } else {
+          totalDiskon = Math.min(Number(voucher.nominal), calculatedTotal * 0.5);
+          logger.info('NOMINAL calculation:', {
+            voucherNominal: Number(voucher.nominal),
+            maxDiscount: calculatedTotal * 0.5,
+            totalDiskon
+          });
+        }
+      }
+
+      const finalTotal = calculatedTotal - totalDiskon;
+
+      // Log perhitungan untuk debugging
+      logger.info('Voucher calculation:', {
+        calculatedTotal,
+        voucherType: voucher?.tipe,
+        voucherNominal: voucher?.nominal,
+        totalDiskon,
+        finalTotal,
+        discountPercentage: voucher ? (totalDiskon / calculatedTotal * 100).toFixed(2) + '%' : '0%',
+        expectedFinalTotal: calculatedTotal - totalDiskon
+      });
+
+      // Create Xendit invoice via payment service
+      let xenditPaymentData;
+      try {
+        // Log Xendit request untuk debugging
+        logger.info('Xendit request data:', {
+          amount: finalTotal,
+          description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
+          itemsCount: siswa.length,
+          expectedTotal: finalTotal
+        });
+
+        xenditPaymentData = await paymentService.createPendaftaranInvoiceV2({
+          externalId: XenditUtils.generateExternalId('DAFTAR_V2'),
+          amount: finalTotal,
+          description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
+          payerEmail: siswa[0].email,
+          customer: {
+            givenNames: siswa[0].namaMurid,
+            email: siswa[0].email
+          },
+          items: siswa.map((s, index) => {
+            const originalPrice = calculatedFees[index].totalBiaya;
+            const discountRatio = totalDiskon / calculatedTotal;
+            const discountedPrice = Math.round(originalPrice * (1 - discountRatio));
+
+            // Log untuk debugging
+            logger.info(`Item ${index + 1} calculation:`, {
+              studentName: s.namaMurid,
+              originalPrice,
+              discountRatio: (discountRatio * 100).toFixed(2) + '%',
+              discountedPrice,
+              totalDiskon,
+              calculatedTotal,
+              expectedItemTotal: Math.round(originalPrice * (1 - discountRatio))
+            });
+
+            return {
+              name: `Pendaftaran - ${s.namaMurid}`,
+              quantity: 1,
+              price: discountedPrice
+            };
+          })
+        });
+      } catch (xenditError) {
+        // Jika Xendit gagal, hapus data yang sudah dibuat
+        if (xenditPaymentData?.pembayaranId) {
+          try {
+            await prisma.$transaction(async (tx) => {
+              // Hapus XenditPayment terlebih dahulu
+              await tx.xenditPayment.deleteMany({
+                where: { pembayaranId: xenditPaymentData.pembayaranId }
+              });
+
+              // Terakhir hapus pembayaran
+              await tx.pembayaran.delete({
+                where: { id: xenditPaymentData.pembayaranId }
+              });
+            }, { timeout: 15000, maxWait: 5000 });
+          } catch (rollbackError) {
+            logger.error('Error during Xendit rollback:', rollbackError);
+          }
+        }
+        throw xenditError;
+      }
+
+      // Create temporary registration data
+      let pendaftaranPrivateTemp;
+      try {
+        pendaftaranPrivateTemp = await prisma.$transaction(async (tx) => {
+          // Create individual student records first
+          const siswaPrivatePromises = siswa.map((s) => {
+            return tx.siswaPrivateTemp.create({
+              data: {
+                namaMurid: s.namaMurid,
+                namaPanggilan: s.namaPanggilan,
+                tanggalLahir: s.tanggalLahir,
+                jenisKelamin: s.jenisKelamin,
+                alamat: s.alamat,
+                strataPendidikan: s.strataPendidikan,
+                kelasSekolah: s.kelasSekolah,
+                email: s.email,
+                namaSekolah: s.namaSekolah,
+                namaOrangTua: s.namaOrangTua,
+                namaPenjemput: s.namaPenjemput,
+                noWhatsapp: s.noWhatsapp,
+                biayaPendaftaran: biayaPendaftaran
+              }
+            });
+          });
+
+          const siswaPrivateRecords = await Promise.all(siswaPrivatePromises);
+
+          // Create multiple private registration records - one for each student
+          const privateRegPromises = siswaPrivateRecords.map((siswaPrivate) => {
+            return tx.pendaftaranPrivateTemp.create({
+              data: {
+                siswaPrivateId: siswaPrivate.id,
+                isFamily,
+                hubunganKeluarga,
+                jenisHubungan: data.jenisHubungan,
+                kartuKeluarga: kartuKeluargaFile,
+                kodeVoucher: kodeVoucher,
+                diskon: totalDiskon,
+                totalBiaya: finalTotal,
+                programId
+              }
+            });
+          });
+
+          const privateRegs = await Promise.all(privateRegPromises);
+          const privateReg = privateRegs[0]; // Use first one as main record
+
+          return privateReg;
+        }, { timeout: 30000, maxWait: 10000 });
+      } catch (dbError) {
+        // Jika database gagal, hapus payment yang sudah dibuat
+        try {
+          await prisma.$transaction(async (tx) => {
+            // Hapus XenditPayment terlebih dahulu karena ada foreign key ke pembayaran
+            await tx.xenditPayment.deleteMany({
+              where: { pembayaranId: xenditPaymentData.pembayaranId }
+            });
+
+            // Kemudian hapus pembayaran
+            await tx.pembayaran.delete({
+              where: { id: xenditPaymentData.pembayaranId }
+            });
+          }, { timeout: 15000, maxWait: 5000 });
+        } catch (rollbackError) {
+          logger.error('Error during rollback:', rollbackError);
+        }
+        throw dbError;
+      }
+
+      logger.info(`Created pendaftaran V2 for ${siswa.length} students in program ${program.namaProgram}`);
+
+      // Log payment data untuk debugging
+      logger.info('Payment data returned from payment service:', {
+        pembayaranId: xenditPaymentData.pembayaranId,
+        xenditInvoiceUrl: xenditPaymentData.xenditInvoiceUrl,
+        expireDate: xenditPaymentData.expireDate,
+        amount: xenditPaymentData.amount,
+        xenditInvoiceId: xenditPaymentData.xenditInvoiceId,
+        fullPaymentData: JSON.stringify(xenditPaymentData, null, 2)
+      });
+
+      return {
+        pendaftaranId: pendaftaranPrivateTemp.id,
+        pembayaranId: xenditPaymentData.pembayaranId,
+        invoiceUrl: xenditPaymentData.xenditInvoiceUrl,
+        totalBiaya: finalTotal,
+        siswaCount: siswa.length,
+      };
+    } catch (error) {
+      logger.error('Error creating pendaftaran V2:', error);
+      throw error;
+    }
+  }
+
+  // Helper methods for V2 registration
+  getProgramType(programName) {
+    const groupPrograms = ['PRA BTA', 'BTA LVL 1', 'BTA LVL 2 & PRA Tahsin', 'TAHSIN', 'TAHFIDZ'];
+    return groupPrograms.includes(programName) ? 'GROUP' : 'PRIVATE';
+  }
+
+  getPrivateSubType(programName) {
+    if (programName.toLowerCase().includes('mandiri')) return 'MANDIRI';
+    if (programName.toLowerCase().includes('sharing')) return 'SHARING';
+    if (programName.toLowerCase().includes('bersaudara')) return 'BERSAUDARA';
+    return null;
+  }
+
+  validateStudentCount(count, programType, subType) {
+    if (programType === 'GROUP' && count !== 1) {
+      throw new BadRequestError('Program GROUP hanya untuk 1 siswa');
+    }
+
+    if (programType === 'PRIVATE') {
+      switch (subType) {
+        case 'MANDIRI':
+          if (count !== 1) throw new BadRequestError('Private Mandiri hanya untuk 1 siswa');
+          break;
+        case 'SHARING':
+          if (count < 1 || count > 3) throw new BadRequestError('Private Sharing untuk 1-3 siswa');
+          break;
+        case 'BERSAUDARA':
+          if (count < 2 || count > 4) throw new BadRequestError('Private Bersaudara untuk 2-4 siswa');
+          break;
+      }
+    }
+  }
+
+  calculateRegistrationFees(siswa, programType, subType, biayaPendaftaran) {
+    const basePrice = biayaPendaftaran || (programType === 'GROUP' ? 250000 : 640000);
+
+    if (programType === 'GROUP') {
+      return siswa.map(() => ({
+        biayaPendaftaran: biayaPendaftaran,
+        diskon: 0,
+        totalBiaya: biayaPendaftaran
+      }));
+    }
+
+    // Private program calculations
+    switch (subType) {
+      case 'MANDIRI':
+        return [{
+          biayaPendaftaran: biayaPendaftaran,
+          diskon: 0,
+          totalBiaya: biayaPendaftaran
+        }];
+
+      case 'SHARING':
+        // 20% discount from previous student's price
+        let previousPrice = biayaPendaftaran;
+        return siswa.map((_, index) => {
+          if (index === 0) {
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon: 0,
+              totalBiaya: biayaPendaftaran
+            };
+          } else {
+            const currentPrice = Math.round(previousPrice * 0.8); // 80% dari harga sebelumnya
+            const diskon = previousPrice - currentPrice;
+            previousPrice = currentPrice; // Update untuk siswa berikutnya
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon,
+              totalBiaya: currentPrice
+            };
+          }
+        });
+
+      case 'BERSAUDARA':
+        // Logic baru untuk Private Bersaudara:
+        // - 2 siswa: siswa 1 = 100%, siswa 2 = 50%
+        // - 3 siswa: siswa 1 = 100%, siswa 2 = 50%, siswa 3 = gratis
+        // - 4 siswa: siswa 1 = 100%, siswa 2 = 50%, siswa 3 = 50% dari siswa 2, siswa 4 = gratis
+        return siswa.map((_, index) => {
+          if (index === 0) {
+            // Siswa pertama: 100%
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon: 0,
+              totalBiaya: biayaPendaftaran
+            };
+          } else if (index === 1) {
+            // Siswa kedua: 50% dari harga pertama
+            const currentPrice = Math.round(biayaPendaftaran * 0.5);
+            const diskon = biayaPendaftaran - currentPrice;
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon,
+              totalBiaya: currentPrice
+            };
+          } else if (index === 2 && siswa.length === 3) {
+            // Siswa ketiga (jika total 3 siswa): gratis
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon: biayaPendaftaran,
+              totalBiaya: 0
+            };
+          } else if (index === 2 && siswa.length === 4) {
+            // Siswa ketiga (jika total 4 siswa): 50% dari siswa kedua
+            const siswaKeduaPrice = Math.round(biayaPendaftaran * 0.5);
+            const currentPrice = Math.round(siswaKeduaPrice * 0.5);
+            const diskon = biayaPendaftaran - currentPrice;
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon,
+              totalBiaya: currentPrice
+            };
+          } else if (index === 3) {
+            // Siswa keempat: gratis
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon: biayaPendaftaran,
+              totalBiaya: 0
+            };
+          } else {
+            // Fallback untuk kasus lain
+            return {
+              biayaPendaftaran: biayaPendaftaran,
+              diskon: 0,
+              totalBiaya: biayaPendaftaran
+            };
+          }
+        });
+
+      default:
+        return siswa.map(() => ({
+          biayaPendaftaran: biayaPendaftaran,
+          diskon: 0,
+          totalBiaya: biayaPendaftaran
+        }));
+    }
+  }
+
+
+
+
+
 
   async pindahProgram(siswaId, data) {
     try {

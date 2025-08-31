@@ -10,7 +10,8 @@ const createUploadDirectories = () => {
         'uploads/images',
         'uploads/documents/surat_kontrak',
         'uploads/documents/surat_izin',
-        'uploads/documents/evidence'
+        'uploads/documents/evidence',
+        'uploads/documents/kartu_keluarga'
     ];
 
     directories.forEach(dir => {
@@ -42,6 +43,9 @@ const storage = multer.diskStorage({
                 break;
             case 'evidence':
                 uploadPath = 'uploads/documents/evidence';
+                break;
+            case 'kartuKeluarga':
+                uploadPath = 'uploads/documents/kartu_keluarga';
                 break;
             default:
                 return cb(new BadRequestError('Invalid field name for file upload'));
@@ -301,6 +305,70 @@ const uploadEvidenceMiddleware = (req, res, next) => {
     });
 };
 
+// Configure multer for kartu keluarga uploads
+const uploadKartuKeluarga = multer({
+    storage: storage,
+    fileFilter: imageFileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    }
+}).single('kartuKeluarga');
+
+// Middleware wrapper for kartu keluarga upload
+const uploadKartuKeluargaMiddleware = (req, res, next) => {
+    uploadKartuKeluarga(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return next(new BadRequestError('File size too large. Maximum size is 5MB.'));
+            }
+            return next(new BadRequestError(err.message));
+        } else if (err) {
+            return next(err);
+        }
+
+        // Transform form-data to expected format
+        if (req.body) {
+            const transformedBody = {};
+            const siswaArray = [];
+            
+            // Extract siswa data
+            Object.keys(req.body).forEach(key => {
+                if (key.startsWith('siswa[')) {
+                    const match = key.match(/siswa\[(\d+)\]\.(.+)/);
+                    if (match) {
+                        const index = parseInt(match[1]);
+                        const property = match[2];
+                        
+                        if (!siswaArray[index]) {
+                            siswaArray[index] = {};
+                        }
+                        
+                        siswaArray[index][property] = req.body[key];
+                    }
+                } else {
+                    // Handle other fields
+                    if (key === 'biayaPendaftaran' || key === 'totalBiaya') {
+                        transformedBody[key] = parseFloat(req.body[key]);
+                    } else if (key === 'isFamily') {
+                        transformedBody[key] = req.body[key] === 'true';
+                    } else {
+                        transformedBody[key] = req.body[key];
+                    }
+                }
+            });
+            
+            // Add siswa array to transformed body
+            if (siswaArray.length > 0) {
+                transformedBody.siswa = siswaArray.filter(item => item && Object.keys(item).length > 0);
+            }
+            
+            req.body = transformedBody;
+        }
+
+        next();
+    });
+};
+
 // Export configurations and middleware
 module.exports = {
     storage,
@@ -313,5 +381,6 @@ module.exports = {
     uploadCoverMiddleware,
     uploadFotoUrlMiddleware,
     uploadCoverGaleriMiddleware,
-    uploadEvidenceMiddleware
+    uploadEvidenceMiddleware,
+    uploadKartuKeluargaMiddleware
 }; 

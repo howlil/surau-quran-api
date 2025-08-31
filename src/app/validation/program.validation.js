@@ -14,6 +14,12 @@ class ProgramValidation {
           'string.empty': 'Deskripsi tidak boleh kosong',
           'any.required': 'Deskripsi wajib diisi'
         }),
+      tipeProgram: Joi.string().valid('GROUP', 'PRIVATE').required()
+        .messages({
+          'string.empty': 'Tipe program tidak boleh kosong',
+          'any.required': 'Tipe program wajib diisi',
+          'any.only': 'Tipe program harus GROUP atau PRIVATE'
+        }),
       cover: Joi.string().optional()
         .messages({
           'string.base': 'Cover harus berupa string'
@@ -30,6 +36,11 @@ class ProgramValidation {
       deskripsi: Joi.string().optional()
         .messages({
           'string.empty': 'Deskripsi tidak boleh kosong'
+        }),
+      tipeProgram: Joi.string().valid('GROUP', 'PRIVATE').optional()
+        .messages({
+          'string.empty': 'Tipe program tidak boleh kosong',
+          'any.only': 'Tipe program harus GROUP atau PRIVATE'
         }),
       cover: Joi.string().optional()
         .messages({

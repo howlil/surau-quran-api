@@ -23,7 +23,10 @@ const PROGRAM_NAMES = [
     'BTA LVL 1',
     'BTA LVL 2 & PRA Tahsin',
     'TAHSIN',
-    'TAHFIDZ'
+    'TAHFIDZ',
+    'Private Mandiri',
+    'Private Bersaudara',
+    'Private Sharing'
 ];
 
 const KELAS_NAMES = [
@@ -31,7 +34,8 @@ const KELAS_NAMES = [
     'Kelas Madinah',
     'Kelas Makkah',
     'Kelas Al-Aqsa',
-    'Kelas Al-Hidayah'
+    'Kelas Al-Hidayah',
+    'Kelas Online'
 ];
 
 // Additional constants for comprehensive data coverage
@@ -40,13 +44,8 @@ const PAYMENT_STATUSES = ['UNPAID', 'PENDING', 'PAID', 'LUNAS', 'SETTLED', 'EXPI
 const PAYROLL_STATUSES = ['DRAFT', 'DIPROSES', 'SELESAI', 'GAGAL'];
 const DISBURSEMENT_STATUSES = ['PENDING', 'COMPLETED', 'FAILED'];
 
-// New constants for class types and rates
-const CLASS_TYPES = {
-    GROUP: { rate: 35000, weight: 0.7 },
-    PRIVATE: { rate: 35000, weight: 0.2 },
-    SUBSTITUTE: { rate: 25000, weight: 0.05 },
-    ONLINE: { rate: 25000, weight: 0.05 }
-};
+// Honor rates
+const HONOR_PER_SKS = 35000;
 
 // Attendance incentives and penalties
 const ATTENDANCE_RULES = {
@@ -157,7 +156,10 @@ class FakerSeeder {
                         namaOrangTua: 'Orang Tua Example',
                         namaPenjemput: 'Penjemput Example',
                         noWhatsapp: '081234567891',
-                        isRegistered: true
+
+                        isFamily: false,
+                        hubunganKeluarga: null,
+                        jenisHubungan: null
                     }
                 }
             ];
@@ -307,7 +309,10 @@ class FakerSeeder {
                                     namaOrangTua: faker.person.fullName(),
                                     namaPenjemput: Math.random() > 0.3 ? faker.person.fullName() : null,
                                     noWhatsapp: Math.random() > 0.1 ? faker.phone.number('08##########') : null,
-                                    isRegistered: Math.random() > 0.2,
+
+                                    isFamily: Math.random() > 0.3, // 30% chance to be family
+                                    hubunganKeluarga: Math.random() > 0.3 ? faker.helpers.arrayElement(['SEDARAH', 'TIDAK_SEDARAH']) : null,
+                                    jenisHubungan: Math.random() > 0.3 ? faker.helpers.arrayElement(['Sepupu', 'Tetangga', 'Teman', 'Lainnya']) : null,
                                     createdAt: new Date(),
                                     updatedAt: new Date()
                                 }
@@ -336,10 +341,14 @@ class FakerSeeder {
         console.log('Creating master data...');
         try {
             // Create Kelas
-            for (const kelasName of KELAS_NAMES) {
+            for (let i = 0; i < KELAS_NAMES.length; i++) {
+                const kelasName = KELAS_NAMES[i];
+                const isOnline = kelasName.toLowerCase().includes('online');
+
                 const kelas = await prismaClient.kelas.create({
                     data: {
                         namaKelas: kelasName,
+                        ipAddressHikvision: isOnline ? null : `192.168.1.${100 + i}`,
                         createdAt: new Date(),
                         updatedAt: new Date()
                     }
@@ -349,9 +358,17 @@ class FakerSeeder {
 
             // Create Programs
             for (const programName of PROGRAM_NAMES) {
+                // Determine program type and SPP based on name
+                const isPrivate = programName.toLowerCase().includes('private');
+                const tipeProgram = isPrivate ? 'PRIVATE' : 'GROUP';
+                const biayaSpp = isPrivate ? 640000 : 250000;
+
                 const program = await prismaClient.program.create({
                     data: {
                         namaProgram: programName,
+                        tipeProgram: tipeProgram,
+                        biayaSpp: biayaSpp,
+                        deskripsi: `${programName} - ${isPrivate ? 'Program Private' : 'Program Reguler'}`,
                         createdAt: new Date(),
                         updatedAt: new Date()
                     }
@@ -418,12 +435,6 @@ class FakerSeeder {
                             hari: faker.helpers.arrayElement(['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']),
                             jamMengajarId: faker.helpers.arrayElement(this.data.jamMengajar).id,
                             guruId: guru.guru.id,
-                            tipeKelas: faker.helpers.weightedArrayElement([
-                                { weight: 0.7, value: 'GROUP' },
-                                { weight: 0.2, value: 'PRIVATE' },
-                                { weight: 0.05, value: 'SUBSTITUTE' },
-                                { weight: 0.05, value: 'ONLINE' }
-                            ]),
                             createdAt: new Date(),
                             updatedAt: new Date()
                         }

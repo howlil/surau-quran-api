@@ -29,11 +29,7 @@ class StatisticsService {
             }
 
             // Get total students count
-            const totalStudents = await prisma.siswa.count({
-                where: {
-                    isRegistered: true
-                }
-            });
+            const totalStudents = await prisma.siswa.count();
 
             // Get present students count for the date filter
             const presentStudents = await prisma.absensiSiswa.count({
@@ -508,11 +504,7 @@ class StatisticsService {
             }
 
             // Get total registered students count
-            const jumlahSiswa = await prisma.siswa.count({
-                where: {
-                    isRegistered: true
-                }
-            });
+            const jumlahSiswa = await prisma.siswa.count();
 
             // Get students present today
             const siswaHadir = await prisma.absensiSiswa.count({

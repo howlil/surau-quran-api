@@ -24,7 +24,7 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
-  rfid      String?   @unique
+  rfid      String?  @unique
   role      Role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -50,8 +50,8 @@ model Token {
 
 // Student model
 model Siswa {
-  id               String   @id @default(uuid())
-  userId           String   @unique
+  id               String  @id @default(uuid())
+  userId           String  @unique
   noWhatsapp       String?
   nis              String? @unique
   namaMurid        String
@@ -64,15 +64,20 @@ model Siswa {
   namaSekolah      String?
   namaOrangTua     String?
   namaPenjemput    String?
-  isRegistered     Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  kartuKeluarga    String?
+  hubunganKeluarga String?
+  jenisHubungan    String?
+  keluargaId       String?
+  isFamily         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user         User           @relation(fields: [userId], references: [id])
-  pendaftaran  Pendaftaran? // Siswa hanya memiliki satu pendaftaran
-  programSiswa ProgramSiswa[] // Siswa hanya memiliki satu program aktif, history program lama tetap ada
-  AbsensiSiswa AbsensiSiswa[]
+  user           User             @relation(fields: [userId], references: [id])
+  pendaftaran    Pendaftaran? // Siswa hanya memiliki satu pendaftaran
+  programSiswa   ProgramSiswa[] // Siswa hanya memiliki satu program aktif, history program lama tetap ada
+  AbsensiSiswa   AbsensiSiswa[]
   kelasPengganti KelasPengganti[]
 }
 
@@ -126,17 +131,23 @@ model Kelas {
 }
 
 model Program {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   namaProgram String
   deskripsi   String?
   cover       String?
-  biayaSpp    Decimal  @db.Decimal(10, 2) @default(300000.00)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  tipeProgram TipeProgram @default(GROUP)
+  biayaSpp    Decimal     @default(300000.00) @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   // Relations
   kelasProgram KelasProgram[]
   programSiswa ProgramSiswa[]
+}
+
+enum TipeProgram {
+  GROUP
+  PRIVATE
 }
 
 model Testimoni {
@@ -150,23 +161,23 @@ model Testimoni {
 }
 
 model Galeri {
-  id           String   @id @default(uuid())
-  judulFoto    String
-  coverGaleri  String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  judulFoto   String
+  coverGaleri String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Finance {
-  id          String          @id @default(uuid())
-  tanggal     String
-  deskripsi   String
-  type        FinanceType
-  category    FinanceCategory
-  total       Decimal         @db.Decimal(12, 2)
-  evidence    String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id        String          @id @default(uuid())
+  tanggal   String
+  deskripsi String
+  type      FinanceType
+  category  FinanceCategory
+  total     Decimal         @db.Decimal(12, 2)
+  evidence  String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 }
 
 model JamMengajar {
@@ -182,24 +193,23 @@ model JamMengajar {
 }
 
 model KelasProgram {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   kelasId       String?
   programId     String
   hari          HARI
   jamMengajarId String
   guruId        String?
-  tipeKelas     TipeKelas @default(GROUP)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  kelas        Kelas?         @relation(fields: [kelasId], references: [id])
-  program      Program        @relation(fields: [programId], references: [id])
-  jamMengajar  JamMengajar    @relation(fields: [jamMengajarId], references: [id])
-  guru         Guru?          @relation(fields: [guruId], references: [id])
-  programSiswa ProgramSiswa[] // Relasi langsung ke ProgramSiswa
-  absensiSiswa AbsensiSiswa[]
-  absensiGuru  AbsensiGuru[]
+  kelas          Kelas?           @relation(fields: [kelasId], references: [id])
+  program        Program          @relation(fields: [programId], references: [id])
+  jamMengajar    JamMengajar      @relation(fields: [jamMengajarId], references: [id])
+  guru           Guru?            @relation(fields: [guruId], references: [id])
+  programSiswa   ProgramSiswa[] // Relasi langsung ke ProgramSiswa
+  absensiSiswa   AbsensiSiswa[]
+  absensiGuru    AbsensiGuru[]
   kelasPengganti KelasPengganti[]
 }
 
@@ -222,14 +232,6 @@ model KelasPengganti {
   @@map("kelas_pengganti")
 }
 
-enum TipeKelas {
-  GROUP // Rp 35,000/sesi
-  PRIVATE // Rp 35,000/sesi
-  SUBSTITUTE // Rp 25,000/sesi (Guru Pengganti)
-  ONLINE // Rp 25,000/sesi (Online diluar Surau)
-}
-
-// Model Pendaftaran (sekali untuk satu siswa)
 model Pendaftaran {
   id               String   @id @default(uuid())
   siswaId          String   @unique
@@ -242,13 +244,11 @@ model Pendaftaran {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  // Relations
   voucher    Voucher?    @relation(fields: [voucher_id], references: [id])
   siswa      Siswa       @relation(fields: [siswaId], references: [id])
   pembayaran Pembayaran? @relation(fields: [pembayaranId], references: [id])
 }
 
-// Model Program Siswa (hubungan siswa dengan program)
 model ProgramSiswa {
   id             String      @id @default(uuid())
   siswaId        String
@@ -268,20 +268,18 @@ model ProgramSiswa {
 }
 
 model JadwalProgramSiswa {
-  id             String @id @default(uuid())
+  id             String   @id @default(uuid())
   programSiswaId String
   hari           HARI
   jamMengajarId  String
-  urutan         Int 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  urutan         Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations  
   programSiswa ProgramSiswa @relation(fields: [programSiswaId], references: [id])
   jamMengajar  JamMengajar  @relation(fields: [jamMengajarId], references: [id])
 }
-
-// Model Jadwal Siswa (untuk menyimpan jadwal-jadwal siswa per program)
 
 model RiwayatStatusSiswa {
   id               String      @id @default(uuid())
@@ -339,14 +337,14 @@ model AbsensiGuru {
 }
 
 model Voucher {
-  id               String      @id @default(uuid())
-  kodeVoucher      String      @unique
-  namaVoucher      String      
-  tipe             TipeVoucher
-  nominal          Decimal     @db.Decimal(10, 2)
-  isActive         Boolean     @default(true)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id          String      @id @default(uuid())
+  kodeVoucher String      @unique
+  namaVoucher String
+  tipe        TipeVoucher
+  nominal     Decimal     @db.Decimal(10, 2)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   // Relations
   PeriodeSpp  PeriodeSpp[]
@@ -407,20 +405,20 @@ model XenditPayment {
 }
 
 model Payroll {
-  id        String        @id @default(uuid())
-  guruId    String
-  periode   String
-  bulan     String
-  tahun     Int
-  gajiPokok Decimal       @db.Decimal(10, 2)
-  insentif  Decimal?      @db.Decimal(10, 2)
-  potongan  Decimal       @db.Decimal(10, 2)
-  totalGaji Decimal       @db.Decimal(10, 2)
-  status    StatusPayroll
-  catatan   String?       // Field catatan optional
-  tanggalKalkulasi DateTime @default(now())
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id               String        @id @default(uuid())
+  guruId           String
+  periode          String
+  bulan            String
+  tahun            Int
+  gajiPokok        Decimal       @db.Decimal(10, 2)
+  insentif         Decimal?      @db.Decimal(10, 2)
+  potongan         Decimal       @db.Decimal(10, 2)
+  totalGaji        Decimal       @db.Decimal(10, 2)
+  status           StatusPayroll
+  catatan          String? // Field catatan optional
+  tanggalKalkulasi DateTime      @default(now())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   // Relations
   guru                Guru                 @relation(fields: [guruId], references: [id])
@@ -459,15 +457,15 @@ model XenditDisbursement {
 }
 
 model PayrollBatchDisbursement {
-  id              String   @id @default(uuid())
-  xenditBatchId   String   @unique
-  reference       String
-  status          String
-  totalAmount     Decimal  @db.Decimal(10, 2)
-  totalCount      Int
-  payrollIds      Json
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(uuid())
+  xenditBatchId String   @unique
+  reference     String
+  status        String
+  totalAmount   Decimal  @db.Decimal(10, 2)
+  totalCount    Int
+  payrollIds    Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum HARI {
@@ -589,7 +587,7 @@ enum FinanceCategory {
   ENROLLMENT
   DONATION
   OTHER_INCOME
-  
+
   // Expense categories  
   PAYROLL_SALARY
   OPERATIONAL
@@ -623,4 +621,40 @@ model PendaftaranTemp {
   voucherId        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model PendaftaranPrivateTemp {
+  id               String   @id @default(uuid())
+  siswaPrivateId   String
+  isFamily         Boolean  @default(false)
+  hubunganKeluarga String?
+  jenisHubungan    String?
+  kartuKeluarga    String?
+  kodeVoucher      String?
+  diskon           Decimal? @db.Decimal(10, 2)
+  totalBiaya       Decimal  @db.Decimal(10, 2)
+  programId        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  siswaPrivate SiswaPrivateTemp @relation(fields: [siswaPrivateId], references: [id])
+}
+
+model SiswaPrivateTemp {
+  id                     String                   @id @default(uuid())
+  namaMurid              String
+  namaPanggilan          String?
+  tanggalLahir           String?
+  jenisKelamin           Gender
+  alamat                 String?
+  strataPendidikan       SPM?
+  kelasSekolah           String?
+  email                  String
+  namaSekolah            String?
+  namaOrangTua           String
+  namaPenjemput          String?
+  noWhatsapp             String?
+  biayaPendaftaran       Decimal                  @db.Decimal(10, 2)
+  PendaftaranPrivateTemp PendaftaranPrivateTemp[]
 }

@@ -105,19 +105,44 @@ class XenditUtils {
       });
 
       let invoice;
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      try {
-        logger.info('Calling Xendit API with params:', JSON.stringify(invoiceParams, null, 2));
-        invoice = await xendit.Invoice.createInvoice({ data: invoiceParams });
-      } catch (err) {
-        logger.error('Error creating Xendit invoice:', {
-          message: err.message,
-          status: err.status,
-          errorCode: err.errorCode,
-          errorMessage: err.errorMessage,
-          response: err.response ? JSON.stringify(err.response, null, 2) : 'No response'
-        });
-        throw new Error(`Failed to create Xendit invoice: ${err.message}`);
+      while (retryCount < maxRetries) {
+        try {
+          logger.info(`Calling Xendit API with params (attempt ${retryCount + 1}/${maxRetries}):`, JSON.stringify(invoiceParams, null, 2));
+          invoice = await xendit.Invoice.createInvoice({ data: invoiceParams });
+          break; // Success, exit retry loop
+        } catch (err) {
+          retryCount++;
+          logger.error(`Error creating Xendit invoice (attempt ${retryCount}/${maxRetries}):`, {
+            message: err.message,
+            status: err.status,
+            errorCode: err.errorCode,
+            errorMessage: err.errorMessage,
+            response: err.response ? JSON.stringify(err.response, null, 2) : 'No response'
+          });
+
+          // If it's the last attempt, try to provide a more helpful error
+          if (retryCount >= maxRetries) {
+            // Check if it's a network/connection issue
+            if (err.message.includes('fetch failed') || err.message.includes('network') || err.message.includes('timeout')) {
+              throw new Error(`Gagal terhubung ke sistem pembayaran. Silakan coba lagi dalam beberapa menit. (Error: ${err.message})`);
+            } else if (err.message.includes('authentication') || err.message.includes('unauthorized')) {
+              throw new Error(`Konfigurasi sistem pembayaran bermasalah. Silakan hubungi admin. (Error: ${err.message})`);
+            } else {
+              throw new Error(`Gagal membuat invoice pembayaran: ${err.message}`);
+            }
+          }
+
+          // Wait before retrying (exponential backoff with jitter)
+          const baseWaitTime = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s
+          const jitter = Math.random() * 1000; // Add random jitter up to 1s
+          const waitTime = baseWaitTime + jitter;
+          
+          logger.info(`Retrying in ${Math.round(waitTime)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
 
       logger.info(`Created Xendit invoice: ${invoice.id}`);

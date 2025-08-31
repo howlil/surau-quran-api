@@ -3,6 +3,7 @@ const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const XenditUtils = require('../../lib/utils/xendit.utils');
+const { BadRequestError } = require('../../lib/http/errors.http');
 
 class SiswaController {
 
@@ -80,6 +81,44 @@ class SiswaController {
     const data = HttpRequest.getBodyParams(req);
     const result = await siswaService.pindahProgram(id, data);
     return Http.Response.success(res, result, 'Siswa berhasil pindah program');
+  });
+
+  // Pendaftaran V2 dengan support private program
+  pendaftaranSiswaV2 = ErrorHandler.asyncHandler(async (req, res) => {
+    // Handle multipart form data - data bisa langsung di req.body atau dalam field 'data'
+    let data;
+
+    if (req.body.data) {
+      // Jika data ada dalam field 'data' sebagai JSON string
+      try {
+        data = JSON.parse(req.body.data);
+      } catch (error) {
+        throw new BadRequestError('Format data JSON tidak valid');
+      }
+    } else {
+      // Jika data langsung ada di req.body
+      data = req.body;
+    }
+
+    // Validate that data is not empty
+    if (!data || Object.keys(data).length === 0) {
+      throw new BadRequestError('Data pendaftaran tidak boleh kosong');
+    }
+
+
+
+    // Get uploaded file (kartuKeluarga) if any
+    const kartuKeluargaFile = req.file ? req.file.filename : null;
+
+    const result = await siswaService.createPendaftaranV2(data, kartuKeluargaFile);
+
+    return Http.Response.success(res, {
+      pendaftaranId: result.pendaftaranId,
+      pembayaranId: result.pembayaranId,
+      invoiceUrl: result.invoiceUrl,
+      totalBiaya: result.totalBiaya,
+      siswaCount: result.siswaCount
+    }, 'Pendaftaran berhasil dilakukan, silakan lakukan pembayaran');
   });
 }
 

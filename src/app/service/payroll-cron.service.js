@@ -41,22 +41,11 @@ class PayrollCronService {
               tanggal: {
                 contains: `-${moment().format('MM')}-${tahun}`
               }
-            },
-            include: {
-              kelasProgram: {
-                select: {
-                  tipeKelas: true
-                }
-              }
             }
           });
 
-          const HONOR_RATES = {
-            GROUP: 35000,
-            PRIVATE: 35000,
-            SUBSTITUTE: 25000,
-            ONLINE: 25000
-          };
+          // Honor per SKS tetap (tidak lagi berdasarkan tipe kelas)
+          const HONOR_PER_SKS = 35000;
 
           let gajiPokok = 0;
           let totalInsentif = 0;
@@ -69,11 +58,8 @@ class PayrollCronService {
           absensiData.forEach(absensi => {
             // Hanya HADIR dan TERLAMBAT yang dihitung untuk gaji
             if (absensi.statusKehadiran === 'HADIR' || absensi.statusKehadiran === 'TERLAMBAT') {
-              const tipeKelas = absensi.kelasProgram.tipeKelas;
-              const honorPerSKS = HONOR_RATES[tipeKelas];
-
               // Add to base salary
-              gajiPokok += absensi.sks * honorPerSKS;
+              gajiPokok += absensi.sks * HONOR_PER_SKS;
               totalSKS += absensi.sks;
 
               // Track daily SKS for incentive
@@ -224,7 +210,7 @@ class PayrollCronService {
         // Jika sudah format "08"
         bulanMM = bulan;
       }
-      
+
       const periode = `${bulanMM} ${tahun}`;
 
       const gurus = await prisma.guru.findMany({
@@ -262,19 +248,15 @@ class PayrollCronService {
             include: {
               kelasProgram: {
                 select: {
-                  tipeKelas: true
+                  id: true
                 }
               }
             }
           });
 
           // Calculate base salary based on SKS and class type
-          const HONOR_RATES = {
-            GROUP: 35000,
-            PRIVATE: 35000,
-            SUBSTITUTE: 25000,
-            ONLINE: 25000
-          };
+          // Honor per SKS tetap (tidak lagi berdasarkan tipe kelas)
+          const HONOR_PER_SKS = 35000;
 
           let gajiPokok = 0;
           let totalInsentif = 0;
@@ -287,11 +269,8 @@ class PayrollCronService {
           absensiData.forEach(absensi => {
             // Hanya HADIR dan TERLAMBAT yang dihitung untuk gaji
             if (absensi.statusKehadiran === 'HADIR' || absensi.statusKehadiran === 'TERLAMBAT') {
-              const tipeKelas = absensi.kelasProgram.tipeKelas;
-              const honorPerSKS = HONOR_RATES[tipeKelas];
-
               // Add to base salary
-              gajiPokok += absensi.sks * honorPerSKS;
+              gajiPokok += absensi.sks * HONOR_PER_SKS;
               totalSKS += absensi.sks;
 
               // Track daily SKS for incentive

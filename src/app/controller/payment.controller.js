@@ -23,39 +23,25 @@ class PaymentController {
         logger.info('Processing Xendit callback:', rawBody);
         try {
             const result = await paymentService.handleXenditCallback(rawBody);
-            logger.info(`Payment status: ${result.statusPembayaran} for payment ID: ${result.id}`);
+            
+            // Check if result exists and has required properties
+            if (!result) {
+                logger.warn('No result returned from handleXenditCallback');
+                return res.status(500).json({
+                    success: false,
+                    message: 'Callback processing failed - no result returned'
+                });
+            }
+
+            logger.info(`Payment status: ${result.statusPembayaran || 'UNKNOWN'} for payment ID: ${result.id || 'UNKNOWN'}`);
 
             if (result.statusPembayaran === 'PAID') {
                 if (result.tipePembayaran === 'PENDAFTARAN') {
-                    try {
-                        pendaftaranResult = await siswaService.processPaidPendaftaran(result.id);
-                        logger.info(`Successfully processed pendaftaran payment for ID: ${result.id}`);
-                    } catch (error) {
-                        if (error.message.includes('already been processed')) {
-                            logger.info(`Payment ID ${result.id} was already processed. Duplicate callback handled gracefully.`);
-                            return Http.Response.success(res, {
-                                success: true,
-                                payment: result,
-                                pendaftaran_status: 'already_processed',
-                                message: error.message
-                            }, 'Payment already processed');
-                        }
-
-                        logger.error(`Failed to process pendaftaran for payment ID: ${result.id}`, {
-                            error: error.message,
-                            stack: error.stack
-                        });
-
-                        return Http.Response.success(res, {
-                            success: true,
-                            payment: result,
-                            pendaftaran_status: 'failed',
-                            error_message: error.message
-                        }, 'Payment processed but student creation failed');
-                    }
+                    // Pendaftaran sudah diproses otomatis di handleXenditCallback
+                    logger.info(`Pendaftaran payment for ID: ${result.id} already processed in callback handler`);
                 } else if (result.tipePembayaran === 'SPP') {
                     try {
-                        sppResult = await paymentService.processPaidSpp(result.id);
+                        const sppResult = await paymentService.processPaidSpp(result.id);
                         logger.info(`Successfully processed SPP payment for ID: ${result.id}`);
                     } catch (error) {
                         logger.error(`Failed to process SPP for payment ID: ${result.id}`, error);
@@ -92,9 +78,10 @@ class PaymentController {
                 });
             }
 
+            // Return error response for critical failures
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Callback processing failed',
                 error: error.message
             });
         }

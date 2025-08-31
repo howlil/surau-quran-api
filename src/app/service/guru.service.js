@@ -261,7 +261,7 @@ class GuruService {
       const { page = 1, limit = 10, nama } = filters;
 
       const where = {};
-      
+
       if (nama) {
         where.nama = {
           contains: nama
@@ -306,7 +306,7 @@ class GuruService {
       const { page = 1, limit = 10, nama } = filters;
 
       const where = {};
-      
+
       if (nama) {
         where.nama = {
           contains: nama
@@ -331,8 +331,7 @@ class GuruService {
               hari: true,
               jamMengajarId: true,
               kelasId: true,
-              programId: true,
-              tipeKelas: true
+              programId: true
             }
           }
         },
@@ -354,8 +353,7 @@ class GuruService {
             kelasId: kp.kelasId,
             programId: kp.programId,
             hari: kp.hari,
-            jamMengajarId: kp.jamMengajarId,
-            tipeKelas: kp.tipeKelas
+            jamMengajarId: kp.jamMengajarId
           }))
         }))
       };

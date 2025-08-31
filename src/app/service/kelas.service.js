@@ -42,7 +42,7 @@ class KelasService {
                 jam: `${conflictingSchedule.jamMengajar.jamMulai} - ${conflictingSchedule.jamMengajar.jamSelesai}`,
                 hari: conflictingSchedule.hari
             };
-            
+
             throw new ConflictError(
                 `Guru sudah memiliki jadwal mengajar pada ${conflictInfo.hari} jam ${conflictInfo.jam} ` +
                 `untuk program ${conflictInfo.program} di kelas ${conflictInfo.kelas}. ` +
@@ -291,7 +291,7 @@ class KelasService {
                     const checkHari = hari || existingKelasProgram.hari;
                     const checkJamMengajarId = jamMengajarId || existingKelasProgram.jamMengajarId;
                     const checkGuruId = guruId || existingKelasProgram.guruId;
-                    
+
                     // Only check for conflict if we have all required fields
                     if (checkGuruId && checkHari && checkJamMengajarId) {
                         await this.checkGuruScheduleConflict(tx, checkGuruId, checkHari, checkJamMengajarId, kelasProgramId);
@@ -363,18 +363,61 @@ class KelasService {
 
                 // Handle student additions - only if not a metadata-only update
                 if (!isMetadataOnlyUpdate && tambahSiswaIds && tambahSiswaIds.length > 0) {
-                    // Find eligible students that are already verified in the program AND not assigned to any kelas program
-                    const programSiswaList = await tx.programSiswa.findMany({
-                        where: {
-                            siswaId: { in: tambahSiswaIds },
-                            status: 'AKTIF',
-                            programId: updatedKelasProgram.programId,
-                            kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program manapun
-                        },
-                        include: {
-                            siswa: true
-                        }
+                    // Get program details to determine if it's private
+                    const program = await tx.program.findUnique({
+                        where: { id: updatedKelasProgram.programId },
+                        select: { tipeProgram: true, namaProgram: true }
                     });
+
+                    if (!program) {
+                        throw new NotFoundError('Program tidak ditemukan');
+                    }
+
+                    let programSiswaList;
+
+                    if (program.tipeProgram === 'PRIVATE') {
+                        // Untuk program private, siswa harus memiliki keluargaId yang sama
+                        // Ambil keluargaId dari siswa pertama yang dipilih
+                        const firstSiswa = await tx.siswa.findUnique({
+                            where: { id: tambahSiswaIds[0] },
+                            select: { keluargaId: true }
+                        });
+
+                        if (!firstSiswa || !firstSiswa.keluargaId) {
+                            throw new BadRequestError('Siswa pertama harus memiliki keluargaId untuk program private');
+                        }
+
+                        // Cari semua siswa yang memiliki keluargaId yang sama
+                        programSiswaList = await tx.programSiswa.findMany({
+                            where: {
+                                siswaId: { in: tambahSiswaIds },
+                                status: 'AKTIF',
+                                programId: updatedKelasProgram.programId,
+                                kelasProgramId: null, // Hanya siswa yang belum terdaftar di kelas program manapun
+                                siswa: {
+                                    keluargaId: firstSiswa.keluargaId // Hanya siswa dengan keluargaId yang sama
+                                }
+                            },
+                            include: {
+                                siswa: true
+                            }
+                        });
+
+                        logger.info(`Private program detected. Found ${programSiswaList.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                    } else {
+                        // Untuk program group, logic tetap sama seperti sebelumnya
+                        programSiswaList = await tx.programSiswa.findMany({
+                            where: {
+                                siswaId: { in: tambahSiswaIds },
+                                status: 'AKTIF',
+                                programId: updatedKelasProgram.programId,
+                                kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program manapun
+                            },
+                            include: {
+                                siswa: true
+                            }
+                        });
+                    }
 
                     // Check if any students are already assigned to other kelas programs
                     const alreadyAssignedStudents = await tx.programSiswa.findMany({
@@ -541,27 +584,72 @@ class KelasService {
                     }
                 });
 
+                // Get program details to determine if it's private
+                const program = await tx.program.findUnique({
+                    where: { id: programId },
+                    select: { tipeProgram: true, namaProgram: true }
+                });
+
+                if (!program) {
+                    throw new NotFoundError('Program tidak ditemukan');
+                }
+
                 // Process student assignments
                 const processedSiswa = [];
                 if (siswaIds.length > 0) {
-                    // Find eligible students that are already verified in the program
-                    const eligibleProgramSiswa = await tx.programSiswa.findMany({
-                        where: {
-                            siswaId: { in: siswaIds },
-                            programId,
-                            status: 'AKTIF',
-                            kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program lain
-                        },
-                        include: {
-                            siswa: true
+                    let eligibleProgramSiswa;
+
+                    if (program.tipeProgram === 'PRIVATE') {
+                        // Untuk program private, siswa harus memiliki keluargaId yang sama
+                        // Ambil keluargaId dari siswa pertama yang dipilih
+                        const firstSiswa = await tx.siswa.findUnique({
+                            where: { id: siswaIds[0] },
+                            select: { keluargaId: true }
+                        });
+
+                        if (!firstSiswa || !firstSiswa.keluargaId) {
+                            throw new BadRequestError('Siswa pertama harus memiliki keluargaId untuk program private');
                         }
-                    });
+
+                        // Cari semua siswa yang memiliki keluargaId yang sama
+                        eligibleProgramSiswa = await tx.programSiswa.findMany({
+                            where: {
+                                siswaId: { in: siswaIds },
+                                programId,
+                                status: 'AKTIF',
+                                kelasProgramId: null, // Hanya siswa yang belum terdaftar di kelas program lain
+                                siswa: {
+                                    keluargaId: firstSiswa.keluargaId // Hanya siswa dengan keluargaId yang sama
+                                }
+                            },
+                            include: {
+                                siswa: true
+                            }
+                        });
+
+                        logger.info(`Private program detected. Found ${eligibleProgramSiswa.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                    } else {
+                        // Untuk program group, logic tetap sama seperti sebelumnya
+                        eligibleProgramSiswa = await tx.programSiswa.findMany({
+                            where: {
+                                siswaId: { in: siswaIds },
+                                programId,
+                                status: 'AKTIF',
+                                kelasProgramId: null // Hanya siswa yang belum terdaftar di kelas program lain
+                            },
+                            include: {
+                                siswa: true
+                            }
+                        });
+                    }
 
                     logger.info('Found eligible students:', {
                         count: eligibleProgramSiswa.length,
+                        programType: program.tipeProgram,
                         students: eligibleProgramSiswa.map(ps => ({
                             siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid
+                            namaSiswa: ps.siswa.namaMurid,
+                            keluargaId: ps.siswa.keluargaId
                         }))
                     });
 
@@ -589,7 +677,6 @@ class KelasService {
                     hari: kelasProgram.hari,
                     jamMengajarId: kelasProgram.jamMengajarId,
                     guruId: kelasProgram.guruId,
-                    tipeKelas: kelasProgram.tipeKelas,
                     siswaYangDitambahkan: processedSiswa
                 };
             });

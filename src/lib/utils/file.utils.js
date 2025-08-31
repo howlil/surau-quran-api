@@ -112,6 +112,10 @@ class FileUtils {
 
         return financeList.map(finance => this.transformFinanceFiles(finance, baseUrl));
     }
+
+    static getKartuKeluargaUrl(baseUrl, filename) {
+        return this.getDocumentUrl(baseUrl, filename, 'kartu_keluarga');
+    }
 }
 
 module.exports = FileUtils; 

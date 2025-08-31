@@ -116,7 +116,7 @@ class AbsensiService {
         }
     }
 
-    
+
 
     async getAbsensiGuruByDate(filters = {}, baseUrl) {
         try {
@@ -254,7 +254,7 @@ class AbsensiService {
                                     keterangan: 'Auto-created: Belum absen'
                                 }
                             });
-                            
+
                             logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
                         } catch (error) {
                             logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
@@ -429,7 +429,7 @@ class AbsensiService {
                     }
                     updateData.keterangan = data.keterangan || null;
                     updateData.suratIzin = null; // Clear surat izin for HADIR
-                    
+
                     updateData.sks = 2;
                     logger.info(`Set SKS: 2 for HADIR status`);
                 }
@@ -738,7 +738,7 @@ class AbsensiService {
 
             const today = moment().startOf('day');
             const inputDate = dateObj.startOf('day');
-            
+
             if (inputDate.isBefore(today)) {
                 throw new BadRequestError('Tanggal tidak boleh masa lalu. Hanya bisa update absensi untuk hari ini atau masa depan');
             }
@@ -976,7 +976,6 @@ class AbsensiService {
                 namaGuru: kelasProgram.guru.nama,
                 nipGuru: kelasProgram.guru.nip,
                 hari: kelasProgram.hari,
-                tipeKelas: kelasProgram.tipeKelas,
                 absensiSiswa: absensiSiswaFormatted
             };
 
@@ -1000,7 +999,7 @@ class AbsensiService {
             // Validasi tanggal tidak boleh masa lalu
             const today = moment().startOf('day');
             const inputDate = dateObj.startOf('day');
-            
+
             if (inputDate.isBefore(today)) {
                 throw new BadRequestError('Tanggal tidak boleh masa lalu. Hanya bisa create absensi untuk hari ini atau masa depan');
             }
@@ -1220,7 +1219,7 @@ class AbsensiService {
             // Validasi tanggal hanya hari ini (tidak boleh masa lalu atau masa depan)
             const today = moment().startOf('day');
             const inputDate = dateObj.startOf('day');
-            
+
             if (!inputDate.isSame(today, 'day')) {
                 throw new BadRequestError('Absensi hanya bisa dilakukan pada hari ini. Tanggal tidak boleh masa lalu atau masa depan');
             }
@@ -1312,7 +1311,7 @@ class AbsensiService {
             // Cek apakah sudah lewat dari shift terakhir
             const shiftTerakhir = jadwalTerurut[jadwalTerurut.length - 1];
             const jamSelesaiTerakhir = moment(shiftTerakhir.jamMengajar.jamSelesai, 'HH:mm');
-            
+
             if (jamInput.isAfter(jamSelesaiTerakhir)) {
                 throw new BadRequestError(`Jam absen (${jam}) sudah lewat dari shift terakhir. Tidak bisa absen lagi setelah jam ${shiftTerakhir.jamMengajar.jamSelesai}`);
             }
@@ -1334,7 +1333,7 @@ class AbsensiService {
                 } else if (jamInput.isBetween(jamMulai, jamSelesai, null, '[]')) {
                     // Dalam rentang shift ini
                     jadwalYangCocok = jadwal;
-                    
+
                     // Tentukan status berdasarkan keterlambatan
                     const keterlambatanMenit = jamInput.diff(jamMulai, 'minutes');
                     if (keterlambatanMenit <= 0) {
@@ -1352,7 +1351,7 @@ class AbsensiService {
                         jadwalYangCocok = jadwalBerikutnya;
                         statusKehadiran = 'HADIR';
                         keterangan = 'Absen dengan RFID sebelum shift berikutnya dimulai';
-                        
+
                         // Shift yang baru selesai perlu di-auto update menjadi TIDAK_HADIR jika masih BELUM_ABSEN
                         jadwalUntukAutoUpdate.push(jadwal);
                         break;
@@ -1360,7 +1359,7 @@ class AbsensiService {
                         // Shift terakhir - masih bisa absen sampai jam selesai + toleransi
                         const toleransiMenit = 30; // Toleransi 30 menit setelah shift selesai
                         const jamSelesaiDenganToleransi = jamSelesai.add(toleransiMenit, 'minutes');
-                        
+
                         if (jamInput.isBefore(jamSelesaiDenganToleransi)) {
                             jadwalYangCocok = jadwal;
                             statusKehadiran = 'TERLAMBAT';
@@ -1392,7 +1391,7 @@ class AbsensiService {
             // Auto-update shift sebelumnya yang masih BELUM_ABSEN menjadi TIDAK_HADIR
             for (const jadwalAutoUpdate of jadwalUntukAutoUpdate) {
                 const existingAbsensiAutoUpdate = existingAbsensiList.find(abs => abs.kelasProgramId === jadwalAutoUpdate.id);
-                
+
                 if (!existingAbsensiAutoUpdate) {
                     // Buat absensi TIDAK_HADIR untuk shift yang belum absen
                     await prisma.absensiGuru.create({
@@ -1406,7 +1405,7 @@ class AbsensiService {
                             keterangan: 'Auto-update: Tidak hadir karena absen di shift berikutnya'
                         }
                     });
-                    
+
                     logger.info(`Auto-created TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
                 } else if (existingAbsensiAutoUpdate.statusKehadiran === 'BELUM_ABSEN') {
                     // Hanya update status BELUM_ABSEN menjadi TIDAK_HADIR
@@ -1418,7 +1417,7 @@ class AbsensiService {
                             updatedAt: new Date()
                         }
                     });
-                    
+
                     logger.info(`Auto-updated BELUM_ABSEN to TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
                 } else {
                     // Jika status bukan BELUM_ABSEN, tidak diubah (HADIR, TERLAMBAT, IZIN, SAKIT tetap tidak berubah)
@@ -1435,7 +1434,7 @@ class AbsensiService {
                 if (existingAbsensi.statusKehadiran === 'HADIR' && statusKehadiran === 'TIDAK_HADIR') {
                     throw new BadRequestError(`Guru sudah hadir di shift ini. Tidak dapat mengubah status dari HADIR menjadi TIDAK_HADIR.`);
                 }
-                
+
                 if (existingAbsensi.statusKehadiran === 'TERLAMBAT' && statusKehadiran === 'TIDAK_HADIR') {
                     throw new BadRequestError(`Guru sudah terlambat di shift ini. Tidak dapat mengubah status dari TERLAMBAT menjadi TIDAK_HADIR.`);
                 }
@@ -1693,7 +1692,7 @@ class AbsensiService {
                                     keterangan: 'Auto-created: Belum absen'
                                 }
                             });
-                            
+
                             logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
                         } catch (error) {
                             logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
