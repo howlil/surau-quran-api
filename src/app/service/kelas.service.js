@@ -376,34 +376,86 @@ class KelasService {
                     let programSiswaList;
 
                     if (program.tipeProgram === 'PRIVATE') {
-                        // Untuk program private, siswa harus memiliki keluargaId yang sama
-                        // Ambil keluargaId dari siswa pertama yang dipilih
-                        const firstSiswa = await tx.siswa.findUnique({
-                            where: { id: tambahSiswaIds[0] },
-                            select: { keluargaId: true }
-                        });
+                        // Tentukan subtipe private berdasarkan nama program
+                        const getPrivateSubType = (programName) => {
+                            if (programName.toLowerCase().includes('mandiri')) return 'MANDIRI';
+                            if (programName.toLowerCase().includes('sharing')) return 'SHARING';
+                            if (programName.toLowerCase().includes('bersaudara')) return 'BERSAUDARA';
+                            return null;
+                        };
 
-                        if (!firstSiswa || !firstSiswa.keluargaId) {
-                            throw new BadRequestError('Siswa pertama harus memiliki keluargaId untuk program private');
-                        }
+                        const subType = getPrivateSubType(program.namaProgram);
 
-                        // Cari semua siswa yang memiliki keluargaId yang sama
-                        programSiswaList = await tx.programSiswa.findMany({
-                            where: {
-                                siswaId: { in: tambahSiswaIds },
-                                status: 'AKTIF',
-                                programId: updatedKelasProgram.programId,
-                                kelasProgramId: null, // Hanya siswa yang belum terdaftar di kelas program manapun
-                                siswa: {
-                                    keluargaId: firstSiswa.keluargaId // Hanya siswa dengan keluargaId yang sama
-                                }
-                            },
-                            include: {
-                                siswa: true
+                        if (subType === 'MANDIRI') {
+                            // Private Mandiri: hanya 1 siswa, tidak ada keluargaId
+                            if (tambahSiswaIds.length > 1) {
+                                throw new BadRequestError('Program Private Mandiri hanya bisa menambahkan 1 siswa');
                             }
-                        });
 
-                        logger.info(`Private program detected. Found ${programSiswaList.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                            const siswa = await tx.siswa.findUnique({
+                                where: { id: tambahSiswaIds[0] },
+                                select: { keluargaId: true }
+                            });
+
+                            if (siswa && siswa.keluargaId) {
+                                throw new BadRequestError('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
+                            }
+
+                            programSiswaList = await tx.programSiswa.findMany({
+                                where: {
+                                    siswaId: { in: tambahSiswaIds },
+                                    status: 'AKTIF',
+                                    programId: updatedKelasProgram.programId,
+                                    kelasProgramId: null,
+                                    siswa: {
+                                        keluargaId: null // Hanya siswa tanpa keluargaId
+                                    }
+                                },
+                                include: {
+                                    siswa: true
+                                }
+                            });
+
+                            logger.info(`Private Mandiri program detected. Found ${programSiswaList.length} students`);
+
+                        } else if (subType === 'SHARING' || subType === 'BERSAUDARA') {
+                            // Private Sharing/Bersaudara: max 3 untuk sharing, max 4 untuk bersaudara
+                            const maxStudents = subType === 'SHARING' ? 3 : 4;
+                            
+                            if (tambahSiswaIds.length > maxStudents) {
+                                throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
+                            }
+
+                            // Ambil keluargaId dari siswa pertama yang dipilih
+                            const firstSiswa = await tx.siswa.findUnique({
+                                where: { id: tambahSiswaIds[0] },
+                                select: { keluargaId: true }
+                            });
+
+                            if (!firstSiswa || !firstSiswa.keluargaId) {
+                                throw new BadRequestError(`Siswa pertama harus memiliki keluargaId untuk program Private ${subType}`);
+                            }
+
+                            // Cari semua siswa yang memiliki keluargaId yang sama
+                            programSiswaList = await tx.programSiswa.findMany({
+                                where: {
+                                    siswaId: { in: tambahSiswaIds },
+                                    status: 'AKTIF',
+                                    programId: updatedKelasProgram.programId,
+                                    kelasProgramId: null,
+                                    siswa: {
+                                        keluargaId: firstSiswa.keluargaId
+                                    }
+                                },
+                                include: {
+                                    siswa: true
+                                }
+                            });
+
+                            logger.info(`Private ${subType} program detected. Found ${programSiswaList.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                        } else {
+                            throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
+                        }
                     } else {
                         // Untuk program group, logic tetap sama seperti sebelumnya
                         programSiswaList = await tx.programSiswa.findMany({
@@ -600,34 +652,86 @@ class KelasService {
                     let eligibleProgramSiswa;
 
                     if (program.tipeProgram === 'PRIVATE') {
-                        // Untuk program private, siswa harus memiliki keluargaId yang sama
-                        // Ambil keluargaId dari siswa pertama yang dipilih
-                        const firstSiswa = await tx.siswa.findUnique({
-                            where: { id: siswaIds[0] },
-                            select: { keluargaId: true }
-                        });
+                        // Tentukan subtipe private berdasarkan nama program
+                        const getPrivateSubType = (programName) => {
+                            if (programName.toLowerCase().includes('mandiri')) return 'MANDIRI';
+                            if (programName.toLowerCase().includes('sharing')) return 'SHARING';
+                            if (programName.toLowerCase().includes('bersaudara')) return 'BERSAUDARA';
+                            return null;
+                        };
 
-                        if (!firstSiswa || !firstSiswa.keluargaId) {
-                            throw new BadRequestError('Siswa pertama harus memiliki keluargaId untuk program private');
-                        }
+                        const subType = getPrivateSubType(program.namaProgram);
 
-                        // Cari semua siswa yang memiliki keluargaId yang sama
-                        eligibleProgramSiswa = await tx.programSiswa.findMany({
-                            where: {
-                                siswaId: { in: siswaIds },
-                                programId,
-                                status: 'AKTIF',
-                                kelasProgramId: null, // Hanya siswa yang belum terdaftar di kelas program lain
-                                siswa: {
-                                    keluargaId: firstSiswa.keluargaId // Hanya siswa dengan keluargaId yang sama
-                                }
-                            },
-                            include: {
-                                siswa: true
+                        if (subType === 'MANDIRI') {
+                            // Private Mandiri: hanya 1 siswa, tidak ada keluargaId
+                            if (siswaIds.length > 1) {
+                                throw new BadRequestError('Program Private Mandiri hanya bisa menambahkan 1 siswa');
                             }
-                        });
 
-                        logger.info(`Private program detected. Found ${eligibleProgramSiswa.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                            const siswa = await tx.siswa.findUnique({
+                                where: { id: siswaIds[0] },
+                                select: { keluargaId: true }
+                            });
+
+                            if (siswa && siswa.keluargaId) {
+                                throw new BadRequestError('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
+                            }
+
+                            eligibleProgramSiswa = await tx.programSiswa.findMany({
+                                where: {
+                                    siswaId: { in: siswaIds },
+                                    programId,
+                                    status: 'AKTIF',
+                                    kelasProgramId: null,
+                                    siswa: {
+                                        keluargaId: null // Hanya siswa tanpa keluargaId
+                                    }
+                                },
+                                include: {
+                                    siswa: true
+                                }
+                            });
+
+                            logger.info(`Private Mandiri program detected. Found ${eligibleProgramSiswa.length} students`);
+
+                        } else if (subType === 'SHARING' || subType === 'BERSAUDARA') {
+                            // Private Sharing/Bersaudara: max 3 untuk sharing, max 4 untuk bersaudara
+                            const maxStudents = subType === 'SHARING' ? 3 : 4;
+                            
+                            if (siswaIds.length > maxStudents) {
+                                throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
+                            }
+
+                            // Ambil keluargaId dari siswa pertama yang dipilih
+                            const firstSiswa = await tx.siswa.findUnique({
+                                where: { id: siswaIds[0] },
+                                select: { keluargaId: true }
+                            });
+
+                            if (!firstSiswa || !firstSiswa.keluargaId) {
+                                throw new BadRequestError(`Siswa pertama harus memiliki keluargaId untuk program Private ${subType}`);
+                            }
+
+                            // Cari semua siswa yang memiliki keluargaId yang sama
+                            eligibleProgramSiswa = await tx.programSiswa.findMany({
+                                where: {
+                                    siswaId: { in: siswaIds },
+                                    programId,
+                                    status: 'AKTIF',
+                                    kelasProgramId: null,
+                                    siswa: {
+                                        keluargaId: firstSiswa.keluargaId
+                                    }
+                                },
+                                include: {
+                                    siswa: true
+                                }
+                            });
+
+                            logger.info(`Private ${subType} program detected. Found ${eligibleProgramSiswa.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                        } else {
+                            throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
+                        }
                     } else {
                         // Untuk program group, logic tetap sama seperti sebelumnya
                         eligibleProgramSiswa = await tx.programSiswa.findMany({

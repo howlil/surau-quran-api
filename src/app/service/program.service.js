@@ -253,22 +253,16 @@ class ProgramService {
                 }
               });
 
-              // Tambahkan ketua ke dalam daftar anggota
-              const semuaAnggota = [
-                {
-                  siswaId: ps.siswa.id,
-                  namaSiswa: ps.siswa.namaMurid
-                },
-                ...anggotaKeluarga.map(ak => ({
-                  siswaId: ak.id,
-                  namaSiswa: ak.namaMurid
-                }))
-              ];
+              // Hanya anggota keluarga (bukan ketua)
+              const anggotaKeluargaFormatted = anggotaKeluarga.map(ak => ({
+                siswaId: ak.id,
+                namaSiswa: ak.namaMurid
+              }));
 
               result.push({
                 siswaId: ps.siswa.id,
                 namaSiswa: ps.siswa.namaMurid,
-                anggota: semuaAnggota
+                anggota: anggotaKeluargaFormatted
               });
             }
           }
