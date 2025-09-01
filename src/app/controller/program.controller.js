@@ -92,7 +92,8 @@ class ProgramController {
 
   getProgramStudents = ErrorHandler.asyncHandler(async (req, res) => {
     const { programId } = HttpRequest.getUrlParams(req);
-    const result = await programService.getProgramStudents(programId);
+    const filters = HttpRequest.getQueryParams(req, ['page', 'limit']);
+    const result = await programService.getProgramStudents(programId, filters);
     return Http.Response.success(res, result);
   });
 

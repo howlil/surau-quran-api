@@ -2,7 +2,6 @@ const kelasService = require('../service/kelas.service');
 const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
-const { logger } = require('../../lib/config/logger.config');
 
 class KelasController {
     create = ErrorHandler.asyncHandler(async (req, res) => {

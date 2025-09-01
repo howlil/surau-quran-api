@@ -188,29 +188,175 @@ class ProgramService {
     }
   }
 
-  async getProgramStudents(programId) {
+  async getProgramStudents(programId, filters = {}) {
     try {
+      const { page = 1, limit = 10 } = filters;
 
-      const programSiswaList = await prisma.programSiswa.findMany({
-        where: {
-          kelasProgramId: null,
-          status: 'AKTIF',
-          programId: programId
-        },
-        include: {
-          siswa: true
+      // Ambil informasi program untuk menentukan tipe dan nama
+      const program = await prisma.program.findUnique({
+        where: { id: programId },
+        select: {
+          id: true,
+          namaProgram: true,
+          tipeProgram: true
         }
       });
 
-      // 3. Mapping ke response
+      if (!program) {
+        throw new Error('Program tidak ditemukan');
+      }
+
+      // Tentukan subtipe private berdasarkan nama program
+      const getPrivateSubType = (programName) => {
+        if (programName.toLowerCase().includes('mandiri')) return 'MANDIRI';
+        if (programName.toLowerCase().includes('sharing')) return 'SHARING';
+        if (programName.toLowerCase().includes('bersaudara')) return 'BERSAUDARA';
+        return null;
+      };
+
+      if (program.tipeProgram === 'PRIVATE') {
+        const subType = getPrivateSubType(program.namaProgram);
+        
+        if (subType === 'SHARING' || subType === 'BERSAUDARA') {
+          // Case 1: Private sharing/bersaudara
+          const whereClause = {
+            kelasProgramId: null,
+            status: 'AKTIF',
+            programId: programId
+          };
+
+          const [total, programSiswaList] = await prisma.$transaction([
+            prisma.programSiswa.count({ where: whereClause }),
+            prisma.programSiswa.findMany({
+              where: whereClause,
+              include: {
+                siswa: true
+              },
+              skip: (page - 1) * limit,
+              take: limit,
+              orderBy: { createdAt: 'desc' }
+            })
+          ]);
+
+          const result = [];
+          const processedKeluargaIds = new Set();
+
+          for (const ps of programSiswaList) {
+            if (ps.siswa.keluargaId && !processedKeluargaIds.has(ps.siswa.keluargaId)) {
+              processedKeluargaIds.add(ps.siswa.keluargaId);
+
+              // Cari semua siswa dengan keluargaId yang sama
+              const anggotaKeluarga = await prisma.siswa.findMany({
+                where: {
+                  keluargaId: ps.siswa.keluargaId,
+                  id: { not: ps.siswa.id }
+                },
+                select: {
+                  id: true,
+                  namaMurid: true
+                }
+              });
+
+              result.push({
+                programSiswaId: ps.id,
+                siswaList: [
+                  {
+                    siswaId: ps.siswa.id,
+                    namaSiswa: ps.siswa.namaMurid,
+                    anggotaKeluarga: anggotaKeluarga.map(ak => ({
+                      siswaId: ak.id,
+                      namaSiswa: ak.namaMurid
+                    }))
+                  }
+                ]
+              });
+            }
+          }
+
+          return {
+            data: result,
+            pagination: {
+              total,
+              limit,
+              page,
+              totalPages: Math.ceil(total / limit)
+            }
+          };
+
+        } else if (subType === 'MANDIRI') {
+          // Case 2: Private mandiri
+          const whereClause = {
+            kelasProgramId: null,
+            status: 'AKTIF',
+            programId: programId
+          };
+
+          const [total, programSiswaList] = await prisma.$transaction([
+            prisma.programSiswa.count({ where: whereClause }),
+            prisma.programSiswa.findMany({
+              where: whereClause,
+              include: {
+                siswa: true
+              },
+              skip: (page - 1) * limit,
+              take: limit,
+              orderBy: { createdAt: 'desc' }
+            })
+          ]);
+
+          const result = programSiswaList.map(ps => ({
+            programSiswaId: ps.id,
+            siswaId: ps.siswa.id,
+            namaSiswa: ps.siswa.namaMurid
+          }));
+
+          return {
+            data: result,
+            pagination: {
+              total,
+              limit,
+              page,
+              totalPages: Math.ceil(total / limit)
+            }
+          };
+        }
+      }
+
+      // Case 3: Program GROUP
+      const whereClause = {
+        kelasProgramId: null,
+        status: 'AKTIF',
+        programId: programId
+      };
+
+      const [total, programSiswaList] = await prisma.$transaction([
+        prisma.programSiswa.count({ where: whereClause }),
+        prisma.programSiswa.findMany({
+          where: whereClause,
+          include: {
+            siswa: true
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: 'desc' }
+        })
+      ]);
+
       const result = programSiswaList.map(ps => ({
         programSiswaId: ps.id,
         siswaId: ps.siswa.id,
-        namaSiswa: ps.siswa.namaMurid,
-        NIS: ps.siswa.nis
+        namaSiswa: ps.siswa.namaMurid
       }));
 
-      return result;
+      return {
+        data: result,
+        pagination: {
+          total,
+          limit,
+          page,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
 
     } catch (error) {
       logger.error('Error getting program students:', error);
