@@ -225,31 +225,27 @@ class ProgramService {
             programId: programId
           };
 
-          const [total, programSiswaList] = await prisma.$transaction([
-            prisma.programSiswa.count({ where: whereClause }),
-            prisma.programSiswa.findMany({
-              where: whereClause,
-              include: {
-                siswa: true
-              },
-              skip: (page - 1) * limit,
-              take: limit,
-              orderBy: { createdAt: 'desc' }
-            })
-          ]);
+          // Ambil semua data dulu untuk mencari ketua (siswa yang tidak punya keluargaId atau yang pertama)
+          const allProgramSiswaList = await prisma.programSiswa.findMany({
+            where: whereClause,
+            include: {
+              siswa: true
+            },
+            orderBy: { createdAt: 'asc' } // Urutkan berdasarkan yang pertama mendaftar
+          });
 
           const result = [];
           const processedKeluargaIds = new Set();
 
-          for (const ps of programSiswaList) {
-            if (ps.siswa.keluargaId && !processedKeluargaIds.has(ps.siswa.keluargaId)) {
-              processedKeluargaIds.add(ps.siswa.keluargaId);
+          for (const ps of allProgramSiswaList) {
+            // Cari ketua: siswa yang tidak punya keluargaId (keluargaId = null)
+            if (!ps.siswa.keluargaId && !processedKeluargaIds.has(ps.siswa.id)) {
+              processedKeluargaIds.add(ps.siswa.id);
 
-              // Cari semua siswa dengan keluargaId yang sama
+              // Cari semua anggota keluarga yang memiliki keluargaId = id_siswa_ketua
               const anggotaKeluarga = await prisma.siswa.findMany({
                 where: {
-                  keluargaId: ps.siswa.keluargaId,
-                  id: { not: ps.siswa.id }
+                  keluargaId: ps.siswa.id // keluargaId = id ketua
                 },
                 select: {
                   id: true,
@@ -257,24 +253,34 @@ class ProgramService {
                 }
               });
 
+              // Tambahkan ketua ke dalam daftar anggota
+              const semuaAnggota = [
+                {
+                  siswaId: ps.siswa.id,
+                  namaSiswa: ps.siswa.namaMurid
+                },
+                ...anggotaKeluarga.map(ak => ({
+                  siswaId: ak.id,
+                  namaSiswa: ak.namaMurid
+                }))
+              ];
+
               result.push({
-                programSiswaId: ps.id,
-                siswaList: [
-                  {
-                    siswaId: ps.siswa.id,
-                    namaSiswa: ps.siswa.namaMurid,
-                    anggotaKeluarga: anggotaKeluarga.map(ak => ({
-                      siswaId: ak.id,
-                      namaSiswa: ak.namaMurid
-                    }))
-                  }
-                ]
+                siswaId: ps.siswa.id,
+                namaSiswa: ps.siswa.namaMurid,
+                anggota: semuaAnggota
               });
             }
           }
 
+          // Apply pagination pada hasil yang sudah difilter
+          const total = result.length;
+          const startIndex = (page - 1) * limit;
+          const endIndex = startIndex + limit;
+          const paginatedResult = result.slice(startIndex, endIndex);
+
           return {
-            data: result,
+            data: paginatedResult,
             pagination: {
               total,
               limit,
@@ -305,7 +311,6 @@ class ProgramService {
           ]);
 
           const result = programSiswaList.map(ps => ({
-            programSiswaId: ps.id,
             siswaId: ps.siswa.id,
             namaSiswa: ps.siswa.namaMurid
           }));
@@ -343,7 +348,6 @@ class ProgramService {
       ]);
 
       const result = programSiswaList.map(ps => ({
-        programSiswaId: ps.id,
         siswaId: ps.siswa.id,
         namaSiswa: ps.siswa.namaMurid
       }));
