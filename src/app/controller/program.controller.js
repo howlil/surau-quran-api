@@ -69,6 +69,7 @@ class ProgramController {
       namaProgram: program.namaProgram,
       deskripsi: program.deskripsi,
       cover: FileUtils.getImageUrl(baseUrl, program.cover),
+      tipeProgram: program.tipeProgram,
       biayaSpp: Number(program.biayaSpp),
       createdAt: program.createdAt,
       updatedAt: program.updatedAt
