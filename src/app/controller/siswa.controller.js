@@ -33,14 +33,11 @@ class SiswaController {
     const data = HttpRequest.getBodyParams(req);
     const result = await siswaService.createPendaftaran(data);
     return Http.Response.success(res, {
-      message: 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran',
-      data: {
-        pendaftaranId: result.pendaftaranId,
-        invoiceUrl: result.paymentInfo.xenditInvoiceUrl,
-        expiryDate: result.paymentInfo.expireDate,
-        amount: result.paymentInfo.amount
-      }
-    });
+      pendaftaranId: result.pendaftaranId,
+      invoiceUrl: result.paymentInfo.xenditInvoiceUrl,
+      expiryDate: result.paymentInfo.expireDate,
+      amount: result.paymentInfo.amount
+    }, 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran');
   });
 
   getPendaftaranInvoice = ErrorHandler.asyncHandler(async (req, res) => {

@@ -13,9 +13,9 @@ const PRODUCTION_PROGRAMS = [
     { name: 'TAHSIN', type: 'GROUP', spp: 250000 },
     { name: 'TAHFIDZ', type: 'GROUP', spp: 250000 },
     // Private Programs
-    { name: 'Private Mandiri', type: 'PRIVATE', spp: 640000 },
-    { name: 'Private Bersaudara', type: 'PRIVATE', spp: 640000 },
-    { name: 'Private Sharing', type: 'PRIVATE', spp: 640000 }
+    { name: 'Private Mandiri', type: 'PRIVATE', spp: 250000 },
+    { name: 'Private Bersaudara', type: 'PRIVATE', spp: 250000 },
+    { name: 'Private Sharing', type: 'PRIVATE', spp: 250000 }
 ];
 
 const PRODUCTION_KELAS = [
