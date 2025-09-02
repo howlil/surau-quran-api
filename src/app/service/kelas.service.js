@@ -720,7 +720,7 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private ${subType} program detected. Found ${eligibleProgramSiswa.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                            logger.info(`Private ${subType} program detected. Found ${eligibleProgramSiswa.length} students with ketua: ${firstSiswaId}`);
                         } else {
                             throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
                         }
