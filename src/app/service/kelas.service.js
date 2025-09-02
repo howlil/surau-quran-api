@@ -426,17 +426,10 @@ class KelasService {
                                 throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
                             }
 
-                            // Ambil keluargaId dari siswa pertama yang dipilih
-                            const firstSiswa = await tx.siswa.findUnique({
-                                where: { id: tambahSiswaIds[0] },
-                                select: { keluargaId: true }
-                            });
+                            // Ambil ID siswa pertama sebagai ketua keluarga
+                            const firstSiswaId = tambahSiswaIds[0];
 
-                            if (!firstSiswa || !firstSiswa.keluargaId) {
-                                throw new BadRequestError(`Siswa pertama harus memiliki keluargaId untuk program Private ${subType}`);
-                            }
-
-                            // Cari semua siswa yang memiliki keluargaId yang sama
+                            // Cari semua siswa yang memiliki keluargaId yang sama dengan ketua
                             programSiswaList = await tx.programSiswa.findMany({
                                 where: {
                                     siswaId: { in: tambahSiswaIds },
@@ -444,7 +437,10 @@ class KelasService {
                                     programId: updatedKelasProgram.programId,
                                     kelasProgramId: null,
                                     siswa: {
-                                        keluargaId: firstSiswa.keluargaId
+                                        OR: [
+                                            { id: firstSiswaId }, // Ketua (tidak punya keluargaId)
+                                            { keluargaId: firstSiswaId } // Anggota keluarga
+                                        ]
                                     }
                                 },
                                 include: {
@@ -452,7 +448,7 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private ${subType} program detected. Found ${programSiswaList.length} students with keluargaId: ${firstSiswa.keluargaId}`);
+                            logger.info(`Private ${subType} program detected. Found ${programSiswaList.length} students with ketua: ${firstSiswaId}`);
                         } else {
                             throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
                         }
@@ -702,17 +698,10 @@ class KelasService {
                                 throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
                             }
 
-                            // Ambil keluargaId dari siswa pertama yang dipilih
-                            const firstSiswa = await tx.siswa.findUnique({
-                                where: { id: siswaIds[0] },
-                                select: { keluargaId: true }
-                            });
+                            // Ambil ID siswa pertama sebagai ketua keluarga
+                            const firstSiswaId = siswaIds[0];
 
-                            if (!firstSiswa || !firstSiswa.keluargaId) {
-                                throw new BadRequestError(`Siswa pertama harus memiliki keluargaId untuk program Private ${subType}`);
-                            }
-
-                            // Cari semua siswa yang memiliki keluargaId yang sama
+                            // Cari semua siswa yang memiliki keluargaId yang sama dengan ketua
                             eligibleProgramSiswa = await tx.programSiswa.findMany({
                                 where: {
                                     siswaId: { in: siswaIds },
@@ -720,7 +709,10 @@ class KelasService {
                                     status: 'AKTIF',
                                     kelasProgramId: null,
                                     siswa: {
-                                        keluargaId: firstSiswa.keluargaId
+                                        OR: [
+                                            { id: firstSiswaId }, // Ketua (tidak punya keluargaId)
+                                            { keluargaId: firstSiswaId } // Anggota keluarga
+                                        ]
                                     }
                                 },
                                 include: {
