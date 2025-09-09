@@ -2208,8 +2208,7 @@ class SiswaService {
             programSiswaId: programLama.id,
             statusLama: 'AKTIF',
             statusBaru: 'TIDAK_AKTIF',
-            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
-            keterangan: `Pindah ke program ${programBaru.namaProgram}`
+            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
           }
         });
 
@@ -2242,8 +2241,7 @@ class SiswaService {
             programSiswaId: programSiswaBaru.id,
             statusLama: 'TIDAK_AKTIF',
             statusBaru: 'AKTIF',
-            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT),
-            keterangan: `Pindah dari program ${programLama.program.namaProgram}`
+            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
           }
         });
 
