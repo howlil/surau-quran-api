@@ -26,14 +26,12 @@ class AbsensiController {
         const data = HttpRequest.getBodyParams(req);
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
-        // Handle file upload surat izin
         if (req.file) {
             data.suratIzin = req.file.filename;
         }
 
         const result = await absensiService.updateAbsensiGuru(id, data);
 
-        // Transform the suratIzin URL if it exists
         if (result.suratIzin) {
             result.suratIzin = FileUtils.getSuratIzinUrl(baseUrl, result.suratIzin);
         }

@@ -536,7 +536,9 @@ class SiswaService {
               program: {
                 select: {
                   id: true,
-                  namaProgram: true
+                  namaProgram: true,
+                  tipeProgram: true
+
                 }
               },
               JadwalProgramSiswa: {
@@ -1150,14 +1152,16 @@ class SiswaService {
           program: {
             select: {
               id: true,
-              namaProgram: true
+              namaProgram: true,
+              tipeProgram: true
             }
           },
           siswa: {
             select: {
               id: true,
               namaMurid: true,
-              nis: true
+              nis: true,
+              keluargaId: true
             }
           }
         }
@@ -1168,6 +1172,31 @@ class SiswaService {
       }
 
       const oldStatus = programSiswa.status;
+
+      // Jika status akan diubah menjadi TIDAK_AKTIF dan program PRIVATE (SHARING/BERSAUDARA),
+      // dan siswa adalah ketua (keluargaId null), lakukan rotasi ketua
+      if (status === 'TIDAK_AKTIF' && programSiswa.program.tipeProgram === 'PRIVATE') {
+        const subType = this.getPrivateSubType(programSiswa.program.namaProgram);
+        if (subType === 'SHARING' || subType === 'BERSAUDARA') {
+          const isKetua = !programSiswa.siswa.keluargaId;
+          if (isKetua) {
+            const exKetuaId = programSiswa.siswa.id;
+            const anggota = await prisma.siswa.findMany({
+              where: { keluargaId: exKetuaId },
+              select: { id: true }
+            });
+            if (anggota.length > 0) {
+              const randomIndex = Math.floor(Math.random() * anggota.length);
+              const ketuaBaru = anggota[randomIndex];
+              await prisma.siswa.update({ where: { id: ketuaBaru.id }, data: { keluargaId: null } });
+              const otherMemberIds = anggota.filter(a => a.id !== ketuaBaru.id).map(a => a.id);
+              if (otherMemberIds.length > 0) {
+                await prisma.siswa.updateMany({ where: { id: { in: otherMemberIds } }, data: { keluargaId: ketuaBaru.id } });
+              }
+            }
+          }
+        }
+      }
 
       // Update status
       const updatedProgramSiswa = await prisma.programSiswa.update({
@@ -2154,6 +2183,10 @@ class SiswaService {
 
       if (!programBaru) {
         throw new NotFoundError(`Program dengan ID ${programBaruId} tidak ditemukan`);
+      }
+
+      if (programLama.program.tipeProgram !== programBaru.tipeProgram) {
+        throw new BadRequestError('Siswa private tidak bisa pindah ke grup dan sebaliknya');
       }
 
       // 4. Validasi tidak pindah ke program yang sama
