@@ -122,6 +122,7 @@ model Guru {
 model Kelas {
   id                 String   @id @default(uuid())
   namaKelas          String
+  warnaCard          String?
   ipAddressHikvision String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -491,6 +492,7 @@ enum Gender {
 }
 
 enum SPM {
+  BELUM_SEKOLAH
   PAUD
   TK
   SD

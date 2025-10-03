@@ -30,9 +30,9 @@ class SiswaValidation {
           'string.max': 'Alamat maksimal 500 karakter',
           'any.required': 'Alamat wajib diisi'
         }),
-      strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
+      strataPendidikan: Joi.string().valid('BELUM_SEKOLAH', 'PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
         .messages({
-          'any.only': 'Strata pendidikan harus salah satu dari: PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
+          'any.only': 'Strata pendidikan harus salah satu dari: BELUM_SEKOLAH, PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
         }),
       kelasSekolah: Joi.string().min(1).max(191).optional()
         .messages({
@@ -142,9 +142,9 @@ class SiswaValidation {
           'string.min': 'Alamat minimal 10 karakter',
           'string.max': 'Alamat maksimal 500 karakter'
         }),
-      strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
+      strataPendidikan: Joi.string().valid('BELUM_SEKOLAH', 'PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
         .messages({
-          'any.only': 'Strata pendidikan harus salah satu dari: PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
+          'any.only': 'Strata pendidikan harus salah satu dari: BELUM_SEKOLAH, PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
         }),
       namaOrangTua: Joi.string().min(2).max(191).optional()
         .messages({

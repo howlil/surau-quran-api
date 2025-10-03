@@ -27,13 +27,9 @@ only siswa private
 3. 
 
 
-
 proses bisnis 
 1. siswa yang ingin prindah program dari grup ke privat atau sebaliknya, bisa menonaktifkan akunya terlebih dahulu, lalu bisa regis lagi dengan akun yang sama, jadi data lama ttp ada di admin, nmun di user gada
 2. berrati pas login siswa check tu apakah yg login ini akun yang aktif?
-
-
-
 
 
 3. kemudian jika siswa private di nonaktifkan akunya, coba cek
@@ -45,3 +41,11 @@ proses bisnis
     - maka secara random mandat ketua akan di berikan ke anggotanya (orang yang memiliki keluargaId yang sama dengan ex ketua)
     - lalu jika sudah ditentukan siapa ketua barunya (orang ini harus di hapus field keluarga Id sebagai penda kalau dia ketua)
     - update keluargaid baru anggota yang lainya
+
+
+
+TODO :
+- ⁠Eror tambah siswa kelas pengganti (eror prisma, tapi data masih masuk) -> Onprogress 
+
+- Tambah pemilihan bayar tunai dan non tunai (ada inputan manual nominal admin) -> Ini perlu pertimbangan buya, apakah nantinya masih akan diterima pembayaran non tunai? karna di sistem akan lebih rapi kalau pembayaran satu pintu 
+- Email siswa -> Kita akan create semua email dengan @surauqrancenter.com nantinya kita akan masukkan ke spreadsheet untuk bahan dari buya, dan kita kirimkan ke whatsapp berupa broadcast ke no siswa masing2

@@ -69,12 +69,7 @@ class WhatsAppUtils {
         }
     }
 
-    /**
-     * Kirim pesan berbasis TEMPLATE resmi (HSM) di WhatsApp Cloud API.
-     * @param {string} phoneNumber - nomor penerima (bisa 08xx atau 62xxx)
-     * @param {string} templateName - nama template yang APPROVED, contoh: "registration_success"
-     * @param {object} templateOptions - { languageCode: 'id', bodyParams: ['Alvin', '12-08-2025'], headerParams: [], buttonParams: [] }
-     */
+  
     static async sendTemplateMessage(phoneNumber, templateName, templateOptions = {}) {
         try {
             const client = WhatsappConfig.getClient();
@@ -179,8 +174,7 @@ class WhatsAppUtils {
 
 
     static #wrapParam(value, explicitType) {
-        // WhatsApp API parameter types: text, currency, date_time, payload, etc.
-        // Kita default-kan ke "text", kecuali disuruh payload (untuk quick_reply)
+      
         const type = explicitType || 'text';
         if (type === 'payload') {
             return { type: 'payload', payload: String(value) };

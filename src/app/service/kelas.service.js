@@ -148,6 +148,9 @@ class KelasService {
                 select: {
                     id: true,
                     namaKelas: true,
+                    warnaCard: true,
+                    createdAt: true,
+                    updatedAt: true
                 },
                 orderBy: {
                     createdAt: 'desc'
@@ -160,6 +163,7 @@ class KelasService {
             throw error;
         }
     }
+
 
     async getInitialStudentIntoClass() {
         try {

@@ -303,7 +303,7 @@ class FakerSeeder {
                                     tanggalLahir: this.generateDate(2000, 2015),
                                     jenisKelamin: Math.random() > 0.5 ? 'LAKI_LAKI' : 'PEREMPUAN',
                                     alamat: Math.random() > 0.1 ? faker.location.streetAddress() : null,
-                                    strataPendidikan: faker.helpers.arrayElement(['SD', 'SMP', 'SMA', 'KULIAH']),
+                                    strataPendidikan: faker.helpers.arrayElement(['BELUM_SEKOLAH', 'PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM']),
                                     kelasSekolah: Math.random() > 0.1 ? `${faker.number.int({ min: 1, max: 12 })}` : null,
                                     namaSekolah: Math.random() > 0.1 ? `${faker.company.name()} School` : null,
                                     namaOrangTua: faker.person.fullName(),
