@@ -269,8 +269,11 @@ class SiswaService {
         }
       });
 
-      const defaultPassword = `${namaPanggilan}${tanggalLahir || ''}`;
-      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+      const generatedPassword = DataGeneratorUtils.generateStudentPassword(
+        namaPanggilan,
+        tanggalLahir
+      );
+      const hashedPassword = await PasswordUtils.hash(generatedPassword);
       const user = await prisma.user.create({
         data: {
           email,
@@ -394,8 +397,11 @@ class SiswaService {
         const student = siswa[i];
         const fee = calculatedFees[i];
 
-        const defaultPassword = `${student.namaPanggilan}${student.tanggalLahir}`;
-        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const generatedPassword = DataGeneratorUtils.generateStudentPassword(
+          student.namaPanggilan,
+          student.tanggalLahir
+        );
+        const hashedPassword = await PasswordUtils.hash(generatedPassword);
         const user = await prisma.user.create({
           data: {
             email: student.email,
