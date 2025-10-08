@@ -259,6 +259,43 @@ class ProductionSeeder {
         }
     }
 
+    async createJamMengajar() {
+        try {
+            for (const jamData of PRODUCTION_JAM_MENGAJAR) {
+                // Check if jam mengajar already exists
+                const existingJam = await prismaClient.jamMengajar.findFirst({
+                    where: {
+                        jamMulai: jamData.jamMulai,
+                        jamSelesai: jamData.jamSelesai
+                    }
+                });
+
+                if (existingJam) {
+                    console.log(`⚠️ Jam mengajar "${jamData.jamMulai} - ${jamData.jamSelesai}" already exists, skipping...`);
+                    this.data.jamMengajar.push(existingJam);
+                    continue;
+                }
+
+                // Create jam mengajar
+                const jamMengajar = await prismaClient.jamMengajar.create({
+                    data: {
+                        id: uuidv4(),
+                        jamMulai: jamData.jamMulai,
+                        jamSelesai: jamData.jamSelesai,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }
+                });
+
+                this.data.jamMengajar.push(jamMengajar);
+                console.log(`⏰ Jam mengajar created: ${jamMengajar.jamMulai} - ${jamMengajar.jamSelesai}`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to create jam mengajar:', error.message);
+            throw error;
+        }
+    }
+
     async cleanup() {
         try {
             await prismaClient.$disconnect();
