@@ -406,7 +406,8 @@ class PaymentService {
               financeRecord = await financeService.createFromEnrollmentPayment({
                 id: updatedPayment.id,
                 jumlahTagihan: updatedPayment.jumlahTagihan,
-                tanggalPembayaran: updatedPayment.tanggalPembayaran
+                tanggalPembayaran: updatedPayment.tanggalPembayaran,
+                metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
               });
               logger.info('Successfully synced enrollment payment to finance:', {
                 paymentId: updatedPayment.id,
@@ -417,7 +418,8 @@ class PaymentService {
               financeRecord = await financeService.createFromSppPayment({
                 id: updatedPayment.id,
                 jumlahTagihan: updatedPayment.jumlahTagihan,
-                tanggalPembayaran: updatedPayment.tanggalPembayaran
+                tanggalPembayaran: updatedPayment.tanggalPembayaran,
+                metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
               });
               logger.info('Successfully synced SPP payment to finance:', {
                 paymentId: updatedPayment.id,

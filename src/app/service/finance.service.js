@@ -26,7 +26,7 @@ class FinanceService {
         }
     }
 
-    async getAll(filters = {}) {
+     async getAll(filters = {}) {
         try {
             const { startDate, endDate, type, page = 1, limit = 10 } = filters;
 
@@ -256,10 +256,9 @@ class FinanceService {
         }
     }
 
-    // Auto-sync methods untuk payment gateway integration
     async createFromSppPayment(pembayaranData) {
         try {
-            const { id, jumlahTagihan, tanggalPembayaran } = pembayaranData;
+            const { id, jumlahTagihan, tanggalPembayaran, metodePembayaran } = pembayaranData;
 
             // Check if finance record already exists for this payment
             const existingRecord = await prisma.finance.findFirst({
@@ -273,10 +272,15 @@ class FinanceService {
                 return existingRecord;
             }
 
+            // Deskripsi yang berbeda berdasarkan metode pembayaran
+            const metodeText = metodePembayaran === 'TUNAI' ? 'Tunai' : 'Payment Gateway';
+            const deskripsi = `Pembayaran SPP ${metodeText} (Auto) - Payment ID: ${id}`;
+
             const financeRecord = await prisma.finance.create({
                 data: {
                     tanggal: tanggalPembayaran,
-                    deskripsi: `Pembayaran SPP (Auto) - Payment ID: ${id}`,
+                    deskripsi: deskripsi,
+                    metodePembayaran: metodePembayaran || 'PAYMENT_GATEWAY',
                     type: 'INCOME',
                     category: 'SPP',
                     total: jumlahTagihan,
@@ -284,7 +288,7 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Auto-created finance record for SPP payment ID: ${id}, Amount: ${jumlahTagihan}`);
+            logger.info(`Auto-created finance record for SPP payment ID: ${id}, Amount: ${jumlahTagihan}, Method: ${metodePembayaran || 'PAYMENT_GATEWAY'}`);
             return financeRecord;
         } catch (error) {
             logger.error(`Error creating finance record from SPP payment:`, error);
@@ -295,7 +299,7 @@ class FinanceService {
     async createFromEnrollmentPayment(pembayaranData) {
         try {
             logger.info('Creating finance record from enrollment payment:', pembayaranData);
-            const { id, jumlahTagihan, tanggalPembayaran } = pembayaranData;
+            const { id, jumlahTagihan, tanggalPembayaran, metodePembayaran } = pembayaranData;
 
             // Check if finance record already exists for this payment
             const existingRecord = await prisma.finance.findFirst({
@@ -312,10 +316,15 @@ class FinanceService {
                 return existingRecord;
             }
 
+            // Tentukan deskripsi berdasarkan metode pembayaran
+            const metodeText = metodePembayaran === 'TUNAI' ? 'Tunai' : 'Payment Gateway';
+            const deskripsi = `Pembayaran Pendaftaran ${metodeText} (Auto) - Payment ID: ${id}`;
+
             const financeRecord = await prisma.finance.create({
                 data: {
                     tanggal: tanggalPembayaran,
-                    deskripsi: `Pembayaran Pendaftaran (Auto) - Payment ID: ${id}`,
+                    deskripsi: deskripsi,
+                    metodePembayaran: metodePembayaran || 'PAYMENT_GATEWAY', // Default untuk backward compatibility
                     type: 'INCOME',
                     category: 'ENROLLMENT',
                     total: jumlahTagihan,
@@ -327,7 +336,8 @@ class FinanceService {
                 paymentId: id,
                 financeRecordId: financeRecord.id,
                 amount: Number(jumlahTagihan),
-                date: tanggalPembayaran
+                date: tanggalPembayaran,
+                metodePembayaran: metodePembayaran
             });
             return financeRecord;
         } catch (error) {

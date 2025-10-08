@@ -86,6 +86,7 @@ class ProgramController {
       programId: program.id,
       namaProgram: program.namaProgram,
       deskripsi: program.deskripsi,
+      tipeProgram: program.tipeProgram,
       cover: program.cover
     }));
     return Http.Response.success(res, mappedResult, 'Data program publik berhasil diambil');

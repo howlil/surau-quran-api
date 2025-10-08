@@ -1,4 +1,3 @@
-// src/app/validation/payment.validation.js
 const Joi = require('joi');
 const ValidatorFactory = require('./factory.validation');
 
@@ -20,9 +19,25 @@ class PaymentValidation {
         .messages({
           'string.min': 'Kode voucher minimal 3 karakter',
           'string.max': 'Kode voucher maksimal 50 karakter'
+        }),
+      metodePembayaran: Joi.string().valid('TUNAI', "PAYMENT_GATEWAY").required()
+        .messages({
+          'any.only': 'Metode pembayaran harus TUNAI atau PAYMENT_GATEWAY',
+          'any.required': 'Metode pembayaran wajib diisi'
+        }),
+      evidence: Joi.string().optional()
+        .when('metodePembayaran', {
+          is: 'TUNAI',
+          then: Joi.required().messages({
+            'any.required': 'Bukti pembayaran wajib diupload untuk pembayaran tunai'
+          }),
+          otherwise: Joi.forbidden().messages({
+            'any.unknown': 'Bukti pembayaran hanya diperlukan untuk metode TUNAI'
+          })
         })
     });
   }
+
 
   static xenditCallback() {
     return ValidatorFactory.create({

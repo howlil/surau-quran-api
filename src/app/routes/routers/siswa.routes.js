@@ -52,6 +52,8 @@ router.post(
   siswaController.pendaftaranSiswaV2
 );
 
+
+// nanti  tambahin siswa baru yang status bayarnya pending
 router.get(
   '/v1/pendaftaran/invoice',
   authMiddleware.authenticate,

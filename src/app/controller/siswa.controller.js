@@ -3,6 +3,7 @@ const Http = require('../../lib/http');
 const HttpRequest = require('../../lib/http/request.http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const XenditUtils = require('../../lib/utils/xendit.utils');
+const FileUtils = require('../../lib/utils/file.utils');
 const { BadRequestError } = require('../../lib/http/errors.http');
 
 class SiswaController {
@@ -31,13 +32,33 @@ class SiswaController {
 
   pendaftaranSiswa = ErrorHandler.asyncHandler(async (req, res) => {
     const data = HttpRequest.getBodyParams(req);
+    
+    // Handle evidence file upload untuk pembayaran tunai
+    if (req.file && req.file.fieldname === 'evidence') {
+      data.evidence = req.file.filename;
+    }
+
     const result = await siswaService.createPendaftaran(data);
-    return Http.Response.success(res, {
-      pendaftaranId: result.pendaftaranId,
-      invoiceUrl: result.paymentInfo.xenditInvoiceUrl,
-      expiryDate: result.paymentInfo.expireDate,
-      amount: result.paymentInfo.amount
-    }, 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran');
+    
+    // Handle response berdasarkan metode pembayaran
+    if (result.success && result.data) {
+      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+      const transformedResult = FileUtils.transformPembayaranFiles(result.data, baseUrl);
+      
+      return Http.Response.success(res, {
+        success: true,
+        message: result.message,
+        data: transformedResult
+      }, 'Pendaftaran tunai berhasil, akun siswa telah dibuat');
+    } else {
+      // Response untuk pembayaran gateway (Xendit)
+      return Http.Response.success(res, {
+        pendaftaranId: result.pendaftaranId,
+        invoiceUrl: result.paymentInfo.xenditInvoiceUrl,
+        expiryDate: result.paymentInfo.expireDate,
+        amount: result.paymentInfo.amount
+      }, 'Pendaftaran berhasil dibuat, silahkan lakukan pembayaran');
+    }
   });
 
   getPendaftaranInvoice = ErrorHandler.asyncHandler(async (req, res) => {
@@ -80,42 +101,84 @@ class SiswaController {
     return Http.Response.success(res, result, 'Siswa berhasil pindah program');
   });
 
-  // Pendaftaran V2 dengan support private program
   pendaftaranSiswaV2 = ErrorHandler.asyncHandler(async (req, res) => {
-    // Handle multipart form data - data bisa langsung di req.body atau dalam field 'data'
     let data;
 
     if (req.body.data) {
-      // Jika data ada dalam field 'data' sebagai JSON string
       try {
         data = JSON.parse(req.body.data);
       } catch (error) {
         throw new BadRequestError('Format data JSON tidak valid');
       }
     } else {
-      // Jika data langsung ada di req.body
       data = req.body;
     }
 
-    // Validate that data is not empty
     if (!data || Object.keys(data).length === 0) {
       throw new BadRequestError('Data pendaftaran tidak boleh kosong');
     }
 
+    // Handle file uploads - bisa ada kartu keluarga, evidence, atau keduanya
+    let kartuKeluargaFile = null;
+    let evidenceFile = null;
 
+    // Handle single file upload
+    if (req.file) {
+      if (req.file.fieldname === 'kartuKeluarga') {
+        kartuKeluargaFile = req.file.filename;
+      } else if (req.file.fieldname === 'evidence') {
+        evidenceFile = req.file.filename;
+      }
+    }
 
-    // Get uploaded file (kartuKeluarga) if any
-    const kartuKeluargaFile = req.file ? req.file.filename : null;
+    // Handle multiple files upload (bisa ada kartu keluarga + evidence)
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach(file => {
+        if (file.fieldname === 'kartuKeluarga') {
+          kartuKeluargaFile = file.filename;
+        } else if (file.fieldname === 'evidence') {
+          evidenceFile = file.filename;
+        }
+      });
+    }
 
+    // Handle multiple files dalam object (multer dengan multiple fields)
+    if (req.files && typeof req.files === 'object' && !Array.isArray(req.files)) {
+      Object.keys(req.files).forEach(fieldname => {
+        const file = req.files[fieldname];
+        if (fieldname === 'kartuKeluarga') {
+          kartuKeluargaFile = file.filename;
+        } else if (fieldname === 'evidence') {
+          evidenceFile = file.filename;
+        }
+      });
+    }
+
+    if (evidenceFile) {
+      data.evidence = evidenceFile;
+    }
+
+  
     const result = await siswaService.createPendaftaranV2(data, kartuKeluargaFile);
 
-    return Http.Response.success(res, {
-      pendaftaranId: result.pendaftaranId,
-      pembayaranId: result.pembayaranId,
-      invoiceUrl: result.invoiceUrl,
-      totalBiaya: result.totalBiaya,
-      siswaCount: result.siswaCount
-    }, 'Pendaftaran berhasil dilakukan, silakan lakukan pembayaran');
+    if (result.success && result.data) {
+      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+      const transformedResult = FileUtils.transformPembayaranFiles(result.data, baseUrl);
+      
+      return Http.Response.success(res, {
+        success: true,
+        message: result.message,
+        data: transformedResult
+      }, 'Pendaftaran tunai V2 berhasil, akun siswa telah dibuat');
+    } else {
+      return Http.Response.success(res, {
+        pendaftaranId: result.pendaftaranId,
+        pembayaranId: result.pembayaranId,
+        invoiceUrl: result.invoiceUrl,
+        totalBiaya: result.totalBiaya,
+        siswaCount: result.siswaCount
+      }, 'Pendaftaran berhasil dilakukan, silakan lakukan pembayaran');
+    }
   });
 }
 

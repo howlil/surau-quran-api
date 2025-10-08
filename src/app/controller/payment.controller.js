@@ -7,6 +7,7 @@ const Http = require('../../lib/http');
 const ErrorHandler = require('../../lib/http/error.handler.htttp');
 const { xenditConfig } = require('../../lib/config/xendit.config');
 const { BadRequestError } = require('../../lib/http/errors.http');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class PaymentController {
 
@@ -24,7 +25,6 @@ class PaymentController {
         try {
             const result = await paymentService.handleXenditCallback(rawBody);
             
-            // Check if result exists and has required properties
             if (!result) {
                 logger.warn('No result returned from handleXenditCallback');
                 return res.status(500).json({
@@ -88,18 +88,43 @@ class PaymentController {
     });
 
     createSppPayment = ErrorHandler.asyncHandler(async (req, res) => {
-        const { periodeSppIds, kodeVoucher } = req.body;
+        const { periodeSppIds, kodeVoucher, metodePembayaran } = req.body;
         const userId = req.user.id;
 
         if (!periodeSppIds || !Array.isArray(periodeSppIds) || periodeSppIds.length === 0) {
             throw new BadRequestError('Pilih minimal satu periode SPP untuk dibayar');
         }
 
+        // Handle evidence file upload untuk pembayaran tunai
+        let evidence = null;
+        if (req.file && req.file.fieldname === 'evidence') {
+            evidence = req.file.filename;
+        }
+
         const paymentData = await sppService.createSppPayment(userId, {
             periodeSppIds,
-            kodeVoucher
+            kodeVoucher,
+            metodePembayaran,
+            evidence
         });
 
+        // Jika pembayaran tunai, langsung proses dan return success
+        if (metodePembayaran === 'TUNAI') {
+            const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+            const transformedResult = FileUtils.transformPembayaranFiles(paymentData.pembayaran, baseUrl);
+            
+            return Http.Response.success(res, {
+                success: true,
+                message: 'Pembayaran SPP tunai berhasil',
+                data: {
+                    pembayaran: transformedResult,
+                    periodeSppIds,
+                    description: `SPP ${paymentData.payment.periods} - ${paymentData.payment.programs}`
+                }
+            }, 'Pembayaran SPP tunai berhasil');
+        }
+
+        // Jika payment gateway, buat invoice Xendit
         const invoiceData = await paymentService.createBatchSppInvoice({
             periodeSppIds,
             siswa: paymentData.siswa,

@@ -5,6 +5,8 @@ const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http')
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
+const financeService = require('./finance.service');
+const moment = require('moment');
 
 class SppService {
     async getSppForAdmin(filters = {}) {
@@ -243,7 +245,7 @@ class SppService {
 
     async createSppPayment(userId, data) {
         try {
-            const { periodeSppIds, kodeVoucher } = data;
+            const { periodeSppIds, kodeVoucher, metodePembayaran, evidence } = data;
 
             const siswa = await prisma.siswa.findUnique({
                 where: { userId },
@@ -298,8 +300,6 @@ class SppService {
                     throw new NotFoundError('Voucher tidak valid atau tidak aktif');
                 }
 
-
-
                 voucherId = voucher.id;
 
                 if (voucher.tipe === 'NOMINAL') {
@@ -328,6 +328,24 @@ class SppService {
             const monthYears = [...new Set(periods.map(p => `${p.bulan} ${p.tahun}`))].join(', ');
             const programs = [...new Set(periods.map(p => p.program))].join(', ');
 
+            // Jika pembayaran tunai, langsung proses pembayaran
+            if (metodePembayaran === 'TUNAI') {
+                return await this.processTunaiSppPayment({
+                    siswa,
+                    periodeSppList,
+                    periodeSppIds,
+                    periods: monthYears,
+                    programs,
+                    originalAmount: totalAmount,
+                    discountAmount,
+                    finalAmount,
+                    voucherId,
+                    kodeVoucher,
+                    evidence
+                });
+            }
+
+            // Jika payment gateway, return data untuk buat invoice
             return {
                 siswa: {
                     id: siswa.id,
@@ -349,6 +367,104 @@ class SppService {
             };
         } catch (error) {
             logger.error('Error creating SPP payment:', error);
+            throw error;
+        }
+    }
+
+    async processTunaiSppPayment(data) {
+        const {
+            siswa,
+            periodeSppList,
+            periodeSppIds,
+            periods,
+            programs,
+            originalAmount,
+            discountAmount,
+            finalAmount,
+            voucherId,
+            kodeVoucher,
+            evidence
+        } = data;
+
+        try {
+            // Buat pembayaran dengan status PAID
+            const pembayaran = await prisma.pembayaran.create({
+                data: {
+                    tipePembayaran: 'SPP',
+                    metodePembayaran: 'TUNAI',
+                    jumlahTagihan: finalAmount,
+                    statusPembayaran: 'PAID',
+                    tanggalPembayaran: new Date().toISOString().split('T')[0],
+                    evidence: evidence
+                }
+            });
+
+            // Update semua periode SPP dengan pembayaran ID
+            await prisma.periodeSpp.updateMany({
+                where: {
+                    id: { in: periodeSppIds }
+                },
+                data: {
+                    pembayaranId: pembayaran.id,
+                    statusPembayaran: 'PAID',
+                    tanggalPembayaran: new Date().toISOString().split('T')[0]
+                }
+            });
+
+            // Update voucher usage jika ada
+            if (voucherId) {
+                await prisma.voucher.update({
+                    where: { id: voucherId },
+                    data: {
+                        usedCount: {
+                            increment: 1
+                        }
+                    }
+                });
+            }
+
+            // Sync ke finance record
+
+            const tanggalPembayaran = moment().format('DD-MM-YYYY');
+
+            await financeService.createFromSppPayment({
+                id: pembayaran.id,
+                jumlahTagihan: finalAmount,
+                tanggalPembayaran: tanggalPembayaran,
+                metodePembayaran: 'TUNAI'
+            });
+
+            logger.info(`Successfully processed tunai SPP payment:`, {
+                pembayaranId: pembayaran.id,
+                siswaId: siswa.id,
+                periodeCount: periodeSppIds.length,
+                amount: finalAmount
+            });
+
+            return {
+                success: true,
+                message: 'Pembayaran SPP tunai berhasil',
+                pembayaran: pembayaran,
+                siswa: {
+                    id: siswa.id,
+                    nama: siswa.namaMurid,
+                    email: siswa.user.email,
+                    noWhatsapp: siswa.noWhatsapp,
+                    alamat: siswa.alamat
+                },
+                payment: {
+                    periodeSppIds,
+                    periods,
+                    programs,
+                    originalAmount,
+                    discountAmount,
+                    finalAmount,
+                    voucherId,
+                    kodeVoucher
+                }
+            };
+        } catch (error) {
+            logger.error('Error processing tunai SPP payment:', error);
             throw error;
         }
     }

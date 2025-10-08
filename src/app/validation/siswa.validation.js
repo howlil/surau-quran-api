@@ -94,6 +94,21 @@ class SiswaValidation {
           'number.positive': 'Total biaya harus lebih dari 0',
           'any.required': 'Total biaya wajib diisi jika tidak menggunakan voucher'
         }),
+      metodePembayaran: Joi.string().valid('TUNAI', "PAYMENT_GATEWAY").required()
+        .messages({
+          'any.only': 'Metode pembayaran harus TUNAI atau PAYMENT_GATEWAY',
+          'any.required': 'Metode pembayaran wajib diisi'
+        }),
+      evidence: Joi.string().optional()
+        .when('metodePembayaran', {
+          is: 'TUNAI',
+          then: Joi.required().messages({
+            'any.required': 'Bukti pembayaran wajib diupload untuk pembayaran tunai'
+          }),
+          otherwise: Joi.forbidden().messages({
+            'any.unknown': 'Bukti pembayaran hanya diperlukan untuk metode TUNAI'
+          })
+        }),
     });
   }
 
@@ -339,7 +354,6 @@ class SiswaValidation {
     });
   }
 
-  // Validation untuk pendaftaran V2 dengan support private program
   static pendaftaranSiswaV2() {
     return ValidatorFactory.create({
       siswa: Joi.array().items(
@@ -401,7 +415,7 @@ class SiswaValidation {
               'string.min': 'Nama penjemput minimal 2 karakter',
               'string.max': 'Nama penjemput maksimal 191 karakter'
             }),
-      
+
           noWhatsapp: Joi.string().pattern(/^(\+62|62|0)[0-9]{9,12}$/).max(20).required()
             .messages({
               'string.pattern.base': 'Format nomor WhatsApp tidak valid (contoh: 081234567890)',
@@ -467,8 +481,25 @@ class SiswaValidation {
           'number.base': 'Total biaya harus berupa angka',
           'number.positive': 'Total biaya harus lebih dari 0',
           'any.required': 'Total biaya wajib diisi'
+        }),
+      metodePembayaran: Joi.string().valid('TUNAI', "PAYMENT_GATEWAY").required()
+        .messages({
+          'any.only': 'Metode pembayaran harus TUNAI atau PAYMENT_GATEWAY',
+          'any.required': 'Metode pembayaran wajib diisi'
+        }),
+      evidence: Joi.string().optional()
+        .when('metodePembayaran', {
+          is: 'TUNAI',
+          then: Joi.required().messages({
+            'any.required': 'Bukti pembayaran wajib diupload untuk pembayaran tunai'
+          }),
+          otherwise: Joi.forbidden().messages({
+            'any.unknown': 'Bukti pembayaran hanya diperlukan untuk metode TUNAI'
+          })
         })
+
     });
+
   }
 }
 

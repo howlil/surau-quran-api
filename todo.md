@@ -49,3 +49,20 @@ TODO :
 
 - Tambah pemilihan bayar tunai dan non tunai (ada inputan manual nominal admin) -> Ini perlu pertimbangan buya, apakah nantinya masih akan diterima pembayaran non tunai? karna di sistem akan lebih rapi kalau pembayaran satu pintu 
 - Email siswa -> Kita akan create semua email dengan @surauqrancenter.com nantinya kita akan masukkan ke spreadsheet untuk bahan dari buya, dan kita kirimkan ke whatsapp berupa broadcast ke no siswa masing2
+
+
+logic payment
+
+Register
+7. update data finance
+
+SPP
+1. bayar
+2. bayar dengan cash
+3. updload bukti
+4. status pending
+5. admin verifikasi bukti
+6. status paid
+7. update data finance
+
+

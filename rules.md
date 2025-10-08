@@ -13,3 +13,5 @@ Honor Mengajar per sesi:
  -  Sedangkan guru yang absen tanpa kabar dan konfirmasi akan dipotong Rp. 20.000,
  - setiap kelas jadwal yang diajar. Guru yang konfirmasi izin tanpa ada surat izin dikenakan sanksi potongan Rp.10.000,
  - setiap kelas yang diajar selain kabar kemalangan, kecelakaan, dan hal yang sangat genting. Hari kerja adalah Hari Senin sampai dengan Sabtu sesuai dengan kelas yang diajar. Teknis Pelaksanaan akan dituangkan di dalam Rapat Kerja Akademik Reguler.
+
+

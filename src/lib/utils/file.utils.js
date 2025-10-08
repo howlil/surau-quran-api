@@ -116,6 +116,25 @@ class FileUtils {
     static getKartuKeluargaUrl(baseUrl, filename) {
         return this.getDocumentUrl(baseUrl, filename, 'kartu_keluarga');
     }
+
+    static getEvidenceUrl(baseUrl, filename) {
+        return this.getDocumentUrl(baseUrl, filename, 'evidence');
+    }
+
+    static transformPembayaranFiles(pembayaran, baseUrl) {
+        if (!pembayaran) return null;
+
+        return {
+            ...pembayaran,
+            evidence: this.getEvidenceUrl(baseUrl, pembayaran.evidence)
+        };
+    }
+
+    static transformPembayaranListFiles(pembayaranList, baseUrl) {
+        if (!Array.isArray(pembayaranList)) return [];
+
+        return pembayaranList.map(pembayaran => this.transformPembayaranFiles(pembayaran, baseUrl));
+    }
 }
 
 module.exports = FileUtils; 

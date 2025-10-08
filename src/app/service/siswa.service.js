@@ -34,9 +34,10 @@ class SiswaService {
         kodeVoucher,
         jumlahPembayaran,
         totalBiaya,
+        metodePembayaran,
+        evidence,
       } = pendaftaranData;
 
-      // Clean and normalize namaMurid and namaPanggilan before use
       const cleanedNamaMurid = namaMurid.trim().replace(/\s+/g, ' ');
       const cleanedNamaPanggilan = namaPanggilan ? namaPanggilan.trim().replace(/\s+/g, ' ') : null;
 
@@ -49,7 +50,6 @@ class SiswaService {
         throw new ConflictError(`Email ${email} sudah terdaftar`);
       }
 
-      // Check if email exists in siswa table through pendaftaranTemp
       const existingPendaftaranTemp = await prisma.pendaftaranTemp.findFirst({
         where: {
           email
@@ -57,7 +57,6 @@ class SiswaService {
       });
 
       if (existingPendaftaranTemp) {
-        // Get the associated payment
         const existingPayment = await prisma.pembayaran.findUnique({
           where: { id: existingPendaftaranTemp.pembayaranId }
         });
@@ -81,7 +80,6 @@ class SiswaService {
         }
       }
 
-      // Check if email exists in siswa table
       const existingSiswa = await prisma.siswa.findFirst({
         where: {
           user: {
@@ -156,61 +154,336 @@ class SiswaService {
         }
       }
 
-      // If totalBiaya is provided, validate it matches our calculation
       if (totalBiaya !== undefined) {
         if (Math.abs(calculatedTotal - Number(totalBiaya)) > 0.01) {
           throw new BadRequestError('Total biaya tidak sesuai dengan perhitungan diskon');
         }
       }
 
-      const paymentData = await paymentService.createPendaftaranInvoice({
-        email,
-        namaMurid: cleanedNamaMurid,
-        totalBiaya: calculatedTotal,
-        noWhatsapp,
-        alamat
-      });
-
-      const pendaftaranTemp = await prisma.pendaftaranTemp.create({
-        data: {
+      // Handle berdasarkan metode pembayaran
+      if (metodePembayaran === 'TUNAI') {
+        // Untuk pembayaran tunai, langsung buat akun siswa
+        return await this.createSiswaFromTunaiPayment({
           namaMurid: cleanedNamaMurid,
           namaPanggilan: cleanedNamaPanggilan,
-          tanggalLahir: tanggalLahir || null,
+          tanggalLahir,
           jenisKelamin,
-          alamat: alamat || null,
-          strataPendidikan: strataPendidikan || null,
-          kelasSekolah: kelasSekolah || null,
+          alamat,
+          strataPendidikan,
+          kelasSekolah,
           email,
-          namaSekolah: namaSekolah || null,
+          namaSekolah,
           namaOrangTua,
-          namaPenjemput: namaPenjemput || null,
-          noWhatsapp: noWhatsapp || null,
+          namaPenjemput,
+          noWhatsapp,
           programId,
           kodeVoucher: kodeVoucher?.toUpperCase() || null,
-          biayaPendaftaran: jumlahPembayaran,
-          diskon: actualDiskon,
+          jumlahPembayaran,
+          actualDiskon,
+          calculatedTotal,
+          voucherId,
+          evidence
+        });
+      } else {
+        // Untuk pembayaran gateway (Xendit), buat invoice dan temp data
+        const paymentData = await paymentService.createPendaftaranInvoice({
+          email,
+          namaMurid: cleanedNamaMurid,
           totalBiaya: calculatedTotal,
-          pembayaranId: paymentData.pembayaranId,
-          voucherId
-        }
-      });
+          noWhatsapp,
+          alamat
+        });
 
-      logger.info(`Created pendaftaran temp with ID: ${pendaftaranTemp.id} for email: ${email}`);
+        const pendaftaranTemp = await prisma.pendaftaranTemp.create({
+          data: {
+            namaMurid: cleanedNamaMurid,
+            namaPanggilan: cleanedNamaPanggilan,
+            tanggalLahir: tanggalLahir || null,
+            jenisKelamin,
+            alamat: alamat || null,
+            strataPendidikan: strataPendidikan || null,
+            kelasSekolah: kelasSekolah || null,
+            email,
+            namaSekolah: namaSekolah || null,
+            namaOrangTua,
+            namaPenjemput: namaPenjemput || null,
+            noWhatsapp: noWhatsapp || null,
+            programId,
+            kodeVoucher: kodeVoucher?.toUpperCase() || null,
+            biayaPendaftaran: jumlahPembayaran,
+            diskon: actualDiskon,
+            totalBiaya: calculatedTotal,
+            pembayaranId: paymentData.pembayaranId,
+            voucherId
+          }
+        });
 
-      return {
-        pendaftaranId: pendaftaranTemp.id,
-        paymentInfo: paymentData
-      };
+        logger.info(`Created pendaftaran temp with ID: ${pendaftaranTemp.id} for email: ${email}`);
+
+        return {
+          pendaftaranId: pendaftaranTemp.id,
+          paymentInfo: paymentData
+        };
+      }
     } catch (error) {
       logger.error('Error creating pendaftaran:', error);
       throw error;
     }
   }
 
-  // Method processPaidPendaftaran telah dipindahkan ke payment.service.js
-  // untuk menghindari duplikasi logic dan memastikan konsistensi data
-  // Semua logic pendaftaran sekarang dihandle oleh payment.service.js dalam method handleXenditCallback
+  async createSiswaFromTunaiPayment(data) {
+    try {
+      const {
+        namaMurid,
+        namaPanggilan,
+        tanggalLahir,
+        jenisKelamin,
+        alamat,
+        strataPendidikan,
+        kelasSekolah,
+        email,
+        namaSekolah,
+        namaOrangTua,
+        namaPenjemput,
+        noWhatsapp,
+        programId,
+        kodeVoucher,
+        jumlahPembayaran,
+        actualDiskon,
+        calculatedTotal,
+        voucherId,
+        evidence
+      } = data;
 
+      logger.info(`Creating siswa directly from tunai payment for email: ${email}`);
+
+      // Buat pembayaran dengan status PAID untuk tunai
+      const pembayaran = await prisma.pembayaran.create({
+        data: {
+          tipePembayaran: 'PENDAFTARAN',
+          metodePembayaran: 'TUNAI',
+          jumlahTagihan: calculatedTotal,
+          statusPembayaran: 'PAID',
+          tanggalPembayaran: new Date().toISOString().split('T')[0],
+          evidence: evidence
+        }
+      });
+
+      const defaultPassword = `${namaPanggilan}${tanggalLahir || ''}`;
+      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          role: 'SISWA'
+        }
+      });
+
+      // Buat data siswa
+      const siswa = await prisma.siswa.create({
+        data: {
+          userId: user.id,
+          namaMurid,
+          namaPanggilan,
+          tanggalLahir,
+          jenisKelamin,
+          alamat,
+          strataPendidikan,
+          kelasSekolah,
+          namaSekolah,
+          namaOrangTua,
+          namaPenjemput,
+          noWhatsapp
+        }
+      });
+
+      // Buat pendaftaran
+      const pendaftaran = await prisma.pendaftaran.create({
+        data: {
+          siswaId: siswa.id,
+          biayaPendaftaran: jumlahPembayaran,
+          tanggalDaftar: new Date().toISOString().split('T')[0],
+          diskon: actualDiskon,
+          totalBiaya: calculatedTotal,
+          voucher_id: voucherId,
+          pembayaranId: pembayaran.id
+        }
+      });
+
+      // Buat program siswa
+      const programSiswa = await prisma.programSiswa.create({
+        data: {
+          siswaId: siswa.id,
+          programId,
+          status: 'AKTIF'
+        }
+      });
+
+      // Update finance record dengan format tanggal DD-MM-YYYY
+      const tanggalPembayaran = moment().format('DD-MM-YYYY');
+      await financeService.createFromEnrollmentPayment({
+        id: pembayaran.id,
+        jumlahTagihan: calculatedTotal,
+        tanggalPembayaran: tanggalPembayaran,
+        metodePembayaran: 'TUNAI'
+      });
+
+      logger.info(`Successfully created siswa with tunai payment:`, {
+        userId: user.id,
+        siswaId: siswa.id,
+        pembayaranId: pembayaran.id,
+        email
+      });
+
+      return {
+        success: true,
+        message: 'Pendaftaran tunai berhasil, akun siswa telah dibuat',
+        data: {
+          userId: user.id,
+          siswaId: siswa.id,
+          pembayaranId: pembayaran.id,
+          pendaftaranId: pendaftaran.id,
+          programSiswaId: programSiswa.id,
+          email,
+          namaMurid,
+          status: 'AKTIF'
+        }
+      };
+    } catch (error) {
+      logger.error('Error creating siswa from tunai payment:', error);
+      throw error;
+    }
+  }
+
+  async createSiswaV2FromTunaiPayment(data) {
+    try {
+      const {
+        siswa,
+        programId,
+        calculatedFees,
+        totalDiskon,
+        finalTotal,
+        voucherId,
+        evidence,
+        kartuKeluargaFile,
+        isFamily,
+        hubunganKeluarga
+      } = data;
+
+      logger.info(`Creating ${siswa.length} siswa directly from tunai payment V2`);
+
+      const pembayaran = await prisma.pembayaran.create({
+        data: {
+          tipePembayaran: 'PENDAFTARAN',
+          metodePembayaran: 'TUNAI',
+          jumlahTagihan: finalTotal,
+          statusPembayaran: 'PAID',
+          tanggalPembayaran: new Date().toISOString().split('T')[0],
+          evidence: evidence
+        }
+      });
+
+      const createdSiswa = [];
+      const createdPendaftaran = [];
+
+      for (let i = 0; i < siswa.length; i++) {
+        const student = siswa[i];
+        const fee = calculatedFees[i];
+
+        const defaultPassword = `${student.namaPanggilan}${student.tanggalLahir}`;
+        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const user = await prisma.user.create({
+          data: {
+            email: student.email,
+            password: hashedPassword,
+            role: 'SISWA'
+          }
+        });
+
+        // Buat data siswa
+        const siswaData = await prisma.siswa.create({
+          data: {
+            userId: user.id,
+            namaMurid: student.namaMurid,
+            namaPanggilan: student.namaPanggilan,
+            tanggalLahir: student.tanggalLahir,
+            jenisKelamin: student.jenisKelamin,
+            alamat: student.alamat,
+            strataPendidikan: student.strataPendidikan,
+            kelasSekolah: student.kelasSekolah,
+            namaSekolah: student.namaSekolah,
+            namaOrangTua: student.namaOrangTua,
+            namaPenjemput: student.namaPenjemput,
+            noWhatsapp: student.noWhatsapp,
+            isFamily: isFamily || false,
+            hubunganKeluarga: hubunganKeluarga || null,
+            kartuKeluarga: kartuKeluargaFile || null
+          }
+        });
+
+        // Buat pendaftaran
+        const pendaftaran = await prisma.pendaftaran.create({
+          data: {
+            siswaId: siswaData.id,
+            biayaPendaftaran: fee.biayaPendaftaran,
+            tanggalDaftar: new Date().toISOString().split('T')[0],
+            diskon: fee.diskon,
+            totalBiaya: fee.totalBiaya,
+            voucher_id: voucherId,
+            pembayaranId: pembayaran.id
+          }
+        });
+
+        // Buat program siswa
+        const programSiswa = await prisma.programSiswa.create({
+          data: {
+            siswaId: siswaData.id,
+            programId,
+            status: 'AKTIF'
+          }
+        });
+
+        createdSiswa.push({
+          userId: user.id,
+          siswaId: siswaData.id,
+          email: student.email,
+          namaMurid: student.namaMurid,
+          status: 'AKTIF'
+        });
+
+        createdPendaftaran.push(pendaftaran.id);
+      }
+
+      // Update finance record dengan format tanggal DD-MM-YYYY
+      const tanggalPembayaran = moment().format('DD-MM-YYYY');
+      await financeService.createFromEnrollmentPayment({
+        id: pembayaran.id,
+        jumlahTagihan: finalTotal,
+        tanggalPembayaran: tanggalPembayaran,
+        metodePembayaran: 'TUNAI'
+      });
+
+      logger.info(`Successfully created ${siswa.length} siswa with tunai payment V2:`, {
+        pembayaranId: pembayaran.id,
+        siswaCount: createdSiswa.length
+      });
+
+      return {
+        success: true,
+        message: `Pendaftaran tunai V2 berhasil, ${siswa.length} akun siswa telah dibuat`,
+        data: {
+          pembayaranId: pembayaran.id,
+          siswa: createdSiswa,
+          pendaftaranIds: createdPendaftaran,
+          totalAmount: finalTotal,
+          status: 'AKTIF'
+        }
+      };
+    } catch (error) {
+      logger.error('Error creating siswa V2 from tunai payment:', error);
+      throw error;
+    }
+  }
 
   async getPendaftaranInvoice(invoices, filters = {}) {
     const { status, tanggal, nama, page = 1, limit = 10 } = filters;
@@ -560,6 +833,11 @@ class SiswaService {
           pendaftaran: {
             select: {
               tanggalDaftar: true,
+              pembayaran: {
+                select: {
+                  evidence: true
+                }
+              }
             }
           }
         },
@@ -1602,10 +1880,9 @@ class SiswaService {
     }
   }
 
-  // Pendaftaran V2 dengan support untuk private program
   async createPendaftaranV2(data, kartuKeluargaFile) {
     try {
-      const { siswa, programId, biayaPendaftaran, isFamily, hubunganKeluarga, kodeVoucher, totalBiaya } = data;
+      const { siswa, programId, biayaPendaftaran, isFamily, hubunganKeluarga, kodeVoucher, totalBiaya, metodePembayaran, evidence } = data;
 
       // Validate required fields
       if (!programId) {
@@ -1725,28 +2002,10 @@ class SiswaService {
       // Validate total biaya matches calculated total
       const calculatedTotal = calculatedFees.reduce((sum, fee) => sum + fee.totalBiaya, 0);
 
-      // Log perhitungan untuk debugging
-      logger.info('Registration fees calculation:', {
-        programName: program.namaProgram,
-        programType,
-        subType,
-        studentCount: siswa.length,
-        biayaPendaftaran,
-        calculatedFees: calculatedFees.map((fee, index) => ({
-          student: siswa[index].namaMurid,
-          biayaPendaftaran: fee.biayaPendaftaran,
-          diskon: fee.diskon,
-          totalBiaya: fee.totalBiaya
-        })),
-        calculatedTotal,
-        providedTotalBiaya: totalBiaya
-      });
-
       if (Math.abs(calculatedTotal - totalBiaya) > 1) {
         throw new BadRequestError(`Total biaya tidak sesuai. Expected: ${calculatedTotal}, Got: ${totalBiaya}. Program: ${program.namaProgram}, Type: ${programType}, SubType: ${subType}`);
       }
 
-      // Process voucher if provided
       let voucher = null;
       let totalDiskon = 0;
       if (kodeVoucher) {
@@ -1842,166 +2101,183 @@ class SiswaService {
         expectedFinalTotal: calculatedTotal - totalDiskon
       });
 
-      // Create Xendit invoice via payment service
-      let xenditPaymentData;
-      try {
-        // Log Xendit request untuk debugging
-        logger.info('Xendit request data:', {
-          amount: finalTotal,
-          description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
-          itemsCount: siswa.length,
-          expectedTotal: finalTotal
+      // Handle berdasarkan metode pembayaran
+      if (metodePembayaran === 'TUNAI') {
+        // Untuk pembayaran tunai, langsung buat akun siswa untuk semua siswa
+        return await this.createSiswaV2FromTunaiPayment({
+          siswa,
+          programId,
+          calculatedFees,
+          totalDiskon,
+          finalTotal,
+          voucherId,
+          evidence,
+          kartuKeluargaFile,
+          isFamily,
+          hubunganKeluarga
         });
+      } else {
+        // Untuk pembayaran gateway (Xendit), buat invoice dan temp data
+        // Create Xendit invoice via payment service
+        let xenditPaymentData;
+        try {
+          // Log Xendit request untuk debugging
+          logger.info('Xendit request data:', {
+            amount: finalTotal,
+            description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
+            itemsCount: siswa.length,
+            expectedTotal: finalTotal
+          });
 
-        xenditPaymentData = await paymentService.createPendaftaranInvoiceV2({
-          externalId: XenditUtils.generateExternalId('DAFTAR_V2'),
-          amount: finalTotal,
-          description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
-          payerEmail: siswa[0].email,
-          customer: {
-            givenNames: siswa[0].namaMurid,
-            email: siswa[0].email
-          },
-          items: siswa.map((s, index) => {
-            const originalPrice = calculatedFees[index].totalBiaya;
-            const discountRatio = totalDiskon / calculatedTotal;
-            const discountedPrice = Math.round(originalPrice * (1 - discountRatio));
+          xenditPaymentData = await paymentService.createPendaftaranInvoiceV2({
+            externalId: XenditUtils.generateExternalId('DAFTAR_V2'),
+            amount: finalTotal,
+            description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
+            payerEmail: siswa[0].email,
+            customer: {
+              givenNames: siswa[0].namaMurid,
+              email: siswa[0].email
+            },
+            items: siswa.map((s, index) => {
+              const originalPrice = calculatedFees[index].totalBiaya;
+              const discountRatio = totalDiskon / calculatedTotal;
+              const discountedPrice = Math.round(originalPrice * (1 - discountRatio));
 
-            // Log untuk debugging
-            logger.info(`Item ${index + 1} calculation:`, {
-              studentName: s.namaMurid,
-              originalPrice,
-              discountRatio: (discountRatio * 100).toFixed(2) + '%',
-              discountedPrice,
-              totalDiskon,
-              calculatedTotal,
-              expectedItemTotal: Math.round(originalPrice * (1 - discountRatio))
+              // Log untuk debugging
+              logger.info(`Item ${index + 1} calculation:`, {
+                studentName: s.namaMurid,
+                originalPrice,
+                discountRatio: (discountRatio * 100).toFixed(2) + '%',
+                discountedPrice,
+                totalDiskon,
+                calculatedTotal,
+                expectedItemTotal: Math.round(originalPrice * (1 - discountRatio))
+              });
+
+              return {
+                name: `Pendaftaran - ${s.namaMurid}`,
+                quantity: 1,
+                price: discountedPrice
+              };
+            })
+          });
+        } catch (xenditError) {
+          // Jika Xendit gagal, hapus data yang sudah dibuat
+          if (xenditPaymentData?.pembayaranId) {
+            try {
+              await prisma.$transaction(async (tx) => {
+                // Hapus XenditPayment terlebih dahulu
+                await tx.xenditPayment.deleteMany({
+                  where: { pembayaranId: xenditPaymentData.pembayaranId }
+                });
+
+                // Terakhir hapus pembayaran
+                await tx.pembayaran.delete({
+                  where: { id: xenditPaymentData.pembayaranId }
+                });
+              }, { timeout: 15000, maxWait: 5000 });
+            } catch (rollbackError) {
+              logger.error('Error during Xendit rollback:', rollbackError);
+            }
+          }
+          throw xenditError;
+        }
+
+        // Create temporary registration data
+        let pendaftaranPrivateTemp;
+        try {
+          pendaftaranPrivateTemp = await prisma.$transaction(async (tx) => {
+            // Create individual student records first
+            const siswaPrivatePromises = siswa.map((s) => {
+              return tx.siswaPrivateTemp.create({
+                data: {
+                  namaMurid: s.namaMurid,
+                  namaPanggilan: s.namaPanggilan,
+                  tanggalLahir: s.tanggalLahir,
+                  jenisKelamin: s.jenisKelamin,
+                  alamat: s.alamat,
+                  strataPendidikan: s.strataPendidikan,
+                  kelasSekolah: s.kelasSekolah,
+                  email: s.email,
+                  namaSekolah: s.namaSekolah,
+                  namaOrangTua: s.namaOrangTua,
+                  namaPenjemput: s.namaPenjemput,
+                  noWhatsapp: s.noWhatsapp,
+                  biayaPendaftaran: biayaPendaftaran
+                }
+              });
             });
 
-            return {
-              name: `Pendaftaran - ${s.namaMurid}`,
-              quantity: 1,
-              price: discountedPrice
-            };
-          })
-        });
-      } catch (xenditError) {
-        // Jika Xendit gagal, hapus data yang sudah dibuat
-        if (xenditPaymentData?.pembayaranId) {
+            const siswaPrivateRecords = await Promise.all(siswaPrivatePromises);
+
+            // Create multiple private registration records - one for each student
+            const privateRegPromises = siswaPrivateRecords.map((siswaPrivate) => {
+              return tx.pendaftaranPrivateTemp.create({
+                data: {
+                  siswaPrivateId: siswaPrivate.id,
+                  isFamily,
+                  hubunganKeluarga,
+                  jenisHubungan: data.jenisHubungan,
+                  kartuKeluarga: kartuKeluargaFile,
+                  kodeVoucher: kodeVoucher,
+                  diskon: totalDiskon,
+                  totalBiaya: finalTotal,
+                  programId
+                }
+              });
+            });
+
+            const privateRegs = await Promise.all(privateRegPromises);
+            const privateReg = privateRegs[0]; // Use first one as main record
+
+            return privateReg;
+          }, { timeout: 30000, maxWait: 10000 });
+        } catch (dbError) {
+          // Jika database gagal, hapus payment yang sudah dibuat
           try {
             await prisma.$transaction(async (tx) => {
-              // Hapus XenditPayment terlebih dahulu
+              // Hapus XenditPayment terlebih dahulu karena ada foreign key ke pembayaran
               await tx.xenditPayment.deleteMany({
                 where: { pembayaranId: xenditPaymentData.pembayaranId }
               });
 
-              // Terakhir hapus pembayaran
+              // Kemudian hapus pembayaran
               await tx.pembayaran.delete({
                 where: { id: xenditPaymentData.pembayaranId }
               });
             }, { timeout: 15000, maxWait: 5000 });
           } catch (rollbackError) {
-            logger.error('Error during Xendit rollback:', rollbackError);
+            logger.error('Error during rollback:', rollbackError);
           }
+          throw dbError;
         }
-        throw xenditError;
+
+        logger.info(`Created pendaftaran V2 for ${siswa.length} students in program ${program.namaProgram}`);
+
+        // Log payment data untuk debugging
+        logger.info('Payment data returned from payment service:', {
+          pembayaranId: xenditPaymentData.pembayaranId,
+          xenditInvoiceUrl: xenditPaymentData.xenditInvoiceUrl,
+          expireDate: xenditPaymentData.expireDate,
+          amount: xenditPaymentData.amount,
+          xenditInvoiceId: xenditPaymentData.xenditInvoiceId,
+          fullPaymentData: JSON.stringify(xenditPaymentData, null, 2)
+        });
+
+        return {
+          pendaftaranId: pendaftaranPrivateTemp.id,
+          pembayaranId: xenditPaymentData.pembayaranId,
+          invoiceUrl: xenditPaymentData.xenditInvoiceUrl,
+          totalBiaya: finalTotal,
+          siswaCount: siswa.length,
+        };
       }
-
-      // Create temporary registration data
-      let pendaftaranPrivateTemp;
-      try {
-        pendaftaranPrivateTemp = await prisma.$transaction(async (tx) => {
-          // Create individual student records first
-          const siswaPrivatePromises = siswa.map((s) => {
-            return tx.siswaPrivateTemp.create({
-              data: {
-                namaMurid: s.namaMurid,
-                namaPanggilan: s.namaPanggilan,
-                tanggalLahir: s.tanggalLahir,
-                jenisKelamin: s.jenisKelamin,
-                alamat: s.alamat,
-                strataPendidikan: s.strataPendidikan,
-                kelasSekolah: s.kelasSekolah,
-                email: s.email,
-                namaSekolah: s.namaSekolah,
-                namaOrangTua: s.namaOrangTua,
-                namaPenjemput: s.namaPenjemput,
-                noWhatsapp: s.noWhatsapp,
-                biayaPendaftaran: biayaPendaftaran
-              }
-            });
-          });
-
-          const siswaPrivateRecords = await Promise.all(siswaPrivatePromises);
-
-          // Create multiple private registration records - one for each student
-          const privateRegPromises = siswaPrivateRecords.map((siswaPrivate) => {
-            return tx.pendaftaranPrivateTemp.create({
-              data: {
-                siswaPrivateId: siswaPrivate.id,
-                isFamily,
-                hubunganKeluarga,
-                jenisHubungan: data.jenisHubungan,
-                kartuKeluarga: kartuKeluargaFile,
-                kodeVoucher: kodeVoucher,
-                diskon: totalDiskon,
-                totalBiaya: finalTotal,
-                programId
-              }
-            });
-          });
-
-          const privateRegs = await Promise.all(privateRegPromises);
-          const privateReg = privateRegs[0]; // Use first one as main record
-
-          return privateReg;
-        }, { timeout: 30000, maxWait: 10000 });
-      } catch (dbError) {
-        // Jika database gagal, hapus payment yang sudah dibuat
-        try {
-          await prisma.$transaction(async (tx) => {
-            // Hapus XenditPayment terlebih dahulu karena ada foreign key ke pembayaran
-            await tx.xenditPayment.deleteMany({
-              where: { pembayaranId: xenditPaymentData.pembayaranId }
-            });
-
-            // Kemudian hapus pembayaran
-            await tx.pembayaran.delete({
-              where: { id: xenditPaymentData.pembayaranId }
-            });
-          }, { timeout: 15000, maxWait: 5000 });
-        } catch (rollbackError) {
-          logger.error('Error during rollback:', rollbackError);
-        }
-        throw dbError;
-      }
-
-      logger.info(`Created pendaftaran V2 for ${siswa.length} students in program ${program.namaProgram}`);
-
-      // Log payment data untuk debugging
-      logger.info('Payment data returned from payment service:', {
-        pembayaranId: xenditPaymentData.pembayaranId,
-        xenditInvoiceUrl: xenditPaymentData.xenditInvoiceUrl,
-        expireDate: xenditPaymentData.expireDate,
-        amount: xenditPaymentData.amount,
-        xenditInvoiceId: xenditPaymentData.xenditInvoiceId,
-        fullPaymentData: JSON.stringify(xenditPaymentData, null, 2)
-      });
-
-      return {
-        pendaftaranId: pendaftaranPrivateTemp.id,
-        pembayaranId: xenditPaymentData.pembayaranId,
-        invoiceUrl: xenditPaymentData.xenditInvoiceUrl,
-        totalBiaya: finalTotal,
-        siswaCount: siswa.length,
-      };
     } catch (error) {
       logger.error('Error creating pendaftaran V2:', error);
       throw error;
     }
   }
 
-  // Helper methods for V2 registration
   getProgramType(programName) {
     const groupPrograms = ['PRA BTA', 'BTA LVL 1', 'BTA LVL 2 & PRA Tahsin', 'TAHSIN', 'TAHFIDZ'];
     return groupPrograms.includes(programName) ? 'GROUP' : 'PRIVATE';
@@ -2140,11 +2416,6 @@ class SiswaService {
         }));
     }
   }
-
-
-
-
-
 
   async pindahProgram(siswaId, data) {
     try {
