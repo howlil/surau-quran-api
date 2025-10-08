@@ -27,6 +27,18 @@ const PRODUCTION_KELAS = [
     'Kelas Online'
 ];
 
+// Jam mengajar berdasarkan aturan kerja: 10:00 - 20:45 WIB, 1 SKS = 1.5 jam
+const PRODUCTION_JAM_MENGAJAR = [
+    { jamMulai: '10:00', jamSelesai: '11:30' }, // SKS 1
+    { jamMulai: '11:30', jamSelesai: '13:00' }, // SKS 2 (termasuk jam istirahat)
+    { jamMulai: '13:00', jamSelesai: '14:30' }, // SKS 3
+    { jamMulai: '14:30', jamSelesai: '16:00' }, // SKS 4
+    { jamMulai: '16:00', jamSelesai: '17:30' }, // SKS 5
+    { jamMulai: '17:30', jamSelesai: '19:00' }, // SKS 6 (termasuk jam istirahat)
+    { jamMulai: '19:00', jamSelesai: '20:30' }, // SKS 7
+    { jamMulai: '20:30', jamSelesai: '20:45' }  // SKS 8 (kelas terakhir)
+];
+
 const ADMIN_USER = {
     email: 'surauqurancenter@gmail.com',
     password: 'Padangp@sir7',
@@ -45,6 +57,7 @@ class ProductionSeeder {
         this.data = {
             programs: [],
             kelas: [],
+            jamMengajar: [],
             adminUser: null
         };
     }
@@ -68,6 +81,10 @@ class ProductionSeeder {
             // Step 4: Create Kelas
             await this.createKelas();
             console.log('✅ Kelas created');
+
+            // Step 5: Create Jam Mengajar
+            await this.createJamMengajar();
+            console.log('✅ Jam mengajar created');
 
             console.log('🎉 Production seeding completed successfully!');
         } catch (error) {

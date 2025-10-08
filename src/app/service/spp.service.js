@@ -6,7 +6,6 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
 const financeService = require('./finance.service');
-const moment = require('moment');
 
 class SppService {
     async getSppForAdmin(filters = {}) {
@@ -531,7 +530,6 @@ class SppService {
         };
     }
 
-
     async generateFiveMonthsAhead(programSiswaId, tanggalDaftar = new Date(), tx = null) {
         try {
             logger.info(`Generating 5 months SPP for programSiswa: ${programSiswaId}`);
@@ -629,13 +627,6 @@ class SppService {
         return months.indexOf(monthName) + 1;
     }
 
-    /**
-     * Generate single SPP for specific month
-     * @param {string} programSiswaId 
-     * @param {number} monthOffset - Offset dari bulan sekarang (1 = bulan depan)
-     * @param {Object} tx - Optional transaction context
-     * @returns {Promise<Object>} Created SPP record
-     */
     async generateSingleSpp(programSiswaId, monthOffset = 1, tx = null) {
         try {
             // Use transaction context if provided, otherwise use global prisma
