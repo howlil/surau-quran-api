@@ -335,6 +335,10 @@ class SiswaService {
         email
       });
 
+      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
+      logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
+
       return {
         success: true,
         message: 'Pendaftaran tunai berhasil, akun siswa telah dibuat',
@@ -467,6 +471,24 @@ class SiswaService {
         pembayaranId: pembayaran.id,
         siswaCount: createdSiswa.length
       });
+
+      // Generate SPP untuk 5 bulan ke depan untuk semua siswa
+      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const sppPromises = createdSiswa.map(async (siswaData) => {
+        // Get programSiswaId untuk siswa ini
+        const programSiswa = await prisma.programSiswa.findFirst({
+          where: { siswaId: siswaData.siswaId }
+        });
+        
+        if (programSiswa) {
+          const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
+          logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswaData.namaMurid}`);
+          return sppRecords;
+        }
+        return [];
+      });
+      
+      await Promise.all(sppPromises);
 
       return {
         success: true,
