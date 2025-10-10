@@ -48,6 +48,7 @@ class FinanceController {
                 deskripsi: item.deskripsi,
                 type: item.type,
                 category: item.category,
+                metodePembayaran: item.metodePembayaran,
                 total: item.total,
                 evidence: item.evidence
             }))
