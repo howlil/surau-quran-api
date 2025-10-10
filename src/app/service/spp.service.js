@@ -404,9 +404,7 @@ class SppService {
                     id: { in: periodeSppIds }
                 },
                 data: {
-                    pembayaranId: pembayaran.id,
-                    statusPembayaran: 'PAID',
-                    tanggalPembayaran: new Date().toISOString().split('T')[0]
+                    pembayaranId: pembayaran.id
                 }
             });
 
