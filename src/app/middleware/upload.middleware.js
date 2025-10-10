@@ -312,7 +312,10 @@ const uploadKartuKeluarga = multer({
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
     }
-}).single('kartuKeluarga');
+}).fields([
+    { name: 'kartuKeluarga', maxCount: 1 },
+    { name: 'evidence', maxCount: 1 }
+]);
 
 // Middleware wrapper for kartu keluarga upload
 const uploadKartuKeluargaMiddleware = (req, res, next) => {
@@ -324,6 +327,16 @@ const uploadKartuKeluargaMiddleware = (req, res, next) => {
             return next(new BadRequestError(err.message));
         } else if (err) {
             return next(err);
+        }
+
+        // Handle uploaded files
+        if (req.files) {
+            // Set individual file references for backward compatibility
+            if (req.files.kartuKeluarga && req.files.kartuKeluarga[0]) {
+                req.file = req.files.kartuKeluarga[0]; // For backward compatibility
+            } else if (req.files.evidence && req.files.evidence[0]) {
+                req.file = req.files.evidence[0]; // For backward compatibility
+            }
         }
 
         // Transform form-data to expected format

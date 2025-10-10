@@ -26,7 +26,7 @@ class FinanceService {
         }
     }
 
-     async getAll(filters = {}) {
+    async getAll(filters = {}) {
         try {
             const { startDate, endDate, type, page = 1, limit = 10 } = filters;
 
@@ -104,7 +104,8 @@ class FinanceService {
                 type: record.type,
                 category: record.category,
                 total: Number(record.total),
-                evidence: record.evidence
+                evidence: record.evidence,
+                metodePembayaran: record.metodePembayaran,
             }));
 
             // Calculate pagination info
@@ -372,6 +373,7 @@ class FinanceService {
                 data: {
                     tanggal: tanggalProses,
                     deskripsi: `Gaji Guru ${guru.nama} (Auto) - ${bulan}/${tahun} - Payroll ID: ${id}`,
+                    metodePembayaran: 'BANK_TRANSFER', // Payroll biasanya via bank transfer
                     type: 'EXPENSE',
                     category: 'PAYROLL_SALARY',
                     total: totalGaji,

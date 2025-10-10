@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const validationMiddleware = require('../../middleware/validation.middleware');
 const authMiddleware = require('../../middleware/auth.middleware');
-const { uploadKartuKeluargaMiddleware } = require('../../middleware/upload.middleware');
+const { uploadKartuKeluargaMiddleware, uploadEvidenceMiddleware } = require('../../middleware/upload.middleware');
 const siswaController = require('../../controller/siswa.controller');
 const siswaValidation = require('../../validation/siswa.validation');
 
@@ -40,6 +40,7 @@ router.patch(
 
 router.post(
   '/v1/pendaftaran',
+  uploadEvidenceMiddleware,
   validationMiddleware.validateBody(siswaValidation.pendaftaranSiswa()),
   siswaController.pendaftaranSiswa
 );

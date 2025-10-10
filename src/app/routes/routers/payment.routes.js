@@ -3,6 +3,7 @@ const router = express.Router();
 const paymentController = require('../../controller/payment.controller');
 const authMiddleware = require('../../middleware/auth.middleware');
 const validationMiddleware = require('../../middleware/validation.middleware');
+const { uploadEvidenceMiddleware } = require('../../middleware/upload.middleware');
 const paymentValidation = require('../../validation/payment.validation');
 
 router.post(
@@ -14,6 +15,7 @@ router.patch(
     '/v1/payment/spp',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SISWA']),
+    uploadEvidenceMiddleware,
     validationMiddleware.validateBody(paymentValidation.createSppPayment()),
     paymentController.createSppPayment
 );
