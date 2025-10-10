@@ -297,7 +297,9 @@ const uploadEvidencePayment = multer({
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit for evidence
     }
-}).single('evidence');
+}).fields([
+    { name: 'evidence', maxCount: 1 }
+]);
 
 // Middleware wrapper for evidence upload
 const uploadEvidenceMiddleware = (req, res, next) => {
@@ -325,6 +327,23 @@ const uploadEvidencePaymentMiddleware = (req, res, next) => {
         } else if (err) {
             return next(err);
         }
+
+        // Parse periodeSppIds if it's a string JSON
+        if (req.body && req.body.periodeSppIds && typeof req.body.periodeSppIds === 'string') {
+            try {
+                req.body.periodeSppIds = JSON.parse(req.body.periodeSppIds);
+            } catch (error) {
+                return next(new BadRequestError('Format periodeSppIds tidak valid'));
+            }
+        }
+
+        // Handle evidence file upload
+        if (req.files && req.files.evidence && req.files.evidence[0]) {
+            req.body.evidence = req.files.evidence[0].filename;
+            // Set req.file for backward compatibility
+            req.file = req.files.evidence[0];
+        }
+
         next();
     });
 };
