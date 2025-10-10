@@ -384,7 +384,7 @@ class SiswaValidation {
               'string.max': 'Alamat maksimal 500 karakter',
               'any.required': 'Alamat wajib diisi'
             }),
-          strataPendidikan: Joi.string().valid('PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
+          strataPendidikan: Joi.string().valid("BELUM_SEKOLAH",'PAUD', 'TK', 'SD', 'SMP', 'SMA', 'KULIAH', 'UMUM').optional()
             .messages({
               'any.only': 'Strata pendidikan harus salah satu dari: PAUD, TK, SD, SMP, SMA, KULIAH, UMUM'
             }),
