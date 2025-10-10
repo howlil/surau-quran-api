@@ -427,6 +427,11 @@ const uploadKartuKeluargaMiddleware = (req, res, next) => {
             } else if (req.files.evidence && req.files.evidence[0]) {
                 req.file = req.files.evidence[0]; // For backward compatibility
             }
+            
+            // Set evidence filename to req.body for validation
+            if (req.files.evidence && req.files.evidence[0]) {
+                req.body.evidence = req.files.evidence[0].filename;
+            }
         }
 
         // Transform form-data to expected format
