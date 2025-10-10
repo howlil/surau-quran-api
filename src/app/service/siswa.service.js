@@ -110,7 +110,6 @@ class SiswaService {
         throw new NotFoundError(`Program dengan ID ${programId} tidak ditemukan`);
       }
 
-      let voucherId = null;
       let actualDiskon = 0;
       let calculatedTotal = Number(jumlahPembayaran);
 
@@ -125,10 +124,6 @@ class SiswaService {
         if (!voucher) {
           throw new NotFoundError(`Voucher ${kodeVoucher} tidak valid atau tidak aktif`);
         }
-
-
-
-        voucherId = voucher.id;
 
         if (voucher.tipe === 'NOMINAL') {
           actualDiskon = Number(voucher.nominal);
@@ -181,7 +176,6 @@ class SiswaService {
           jumlahPembayaran,
           actualDiskon,
           calculatedTotal,
-          voucherId,
           evidence
         });
       } else {
@@ -213,8 +207,7 @@ class SiswaService {
             biayaPendaftaran: jumlahPembayaran,
             diskon: actualDiskon,
             totalBiaya: calculatedTotal,
-            pembayaranId: paymentData.pembayaranId,
-            voucherId
+            pembayaranId: paymentData.pembayaranId
           }
         });
 
@@ -251,7 +244,6 @@ class SiswaService {
         jumlahPembayaran,
         actualDiskon,
         calculatedTotal,
-        voucherId,
         evidence
       } = data;
 
@@ -308,7 +300,7 @@ class SiswaService {
           tanggalDaftar: new Date().toISOString().split('T')[0],
           diskon: actualDiskon,
           totalBiaya: calculatedTotal,
-          voucher_id: voucherId,
+          kodeVoucher: kodeVoucher,
           pembayaranId: pembayaran.id
         }
       });
@@ -370,7 +362,7 @@ class SiswaService {
         calculatedFees,
         totalDiskon,
         finalTotal,
-        voucherId,
+        kodeVoucher,
         evidence,
         kartuKeluargaFile,
         isFamily,
@@ -439,7 +431,7 @@ class SiswaService {
             tanggalDaftar: new Date().toISOString().split('T')[0],
             diskon: fee.diskon,
             totalBiaya: fee.totalBiaya,
-            voucher_id: voucherId,
+            kodeVoucher: kodeVoucher,
             pembayaranId: pembayaran.id
           }
         });
@@ -2036,6 +2028,7 @@ class SiswaService {
 
       let voucher = null;
       let totalDiskon = 0;
+      
       if (kodeVoucher) {
         // Log voucher query untuk debugging
         logger.info('Voucher query:', {
@@ -2081,16 +2074,7 @@ class SiswaService {
           });
         }
 
-        // Log voucher data yang ditemukan
-        logger.info('Voucher found:', {
-          id: voucher.id,
-          kodeVoucher: voucher.kodeVoucher,
-          tipe: voucher.tipe,
-          nominal: voucher.nominal,
-          isActive: voucher.isActive,
-          createdAt: voucher.createdAt,
-          updatedAt: voucher.updatedAt
-        });
+     
 
         // Calculate voucher discount on total
         logger.info('Calculating voucher discount:', {
@@ -2138,7 +2122,7 @@ class SiswaService {
           calculatedFees,
           totalDiskon,
           finalTotal,
-          voucherId,
+          kodeVoucher: kodeVoucher?.toUpperCase() || null,
           evidence,
           kartuKeluargaFile,
           isFamily,
@@ -2247,7 +2231,7 @@ class SiswaService {
                   hubunganKeluarga,
                   jenisHubungan: data.jenisHubungan,
                   kartuKeluarga: kartuKeluargaFile,
-                  kodeVoucher: kodeVoucher,
+                  kodeVoucher: kodeVoucher?.toUpperCase() || null,
                   diskon: totalDiskon,
                   totalBiaya: finalTotal,
                   programId
