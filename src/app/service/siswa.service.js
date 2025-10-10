@@ -176,6 +176,7 @@ class SiswaService {
           jumlahPembayaran,
           actualDiskon,
           calculatedTotal,
+          voucherId,
           evidence
         });
       } else {
@@ -207,7 +208,8 @@ class SiswaService {
             biayaPendaftaran: jumlahPembayaran,
             diskon: actualDiskon,
             totalBiaya: calculatedTotal,
-            pembayaranId: paymentData.pembayaranId
+            pembayaranId: paymentData.pembayaranId,
+            voucherId
           }
         });
 
@@ -244,6 +246,7 @@ class SiswaService {
         jumlahPembayaran,
         actualDiskon,
         calculatedTotal,
+        voucherId,
         evidence
       } = data;
 
@@ -300,7 +303,7 @@ class SiswaService {
           tanggalDaftar: new Date().toISOString().split('T')[0],
           diskon: actualDiskon,
           totalBiaya: calculatedTotal,
-          kodeVoucher: kodeVoucher,
+          voucher_id: voucherId,
           pembayaranId: pembayaran.id
         }
       });
@@ -362,7 +365,7 @@ class SiswaService {
         calculatedFees,
         totalDiskon,
         finalTotal,
-        kodeVoucher,
+        voucherId,
         evidence,
         kartuKeluargaFile,
         isFamily,
@@ -431,7 +434,7 @@ class SiswaService {
             tanggalDaftar: new Date().toISOString().split('T')[0],
             diskon: fee.diskon,
             totalBiaya: fee.totalBiaya,
-            kodeVoucher: kodeVoucher,
+            voucher_id: voucherId,
             pembayaranId: pembayaran.id
           }
         });
@@ -2028,6 +2031,7 @@ class SiswaService {
 
       let voucher = null;
       let totalDiskon = 0;
+      let voucherId = null;
       
       if (kodeVoucher) {
         // Log voucher query untuk debugging
@@ -2074,7 +2078,8 @@ class SiswaService {
           });
         }
 
-     
+        // Set voucherId for later use
+        voucherId = voucher.id;
 
         // Calculate voucher discount on total
         logger.info('Calculating voucher discount:', {
@@ -2122,7 +2127,7 @@ class SiswaService {
           calculatedFees,
           totalDiskon,
           finalTotal,
-          kodeVoucher: kodeVoucher?.toUpperCase() || null,
+          voucherId,
           evidence,
           kartuKeluargaFile,
           isFamily,
