@@ -88,8 +88,17 @@ class PaymentController {
     });
 
     createSppPayment = ErrorHandler.asyncHandler(async (req, res) => {
-        const { periodeSppIds, kodeVoucher, metodePembayaran } = req.body;
+        let { periodeSppIds, kodeVoucher, metodePembayaran } = req.body;
         const userId = req.user.id;
+
+        // Handle periodeSppIds jika dikirim sebagai string JSON
+        if (typeof periodeSppIds === 'string') {
+            try {
+                periodeSppIds = JSON.parse(periodeSppIds);
+            } catch (error) {
+                throw new BadRequestError('Format periodeSppIds tidak valid');
+            }
+        }
 
         if (!periodeSppIds || !Array.isArray(periodeSppIds) || periodeSppIds.length === 0) {
             throw new BadRequestError('Pilih minimal satu periode SPP untuk dibayar');

@@ -290,9 +290,33 @@ const uploadEvidence = multer({
     }
 }).single('evidence');
 
+// Configure multer for evidence uploads (Payment) - Image Only
+const uploadEvidencePayment = multer({
+    storage: storage,
+    fileFilter: imageFileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit for evidence
+    }
+}).single('evidence');
+
 // Middleware wrapper for evidence upload
 const uploadEvidenceMiddleware = (req, res, next) => {
     uploadEvidence(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
+            }
+            return next(new BadRequestError(err.message));
+        } else if (err) {
+            return next(err);
+        }
+        next();
+    });
+};
+
+// Middleware wrapper for evidence payment upload (Images)
+const uploadEvidencePaymentMiddleware = (req, res, next) => {
+    uploadEvidencePayment(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
@@ -395,5 +419,6 @@ module.exports = {
     uploadFotoUrlMiddleware,
     uploadCoverGaleriMiddleware,
     uploadEvidenceMiddleware,
+    uploadEvidencePaymentMiddleware,
     uploadKartuKeluargaMiddleware
 }; 
