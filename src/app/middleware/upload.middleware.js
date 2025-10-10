@@ -105,6 +105,23 @@ const pdfFileFilter = (req, file, cb) => {
     cb(new BadRequestError('File harus berupa PDF'), false);
 };
 
+const imageOrPdfFileFilter = (req, file, cb) => {
+    // Check mime type for both images and PDF
+    const allowedMimes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+        'application/pdf'
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
+        // Check file extension
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.gif', '.pdf'].includes(ext)) {
+            return cb(null, true);
+        }
+    }
+    cb(new BadRequestError('File harus berupa gambar (JPG, JPEG, PNG, GIF) atau PDF'), false);
+};
+
 // Configure multer for image uploads
 const uploadImage = multer({
     storage: storage,
@@ -290,6 +307,15 @@ const uploadEvidence = multer({
     }
 }).single('evidence');
 
+// Configure multer for evidence uploads (Pendaftaran) - Image or PDF
+const uploadEvidencePendaftaran = multer({
+    storage: storage,
+    fileFilter: imageOrPdfFileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit for evidence
+    }
+}).single('evidence');
+
 // Configure multer for evidence uploads (Payment) - Image Only
 const uploadEvidencePayment = multer({
     storage: storage,
@@ -304,6 +330,21 @@ const uploadEvidencePayment = multer({
 // Middleware wrapper for evidence upload
 const uploadEvidenceMiddleware = (req, res, next) => {
     uploadEvidence(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
+            }
+            return next(new BadRequestError(err.message));
+        } else if (err) {
+            return next(err);
+        }
+        next();
+    });
+};
+
+// Middleware wrapper for evidence pendaftaran upload (Images or PDF)
+const uploadEvidencePendaftaranMiddleware = (req, res, next) => {
+    uploadEvidencePendaftaran(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return next(new BadRequestError('File size too large. Maximum size is 10MB.'));
@@ -351,7 +392,7 @@ const uploadEvidencePaymentMiddleware = (req, res, next) => {
 // Configure multer for kartu keluarga uploads
 const uploadKartuKeluarga = multer({
     storage: storage,
-    fileFilter: imageFileFilter,
+    fileFilter: imageOrPdfFileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
     }
@@ -438,6 +479,7 @@ module.exports = {
     uploadFotoUrlMiddleware,
     uploadCoverGaleriMiddleware,
     uploadEvidenceMiddleware,
+    uploadEvidencePendaftaranMiddleware,
     uploadEvidencePaymentMiddleware,
     uploadKartuKeluargaMiddleware
 }; 
