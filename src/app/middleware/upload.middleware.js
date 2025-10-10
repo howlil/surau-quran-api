@@ -353,6 +353,12 @@ const uploadEvidencePendaftaranMiddleware = (req, res, next) => {
         } else if (err) {
             return next(err);
         }
+
+        // Handle evidence file upload
+        if (req.file && req.file.fieldname === 'evidence') {
+            req.body.evidence = req.file.filename;
+        }
+
         next();
     });
 };
