@@ -112,6 +112,7 @@ class SiswaService {
 
       let actualDiskon = 0;
       let calculatedTotal = Number(jumlahPembayaran);
+      let voucherId = null;
 
       if (kodeVoucher) {
         const voucher = await prisma.voucher.findUnique({
@@ -124,6 +125,9 @@ class SiswaService {
         if (!voucher) {
           throw new NotFoundError(`Voucher ${kodeVoucher} tidak valid atau tidak aktif`);
         }
+
+        // Set voucherId for later use
+        voucherId = voucher.id;
 
         if (voucher.tipe === 'NOMINAL') {
           actualDiskon = Number(voucher.nominal);
