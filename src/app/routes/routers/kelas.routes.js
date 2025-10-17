@@ -25,44 +25,10 @@ router.delete('/v1/kelas/:id',
 );
 
 
-
 router.get('/v1/kelas',
     kelasController.getAll
 );
 
-
-router.get('/v1/kelas/initial-student',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
-    validationMiddleware.validateQuery(kelasValidation.getInitialStudentQuery()),
-    kelasController.getInitialStudentIntoClass
-);
-
-
-router.patch(
-    '/v1/kelas-program/:kelasProgramId/initial-student',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
-    validationMiddleware.validateBody(kelasValidation.patchInitialStudentIntoClass()),
-    kelasController.patchInitialStudentIntoClass
-);
-
-router.post(
-    '/v1/kelas-program',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
-    validationMiddleware.validateBody(kelasValidation.createKelasProgram()),
-    kelasController.createKelasProgram
-);
-
-router.delete(
-    '/v1/kelas-program/:kelasProgramId',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
-    kelasController.deleteKelasProgram
-);
-
-// Route untuk CCTV - hanya untuk SISWA
 router.get('/v1/cctv',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SISWA']),

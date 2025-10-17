@@ -2,10 +2,14 @@ const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
+const FileUtils = require('../../lib/utils/file.utils');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class FinanceService {
-    async create(data) {
+    async create(options) {
         try {
+            const { data } = options;
+
             const finance = await prisma.finance.create({
                 data: {
                     tanggal: data.tanggal,
@@ -17,20 +21,29 @@ class FinanceService {
                 }
             });
 
-            return finance;
+            const transformedResult = FileUtils.transformFinanceFiles(finance);
+
+            return {
+                id: transformedResult.id,
+                tanggal: transformedResult.tanggal,
+                deskripsi: transformedResult.deskripsi,
+                type: transformedResult.type,
+                category: transformedResult.category,
+                total: Number(transformedResult.total),
+                evidence: transformedResult.evidence
+            };
         } catch (error) {
             throw error
         }
     }
 
-    async getAll(filters = {}) {
+    async getAll(options = {}) {
         try {
+            const { data: filters = {}, where: additionalWhere = {} } = options;
             const { startDate, endDate, type, page = 1, limit = 10 } = filters;
 
-            // Build where clause for database query
-            const where = {};
+            const where = { ...additionalWhere };
 
-            // Add type filter only if provided
             if (type) {
                 where.type = type;
             }
@@ -40,33 +53,27 @@ class FinanceService {
 
             if (startDate) {
                 if (endDate) {
-                    // Filter rentang tanggal: startDate sampai endDate
-                    const startDateFormatted = moment(startDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
-                    const endDateFormatted = moment(endDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    const startDateFormatted = CommonServiceUtils.convertDateForDatabase(startDate);
+                    const endDateFormatted = CommonServiceUtils.convertDateForDatabase(endDate);
 
-                    // Get all records untuk filter manual
                     const allRecords = await prisma.finance.findMany({
                         where: type ? { type: type } : {},
                         orderBy: { tanggal: 'desc' }
                     });
 
-                    // Filter records by date range
                     filteredData = allRecords.filter(record => {
-                        const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                        const recordDateFormatted = CommonServiceUtils.convertDateForDatabase(record.tanggal);
                         return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
                     });
 
                     totalRecords = filteredData.length;
 
-                    // Apply pagination manually
                     const startIndex = (page - 1) * limit;
                     const endIndex = startIndex + parseInt(limit);
                     filteredData = filteredData.slice(startIndex, endIndex);
                 } else {
-                    // Filter tanggal exact: hanya pada startDate
                     where.tanggal = startDate;
 
-                    // Use PrismaUtils.paginate for exact date
                     const result = await PrismaUtils.paginate(prisma.finance, {
                         page,
                         limit,
@@ -78,7 +85,6 @@ class FinanceService {
                     totalRecords = result.pagination.total;
                 }
             } else {
-                // No date filter, use normal pagination
                 const result = await PrismaUtils.paginate(prisma.finance, {
                     page,
                     limit,
@@ -90,23 +96,22 @@ class FinanceService {
                 totalRecords = result.pagination.total;
             }
 
-            // Calculate totals for filtered data
             const totals = await this.calculateTotals(startDate, endDate);
 
-            // Format response
-            const dataTable = filteredData.map(record => ({
-                id: record.id,
-                tanggal: record.tanggal,
-                deskripsi: record.deskripsi,
-                type: record.type,
-                category: record.category,
-                total: Number(record.total),
-                evidence: record.evidence,
-                metodePembayaran: record.metodePembayaran,
+            const transformedDataTable = FileUtils.transformFinanceListFiles(filteredData);
+
+            const dataTable = transformedDataTable.map(item => ({
+                id: item.id,
+                tanggal: item.tanggal,
+                deskripsi: item.deskripsi,
+                type: item.type,
+                category: item.category,
+                metodePembayaran: item.metodePembayaran,
+                total: item.total,
+                evidence: item.evidence
             }));
 
-            // Calculate pagination info
-            const totalPages = Math.ceil(totalRecords / limit);
+            const totalPages = CommonServiceUtils.calculateTotalPages(totalRecords, limit);
 
             return {
                 income: totals.income,
@@ -129,8 +134,8 @@ class FinanceService {
         try {
             if (startDate && endDate) {
                 // Convert DD-MM-YYYY to YYYY-MM-DD for proper date comparison
-                const startDateFormatted = moment(startDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
-                const endDateFormatted = moment(endDate, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                const startDateFormatted = CommonServiceUtils.convertDateForDatabase(startDate);
+                const endDateFormatted = CommonServiceUtils.convertDateForDatabase(endDate);
 
                 // Get all records and filter them manually
                 const allIncomeRecords = await prisma.finance.findMany({
@@ -143,18 +148,18 @@ class FinanceService {
 
                 // Filter records by date range
                 const filteredIncomeRecords = allIncomeRecords.filter(record => {
-                    const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    const recordDateFormatted = CommonServiceUtils.convertDateForDatabase(record.tanggal);
                     return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
                 });
 
                 const filteredExpenseRecords = allExpenseRecords.filter(record => {
-                    const recordDateFormatted = moment(record.tanggal, 'DD-MM-YYYY').format('YYYY-MM-DD');
+                    const recordDateFormatted = CommonServiceUtils.convertDateForDatabase(record.tanggal);
                     return recordDateFormatted >= startDateFormatted && recordDateFormatted <= endDateFormatted;
                 });
 
                 // Calculate totals manually
-                const income = filteredIncomeRecords.reduce((sum, record) => sum + Number(record.total), 0);
-                const expense = filteredExpenseRecords.reduce((sum, record) => sum + Number(record.total), 0);
+                const income = filteredIncomeRecords.reduce((sum, record) => sum + CommonServiceUtils.safeNumber(record.total), 0);
+                const expense = filteredExpenseRecords.reduce((sum, record) => sum + CommonServiceUtils.safeNumber(record.total), 0);
                 const revenue = income - expense;
 
                 return {
@@ -189,8 +194,8 @@ class FinanceService {
                     }
                 });
 
-                const income = Number(incomeResult._sum.total || 0);
-                const expense = Number(expenseResult._sum.total || 0);
+                const income = CommonServiceUtils.safeNumber(incomeResult._sum.total);
+                const expense = CommonServiceUtils.safeNumber(expenseResult._sum.total);
                 const revenue = income - expense;
 
                 return {
@@ -205,8 +210,11 @@ class FinanceService {
     }
 
 
-    async update(id, data) {
+    async update(options) {
         try {
+            const { data, where } = options;
+            const { id } = where;
+
             // Check if finance record exists
             const finance = await prisma.finance.findUnique({
                 where: { id }
@@ -221,15 +229,28 @@ class FinanceService {
                 data
             });
 
-            return updated;
+            const transformedResult = FileUtils.transformFinanceFiles(updated);
+
+            return {
+                id: transformedResult.id,
+                tanggal: transformedResult.tanggal,
+                deskripsi: transformedResult.deskripsi,
+                type: transformedResult.type,
+                category: transformedResult.category,
+                total: Number(transformedResult.total),
+                evidence: transformedResult.evidence
+            };
         } catch (error) {
             if (error.statusCode) throw error;
             throw error
         }
     }
 
-    async delete(id) {
+    async delete(options) {
         try {
+            const { where } = options;
+            const { id } = where;
+
             // Check if finance record exists
             const finance = await prisma.finance.findUnique({
                 where: { id }
@@ -339,7 +360,7 @@ class FinanceService {
                 return existingRecord;
             }
 
-            const tanggalProses = moment().format('DD-MM-YYYY');
+            const tanggalProses = CommonServiceUtils.getCurrentDate('DD-MM-YYYY');
 
             const financeRecord = await prisma.finance.create({
                 data: {

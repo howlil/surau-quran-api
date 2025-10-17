@@ -4,35 +4,15 @@ const financeService = require('./finance.service');
 const moment = require('moment');
 const axios = require('axios');
 const FormatUtils = require('../../lib/utils/format.utils');
-const { DATE_FORMATS } = require('../../lib/constants');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class PayrollService {
 
-  parseMonthYearFilter(monthYear) {
-    if (!monthYear) {
-      const now = new Date();
-      return {
-        bulan: String(now.getMonth() + 1).padStart(2, '0'),
-        tahun: now.getFullYear()
-      };
-    }
-
-    const [bulan, tahun] = monthYear.split('-').map(num => parseInt(num));
-
-    if (isNaN(bulan) || isNaN(tahun) || bulan < 1 || bulan > 12) {
-      throw ErrorFactory.badRequest('Format filter bulan-tahun tidak valid. Gunakan format MM-YYYY');
-    }
-
-    return {
-      bulan: String(bulan).padStart(2, '0'),
-      tahun: tahun
-    };
-  }
 
   async getAllPayrollsForAdmin(filters = {}) {
     try {
       const { page = 1, limit = 10, monthYear } = filters;
-      const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
+      const { bulan, tahun } = CommonServiceUtils.parseMonthYearFilter(monthYear);
 
 
       // Get all active gurus first
@@ -231,7 +211,7 @@ class PayrollService {
           tahun: payroll.tahun,
           status: payroll.status,
           paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-          tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
+          tanggalKalkulasi: payroll.tanggalKalkulasi ? CommonServiceUtils.formatDate(payroll.tanggalKalkulasi) : null,
           catatan: payroll.catatan,
           gajiBersih: totalMengajar + totalInsentif - totalPotongan,
           detail: detailData
@@ -244,7 +224,7 @@ class PayrollService {
       const paginatedData = allGuruData.slice(startIndex, endIndex);
 
       const totalItems = allGuruData.length;
-      const totalPages = Math.ceil(totalItems / limit);
+      const totalPages = CommonServiceUtils.calculateTotalPages(totalItems, limit);
 
       return {
         data: paginatedData,
@@ -289,11 +269,11 @@ class PayrollService {
 
     absensiList.forEach((absensi, index) => {
       // Convert string values to numbers
-      const sks = Number(absensi.sks) || 0;
-      const potonganTerlambat = Number(absensi.potonganTerlambat) || 0;
-      const potonganTanpaKabar = Number(absensi.potonganTanpaKabar) || 0;
-      const potonganTanpaSuratIzin = Number(absensi.potonganTanpaSuratIzin) || 0;
-      const insentifKehadiran = Number(absensi.insentifKehadiran) || 0;
+      const sks = CommonServiceUtils.safeNumber(absensi.sks);
+      const potonganTerlambat = CommonServiceUtils.safeNumber(absensi.potonganTerlambat);
+      const potonganTanpaKabar = CommonServiceUtils.safeNumber(absensi.potonganTanpaKabar);
+      const potonganTanpaSuratIzin = CommonServiceUtils.safeNumber(absensi.potonganTanpaSuratIzin);
+      const insentifKehadiran = CommonServiceUtils.safeNumber(absensi.insentifKehadiran);
 
 
       switch (absensi.statusKehadiran) {
@@ -419,12 +399,7 @@ class PayrollService {
 
       const absensiStats = this.calculateDetailedAbsensiStats(absensiData);
 
-        totalSKS: absensiStats.totalSKS,
-        totalKehadiran: absensiStats.totalKehadiran,
-        jumlahTelat: absensiStats.jumlahTelat,
-        jumlahIzin: absensiStats.jumlahIzin,
-        jumlahTidakHadir: absensiStats.jumlahTidakHadir
-      });
+
 
       let jumlahSKS, jumlahInsentif, jumlahTelat, jumlahIzin, jumlahDLL;
       let rateSKS = 35000, rateInsentif = 10000, rateTelat = 10000, rateIzin = 10000, rateDLL = 10000;
@@ -491,10 +466,10 @@ class PayrollService {
       // Ensure values stay within DECIMAL(10,2) range (max 99999999.99)
       const MAX_VALUE = 99999999.99;
 
-      const safeGajiPokok = Math.min(Math.max(Number(totalMengajar.toFixed(2)), 0), MAX_VALUE);
-      const safeInsentif = Math.min(Math.max(Number(totalInsentif.toFixed(2)), 0), MAX_VALUE);
-      const safePotongan = Math.min(Math.max(Number(totalPotongan.toFixed(2)), 0), MAX_VALUE);
-      const safeTotalGaji = Math.min(Math.max(Number(totalGaji.toFixed(2)), 0), MAX_VALUE);
+      const safeGajiPokok = CommonServiceUtils.safeRound(totalMengajar, 2, MAX_VALUE);
+      const safeInsentif = CommonServiceUtils.safeRound(totalInsentif, 2, MAX_VALUE);
+      const safePotongan = CommonServiceUtils.safeRound(totalPotongan, 2, MAX_VALUE);
+      const safeTotalGaji = CommonServiceUtils.safeRound(totalGaji, 2, MAX_VALUE);
 
 
       // Validate if potongan exceeds total earnings
@@ -801,7 +776,7 @@ class PayrollService {
             tahun: payroll.tahun,
             status: payroll.status,
             paymentStatus: payroll.payrollDisbursement?.xenditDisbursement?.xenditStatus,
-            tanggalKalkulasi: payroll.tanggalKalkulasi ? moment(payroll.tanggalKalkulasi).format(DATE_FORMATS.DEFAULT) : null,
+            tanggalKalkulasi: payroll.tanggalKalkulasi ? CommonServiceUtils.formatDate(payroll.tanggalKalkulasi) : null,
             catatan: payroll.catatan,
             gajiBersih: totalMengajar + totalInsentif - totalPotongan,
             detail: {
@@ -844,7 +819,7 @@ class PayrollService {
       const paginatedData = formattedData.slice(startIndex, endIndex);
 
       const totalItems = formattedData.length;
-      const totalPages = Math.ceil(totalItems / limit);
+      const totalPages = CommonServiceUtils.calculateTotalPages(totalItems, limit);
 
       return {
         data: paginatedData,
@@ -870,9 +845,7 @@ class PayrollService {
   }
 
   async batchPayrollDisbursement(payrollIds) {
-    if (!Array.isArray(payrollIds) || payrollIds.length === 0) {
-      throw ErrorFactory.badRequest('payrollIds harus berupa array dan tidak boleh kosong');
-    }
+    CommonServiceUtils.validateArray(payrollIds, 'payrollIds');
 
     const payrolls = await prisma.payroll.findMany({
       where: { id: { in: payrollIds } },
@@ -966,7 +939,7 @@ class PayrollService {
           data: {
             payrollId,
             amount: disbursement.amount,
-            tanggalProses: moment().format(DATE_FORMATS.DEFAULT),
+            tanggalProses: CommonServiceUtils.getCurrentDate(),
             xenditDisbursement: {
               create: {
                 xenditDisbursementId: disbursement.id,

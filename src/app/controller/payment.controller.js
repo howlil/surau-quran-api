@@ -16,31 +16,23 @@ class PaymentController {
 
             const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
             if (!isValidToken) {
-                logger.warn('Invalid Xendit callback token received');
                 throw ErrorFactory.unauthorized('Invalid callback token');
             }
 
-            logger.info('Processing Xendit callback:', rawBody);
             const result = await paymentService.handleXenditCallback(rawBody);
-            
+
             if (!result) {
-                logger.warn('No result returned from handleXenditCallback');
                 throw ErrorFactory.internalServerError('Callback processing failed - no result returned');
             }
 
-            logger.info(`Payment status: ${result.statusPembayaran || 'UNKNOWN'} for payment ID: ${result.id || 'UNKNOWN'}`);
 
             if (result.statusPembayaran === 'PAID') {
                 if (result.tipePembayaran === 'PENDAFTARAN') {
-                    // Pendaftaran sudah diproses otomatis di handleXenditCallback
-                    logger.info(`Pendaftaran payment for ID: ${result.id} already processed in callback handler`);
                 } else if (result.tipePembayaran === 'SPP') {
                     try {
                         const sppResult = await paymentService.processPaidSpp(result.id);
-                        logger.info(`Successfully processed SPP payment for ID: ${result.id}`);
                     } catch (error) {
                         logger.error(`Failed to process SPP for payment ID: ${result.id}`, error);
-                        // Don't throw error here to prevent webhook retries
                         return ResponseFactory.get({
                             success: false,
                             message: 'Payment processed but SPP update failed',
@@ -56,24 +48,7 @@ class PaymentController {
                 payment: result
             }).send(res);
         } catch (error) {
-            logger.error('Error handling Xendit callback:', {
-                error: error.message,
-                stack: error.stack,
-                body: req.body
-            });
-
-            // Check if this is a duplicate callback that was already processed
-            if (error.message && error.message.includes('duplicate') ||
-                error.message && error.message.includes('already processed') ||
-                error.message && error.message.includes('not found')) {
-                // Still return 200 for Xendit to prevent retries
-                return ResponseFactory.get({
-                    success: true,
-                    message: 'Callback acknowledged but skipped processing (duplicate or already processed)',
-                }).send(res);
-            }
-
-      next(error)
+            next(error)
         }
     };
 
@@ -86,7 +61,6 @@ class PaymentController {
                 throw ErrorFactory.badRequest('Pilih minimal satu periode SPP untuk dibayar');
             }
 
-            // Handle evidence file upload untuk pembayaran tunai
             let evidence = null;
             if (req.file && req.file.fieldname === 'evidence') {
                 evidence = req.file.filename;
@@ -99,11 +73,9 @@ class PaymentController {
                 evidence
             });
 
-            // Jika pembayaran tunai, langsung proses dan return success
             if (metodePembayaran === 'TUNAI') {
-                const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-                const transformedResult = FileUtils.transformPembayaranFiles(paymentData.pembayaran, baseUrl);
-                
+                const transformedResult = FileUtils.transformPembayaranFiles(paymentData.pembayaran);
+
                 return ResponseFactory.get({
                     success: true,
                     message: 'Pembayaran SPP tunai berhasil',
@@ -117,9 +89,10 @@ class PaymentController {
 
             // Jika payment gateway, buat invoice Xendit
             const invoiceData = await paymentService.createBatchSppInvoice({
-                periodeSppIds,
-                siswa: paymentData.siswa,
-                payment: paymentData.payment,
+                data: {
+                    periodeSppIds,
+                    siswa: paymentData.siswa,
+                    payment: paymentData.payment,
                 voucherId: paymentData.payment.voucherId
             });
 
@@ -135,7 +108,6 @@ class PaymentController {
             next(error)
         }
     };
-
 
 }
 

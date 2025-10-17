@@ -3,8 +3,10 @@ const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class VoucherService {
-  async create(data) {
+  async create(options) {
     try {
+      const { data } = options;
+      
       const existing = await prisma.voucher.findUnique({
         where: { kodeVoucher: data.kodeVoucher }
       });
@@ -23,8 +25,11 @@ class VoucherService {
     }
   }
 
-  async update(id, data) {
+  async update(options) {
     try {
+      const { data, where } = options;
+      const { id } = where;
+      
       const voucher = await prisma.voucher.findUnique({
         where: { id }
       });
@@ -57,8 +62,11 @@ class VoucherService {
     }
   }
 
-  async delete(id) {
+  async delete(options) {
     try {
+      const { where } = options;
+      const { id } = where;
+      
       const voucher = await prisma.voucher.findUnique({
         where: { id },
         include: {
@@ -85,10 +93,11 @@ class VoucherService {
     }
   }
 
-  async getAll(filters = {}) {
+  async getAll(options = {}) {
+    const { data: filters = {}, where: additionalWhere = {} } = options;
     const { page = 1, limit = 10, nama } = filters;
     try {
-      const where = {};
+      const where = { ...additionalWhere };
 
       if (nama) {
         where.OR = [

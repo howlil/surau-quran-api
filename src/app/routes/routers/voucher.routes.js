@@ -29,7 +29,6 @@ router.delete(
 );
 
 
-
 router.get(
   '/v1/voucher',
   authMiddleware.authenticate,

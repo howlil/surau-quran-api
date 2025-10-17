@@ -16,33 +16,6 @@ router.post('/v1/logout',
   authController.logout
 );
 
-router.post('/v1/admin',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
-  validationMiddleware.validateBody(authValidation.createAdmin()),
-  authController.createAdmin
-);
-
-router.get('/v1/admin',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
-  validationMiddleware.validateQuery(authValidation.getAdminQuery()),
-  authController.getAllAdmins
-);
-
-
-router.patch('/v1/admin/:id',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
-  validationMiddleware.validateBody(authValidation.updateAdmin()),
-  authController.updateAdmin
-);
-
-router.delete('/v1/admin/:id',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU']),
-  authController.deleteAdmin
-);
 
 router.post('/v1/forgot-password',
   validationMiddleware.validateBody(  authValidation.forgotPassword()),

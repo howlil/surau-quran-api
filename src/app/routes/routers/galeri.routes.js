@@ -6,7 +6,6 @@ const { uploadCoverGaleriMiddleware } = require('../../middleware/upload.middlew
 const GaleriController = require('../../controller/galeri.controller');
 const GaleriValidation = require('../../validation/galeri.validation');
 
-// GET all galeri
 router.get(
     '/v1/galeri',
     validationMiddleware.validateQuery(GaleriValidation.getGaleriQuery()),
@@ -14,8 +13,6 @@ router.get(
 );
 
 
-
-// POST create galeri
 router.post(
     '/v1/galeri',
     authMiddleware.authenticate,
@@ -25,7 +22,6 @@ router.post(
     GaleriController.create
 );
 
-// PATCH update galeri
 router.patch(
     '/v1/galeri/:id',
     authMiddleware.authenticate,
@@ -35,7 +31,6 @@ router.patch(
     GaleriController.update
 );
 
-// DELETE galeri
 router.delete(
     '/v1/galeri/:id',
     authMiddleware.authenticate,

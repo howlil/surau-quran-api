@@ -10,11 +10,10 @@ class RfidController {
             const result = await rfidService.searchUser(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-      next(error)
+            next(error)
         }
     };
 
-    // Register RFID untuk user
     registerRfid = async (req, res, next) => {
         try {
             const { userId, rfid } = req.extract.getBody(['userId', 'rfid']);
@@ -25,7 +24,6 @@ class RfidController {
         }
     };
 
-    // Update RFID user
     updateRfid = async (req, res, next) => {
         try {
             const { id } = req.extract.getParams(['id']);
@@ -37,7 +35,6 @@ class RfidController {
         }
     };
 
-    // Delete RFID user
     deleteRfid = async (req, res, next) => {
         try {
             const { id } = req.extract.getParams(['id']);
@@ -48,19 +45,16 @@ class RfidController {
         }
     };
 
-    // Get list semua user dengan status RFID
     getRfidList = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['search', 'role', 'hasRfid', 'page', 'limit']);
             const result = await rfidService.getRfidList(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-      next(error)
+            next(error)
         }
     };
 
-    // Get detail RFID user
-    
 }
 
 module.exports = new RfidController(); 

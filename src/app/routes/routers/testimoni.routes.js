@@ -6,36 +6,21 @@ const { uploadFotoUrlMiddleware } = require('../../middleware/upload.middleware'
 const TestimoniController = require('../../controller/testimoni.controller');
 const TestimoniValidation = require('../../validation/testimoni.validation');
 
-// GET all testimoni
 router.get(
     '/v1/testimoni',
     validationMiddleware.validateQuery(TestimoniValidation.getTestimoniQuery()),
     TestimoniController.getAll
 );
 
-
-
-// POST create testimoni
 router.post(
     '/v1/testimoni',
     authMiddleware.authenticate,
     authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadFotoUrlMiddleware,
-    (req, res, next) => {
-        // Validate that file was uploaded
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'Foto wajib diisi'
-            });
-        }
-        next();
-    },
     validationMiddleware.validateBody(TestimoniValidation.create()),
     TestimoniController.create
 );
 
-// PATCH update testimoni
 router.patch(
     '/v1/testimoni/:id',
     authMiddleware.authenticate,
@@ -45,7 +30,6 @@ router.patch(
     TestimoniController.update
 );
 
-// DELETE testimoni
 router.delete(
     '/v1/testimoni/:id',
     authMiddleware.authenticate,

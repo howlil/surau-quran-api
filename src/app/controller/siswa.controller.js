@@ -11,10 +11,10 @@ class SiswaController {
       const filters = req.extract.getQuery([
         'nama', 'programId', 'page', 'limit'
       ]);
-      const result = await siswaService.getAll(filters);
+      const result = await siswaService.getAll({ data: filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
@@ -25,7 +25,7 @@ next(error)
       const result = await siswaService.getProfile(userId, filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
@@ -43,26 +43,22 @@ next(error)
   pendaftaranSiswa = async (req, res, next) => {
     try {
       const data = req.extract.getBody();
-      
-      // Handle evidence file upload untuk pembayaran tunai
+
       if (req.file && req.file.fieldname === 'evidence') {
         data.evidence = req.file.filename;
       }
 
       const result = await siswaService.createPendaftaran(data);
-      
-      // Handle response berdasarkan metode pembayaran
+
       if (result.success && result.data) {
-        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const transformedResult = FileUtils.transformPembayaranFiles(result.data, baseUrl);
-        
+        const transformedResult = FileUtils.transformPembayaranFiles(result.data);
+
         return ResponseFactory.get({
           success: true,
           message: result.message,
           data: transformedResult
         }).send(res);
       } else {
-        // Response untuk pembayaran gateway (Xendit)
         return ResponseFactory.get({
           pendaftaranId: result.pendaftaranId,
           invoiceUrl: result.paymentInfo.xenditInvoiceUrl,
@@ -84,7 +80,7 @@ next(error)
       const result = await siswaService.getPendaftaranInvoice(invoices, filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
@@ -92,19 +88,10 @@ next(error)
     try {
       const { id } = req.extract.getParams(['id']);
       const data = req.extract.getBody(['programId', 'status']);
-      const result = await siswaService.updateStatusSiswa(data.programId, id, data.status);
-      return ResponseFactory.updated({
-        message: 'Status program siswa berhasil diperbarui',
-        data: {
-          siswaId: id,
-          siswaNama: result.siswa.namaMurid,
-          siswaNis: result.siswa.nis,
-          programId: result.programId,
-          programNama: result.program.namaProgram,
-          statusLama: result.statusLama,
-          statusBaru: result.statusBaru
-        }
-      }).send(res);
+      const result = await siswaService.updateStatusSiswa({ 
+        data: { programId: data.programId, siswaId: id, status: data.status } 
+      });
+      return ResponseFactory.updated(result).send(res);
     } catch (error) {
       next(error)
     }
@@ -116,7 +103,7 @@ next(error)
       const result = await siswaService.getJadwalSiswa(rfid);
       return ResponseFactory.get(result).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
@@ -149,11 +136,9 @@ next(error)
         throw ErrorFactory.badRequest('Data pendaftaran tidak boleh kosong');
       }
 
-      // Handle file uploads - bisa ada kartu keluarga, evidence, atau keduanya
       let kartuKeluargaFile = null;
       let evidenceFile = null;
 
-      // Handle single file upload
       if (req.file) {
         if (req.file.fieldname === 'kartuKeluarga') {
           kartuKeluargaFile = req.file.filename;
@@ -162,7 +147,6 @@ next(error)
         }
       }
 
-      // Handle multiple files upload (bisa ada kartu keluarga + evidence)
       if (req.files && Array.isArray(req.files)) {
         req.files.forEach(file => {
           if (file.fieldname === 'kartuKeluarga') {
@@ -173,7 +157,6 @@ next(error)
         });
       }
 
-      // Handle multiple files dalam object (multer dengan multiple fields)
       if (req.files && typeof req.files === 'object' && !Array.isArray(req.files)) {
         Object.keys(req.files).forEach(fieldname => {
           const file = req.files[fieldname];
@@ -192,9 +175,8 @@ next(error)
       const result = await siswaService.createPendaftaranV2(data, kartuKeluargaFile);
 
       if (result.success && result.data) {
-        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const transformedResult = FileUtils.transformPembayaranFiles(result.data, baseUrl);
-        
+        const transformedResult = FileUtils.transformPembayaranFiles(result.data);
+
         return ResponseFactory.get({
           success: true,
           message: result.message,

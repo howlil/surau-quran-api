@@ -1,6 +1,7 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class RfidService {
     async searchUser(filters = {}) {
@@ -90,7 +91,7 @@ class RfidService {
             const paginatedUsers = users.slice(startIndex, endIndex);
 
             const totalItems = users.length;
-            const totalPages = Math.ceil(totalItems / limit);
+            const totalPages = CommonServiceUtils.calculateTotalPages(totalItems, limit);
 
             return {
                 data: paginatedUsers,
@@ -375,7 +376,7 @@ class RfidService {
             const paginatedUsers = users.slice(startIndex, endIndex);
 
             const totalItems = users.length;
-            const totalPages = Math.ceil(totalItems / limit);
+            const totalPages = CommonServiceUtils.calculateTotalPages(totalItems, limit);
 
             return {
                 data: paginatedUsers,

@@ -28,62 +28,6 @@ class AuthController {
     }
   };
 
-  createAdmin = async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const data = req.extract.getBody();
-      const result = await authService.createAdmin(data, userId);
-      return ResponseFactory.created(result).send(res);
-    } catch (error) {
-      next(error)
-    }
-  };
-
-  getAllAdmins = async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const filters = req.extract.getQuery(['page', 'limit', 'nama']);
-      const result = await authService.getAllAdmins(userId, filters);
-      
-      const transformedData = {
-        ...result,
-        data: result.data
-          .filter(admin => admin.user.role === 'ADMIN')
-          .map(admin => ({
-            id: admin.id,
-            nama: admin.nama,
-            email: admin.user.email,
-          }))
-      };
-      
-      return ResponseFactory.getAll(transformedData.data, transformedData.meta).send(res);
-    } catch (error) {
-next(error)
-    }
-  };
-
-  updateAdmin = async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const { id: adminId } = req.extract.getParams(['id']);
-      const data = req.extract.getBody();
-      const result = await authService.updateAdmin(adminId, data, userId);
-      return ResponseFactory.updated(result).send(res);
-    } catch (error) {
-      next(error)
-    }
-  };
-
-  deleteAdmin = async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const { id: adminId } = req.extract.getParams(['id']);
-      await authService.deleteAdmin(adminId, userId);
-      return ResponseFactory.deleted().send(res);
-    } catch (error) {
-      next(error)
-    }
-  };
 
   forgotPassword = async (req, res, next) => {
     try {
@@ -95,18 +39,6 @@ next(error)
 
       const result = await authService.requestPasswordReset(email);
 
-      // Check if token was returned (email sending failed)
-      if (result.token) {
-        // In development mode, return the token for testing
-        if (process.env.NODE_ENV === 'development') {
-          return ResponseFactory.get({
-            message: result.message,
-            token: result.token,
-            resetLink: `${process.env.FRONTEND_URL}/reset-password?token=${result.token}`
-          }).send(res);
-        }
-      }
-
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error('Error processing forgot password request:', error);
@@ -117,7 +49,7 @@ next(error)
         }).send(res);
       }
 
-next(error)
+      next(error)
     }
   };
 

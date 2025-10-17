@@ -2,7 +2,6 @@ const guruService = require('../service/guru.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const { prisma } = require('../../lib/config/prisma.config');
-const FileUtils = require('../../lib/utils/file.utils');
 
 class GuruController {
   create = async (req, res, next) => {
@@ -18,12 +17,8 @@ class GuruController {
         }
       }
 
-      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-      data.baseUrl = baseUrl;
-
-      const result = await guruService.create(data);
-      const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
-      return ResponseFactory.created(transformedResult).send(res);
+      const result = await guruService.create({ data });
+      return ResponseFactory.created(result).send(res);
     } catch (error) {
       next(error)
     }
@@ -43,12 +38,8 @@ class GuruController {
         }
       }
 
-      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-      data.baseUrl = baseUrl;
-
-      const result = await guruService.update(id, data);
-      const transformedResult = FileUtils.transformGuruFiles(result, baseUrl);
-      return ResponseFactory.updated(transformedResult).send(res);
+      const result = await guruService.update({ data, where: { id } });
+      return ResponseFactory.updated(result).send(res);
     } catch (error) {
       next(error)
     }
@@ -57,7 +48,7 @@ class GuruController {
   delete = async (req, res, next) => {
     try {
       const { id } = req.extract.getParams(['id']);
-      await guruService.delete(id);
+      await guruService.delete({ where: { id } });
       return ResponseFactory.deleted().send(res);
     } catch (error) {
       next(error)
@@ -69,37 +60,21 @@ class GuruController {
       const filters = req.extract.getQuery([
         'page', 'limit', 'nama'
       ]);
-      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-      const result = await guruService.getAll(filters);
-
-      const transformedData = {
-        ...result,
-        data: FileUtils.transformGuruListFiles(result.data, baseUrl)
-      };
-
-      return ResponseFactory.getAll(transformedData.data, transformedData.meta).send(res);
+      const result = await guruService.getAll({ data: filters });
+      return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
+  
   getAllWithSchedules = async (req, res, next) => {
     try {
-      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
       const filters = req.extract.getQuery(['page', 'limit', 'nama']);
       const result = await guruService.getAllGuruWithSchedules(filters);
-
-      const transformedResult = {
-        ...result,
-        data: result.data.map(guru => ({
-          ...guru,
-          fotoProfile: FileUtils.getImageUrl(baseUrl, guru.fotoProfile)
-        }))
-      };
-
-      return ResponseFactory.getAll(transformedResult.data, transformedResult.meta).send(res);
+      return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
 
@@ -136,11 +111,9 @@ next(error)
 
       const { filePath, fileName } = await guruService.getContractFile(guru.id);
 
-      // Set headers for PDF download
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
-      // Stream the file
       const fileStream = require('fs').createReadStream(filePath);
       fileStream.pipe(res);
     } catch (error) {

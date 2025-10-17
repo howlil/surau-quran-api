@@ -2,8 +2,10 @@ const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 
 class JamMengajarService {
-  async create(data) {
+  async create(options) {
     try {
+      const { data } = options;
+      
       const existing = await prisma.jamMengajar.findFirst({
         where: {
           jamMulai: data.jamMulai,
@@ -25,8 +27,11 @@ class JamMengajarService {
     }
   }
 
-  async update(id, data) {
+  async update(options) {
     try {
+      const { data, where } = options;
+      const { id } = where;
+      
       const jamMengajar = await prisma.jamMengajar.findUnique({
         where: { id }
       });
@@ -61,8 +66,11 @@ class JamMengajarService {
     }
   }
 
-  async delete(id) {
+  async delete(options) {
     try {
+      const { where } = options;
+      const { id } = where;
+      
       const jamMengajar = await prisma.jamMengajar.findUnique({
         where: { id }
       });

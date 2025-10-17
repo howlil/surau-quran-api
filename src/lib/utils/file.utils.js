@@ -1,6 +1,11 @@
 class FileUtils {
-    static getImageUrl(baseUrl, filename) {
+    static getBaseUrl() {
+        return process.env.BACKEND_URL;
+    }
+
+    static getImageUrl(filename) {
         if (!filename) return null;
+        const baseUrl = this.getBaseUrl();
         const actualFilename = filename.split('\\').pop();
         if (actualFilename.includes('uploads/images/')) {
             return `${baseUrl}/${actualFilename}`;
@@ -8,8 +13,9 @@ class FileUtils {
         return `${baseUrl}/uploads/images/${actualFilename}`;
     }
 
-    static getDocumentUrl(baseUrl, filename, type = 'surat_kontrak') {
+    static getDocumentUrl(filename, type = 'surat_kontrak') {
         if (!filename) return null;
+        const baseUrl = this.getBaseUrl();
         const actualFilename = filename.split('\\').pop();
         if (actualFilename.includes(`uploads/documents/${type}/`)) {
             return `${baseUrl}/${actualFilename}`;
@@ -17,124 +23,111 @@ class FileUtils {
         return `${baseUrl}/uploads/documents/${type}/${actualFilename}`;
     }
 
-    static getSuratIzinUrl(baseUrl, filename) {
-        return this.getDocumentUrl(baseUrl, filename, 'surat_izin');
+    static getSuratIzinUrl(filename) {
+        return this.getDocumentUrl(filename, 'surat_izin');
     }
 
-    static transformGuruFiles(guru, baseUrl) {
-        if (!guru) return null;
+    static getKartuKeluargaUrl(filename) {
+        return this.getDocumentUrl(filename, 'kartu_keluarga');
+    }
 
+    static getEvidenceUrl(filename) {
+        return this.getDocumentUrl(filename, 'evidence');
+    }
+
+    // Transform methods
+    static transformGuruFiles(guru) {
+        if (!guru) return null;
         return {
             ...guru,
-            fotoProfile: this.getImageUrl(baseUrl, guru.fotoProfile),
-            suratKontrak: this.getDocumentUrl(baseUrl, guru.suratKontrak),
+            fotoProfile: this.getImageUrl(guru.fotoProfile),
+            suratKontrak: this.getDocumentUrl(guru.suratKontrak),
             user: guru.user
         };
     }
 
-    static transformGuruListFiles(gurus, baseUrl) {
+    static transformGuruListFiles(gurus) {
         if (!Array.isArray(gurus)) return [];
-
-        return gurus.map(guru => this.transformGuruFiles(guru, baseUrl));
+        return gurus.map(guru => this.transformGuruFiles(guru));
     }
 
-    static transformAbsensiGuruFiles(absensi, baseUrl) {
+    static transformAbsensiGuruFiles(absensi) {
         if (!absensi) return null;
-
         return {
             ...absensi,
-            suratIzin: this.getSuratIzinUrl(baseUrl, absensi.suratIzin)
+            suratIzin: this.getSuratIzinUrl(absensi.suratIzin)
         };
     }
 
-    static transformAbsensiGuruListFiles(absensiList, baseUrl) {
+    static transformAbsensiGuruListFiles(absensiList) {
         if (!Array.isArray(absensiList)) return [];
-
-        return absensiList.map(absensi => this.transformAbsensiGuruFiles(absensi, baseUrl));
+        return absensiList.map(absensi => this.transformAbsensiGuruFiles(absensi));
     }
 
-    static transformProgramFiles(program, baseUrl) {
+    static transformProgramFiles(program) {
         if (!program) return null;
-
         return {
             ...program,
-            cover: this.getImageUrl(baseUrl, program.cover)
+            cover: this.getImageUrl(program.cover)
         };
     }
 
-    static transformProgramListFiles(programs, baseUrl) {
+    static transformProgramListFiles(programs) {
         if (!Array.isArray(programs)) return [];
-
-        return programs.map(program => this.transformProgramFiles(program, baseUrl));
+        return programs.map(program => this.transformProgramFiles(program));
     }
 
-    static transformTestimoniFiles(testimoni, baseUrl) {
+    static transformTestimoniFiles(testimoni) {
         if (!testimoni) return null;
-
         return {
             ...testimoni,
-            fotoUrl: this.getImageUrl(baseUrl, testimoni.fotoUrl)
+            fotoUrl: this.getImageUrl(testimoni.fotoUrl)
         };
     }
 
-    static transformTestimoniListFiles(testimoniList, baseUrl) {
+    static transformTestimoniListFiles(testimoniList) {
         if (!Array.isArray(testimoniList)) return [];
-
-        return testimoniList.map(testimoni => this.transformTestimoniFiles(testimoni, baseUrl));
+        return testimoniList.map(testimoni => this.transformTestimoniFiles(testimoni));
     }
 
-    static transformGaleriFiles(galeri, baseUrl) {
+    static transformGaleriFiles(galeri) {
         if (!galeri) return null;
-
         return {
             ...galeri,
-            coverGaleri: this.getImageUrl(baseUrl, galeri.coverGaleri)
+            coverGaleri: this.getImageUrl(galeri.coverGaleri)
         };
     }
 
-    static transformGaleriListFiles(galeriList, baseUrl) {
+    static transformGaleriListFiles(galeriList) {
         if (!Array.isArray(galeriList)) return [];
-
-        return galeriList.map(galeri => this.transformGaleriFiles(galeri, baseUrl));
+        return galeriList.map(galeri => this.transformGaleriFiles(galeri));
     }
 
-    static transformFinanceFiles(finance, baseUrl) {
+    static transformFinanceFiles(finance) {
         if (!finance) return null;
-
         return {
             ...finance,
-            evidence: this.getDocumentUrl(baseUrl, finance.evidence, 'evidence')
+            evidence: this.getDocumentUrl(finance.evidence, 'evidence')
         };
     }
 
-    static transformFinanceListFiles(financeList, baseUrl) {
+    static transformFinanceListFiles(financeList) {
         if (!Array.isArray(financeList)) return [];
-
-        return financeList.map(finance => this.transformFinanceFiles(finance, baseUrl));
+        return financeList.map(finance => this.transformFinanceFiles(finance));
     }
 
-    static getKartuKeluargaUrl(baseUrl, filename) {
-        return this.getDocumentUrl(baseUrl, filename, 'kartu_keluarga');
-    }
-
-    static getEvidenceUrl(baseUrl, filename) {
-        return this.getDocumentUrl(baseUrl, filename, 'evidence');
-    }
-
-    static transformPembayaranFiles(pembayaran, baseUrl) {
+    static transformPembayaranFiles(pembayaran) {
         if (!pembayaran) return null;
-
         return {
             ...pembayaran,
-            evidence: this.getEvidenceUrl(baseUrl, pembayaran.evidence)
+            evidence: this.getEvidenceUrl(pembayaran.evidence)
         };
     }
 
-    static transformPembayaranListFiles(pembayaranList, baseUrl) {
+    static transformPembayaranListFiles(pembayaranList) {
         if (!Array.isArray(pembayaranList)) return [];
-
-        return pembayaranList.map(pembayaran => this.transformPembayaranFiles(pembayaran, baseUrl));
+        return pembayaranList.map(pembayaran => this.transformPembayaranFiles(pembayaran));
     }
 }
 
-module.exports = FileUtils; 
+module.exports = FileUtils;

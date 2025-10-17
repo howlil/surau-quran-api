@@ -19,7 +19,6 @@ class PayrollController {
     }
   };
 
-
   getAllPayrollsForAdmin = async (req, res, next) => {
     try {
       const filters = req.extract.getQuery([
@@ -28,10 +27,9 @@ class PayrollController {
       const result = await payrollService.getAllPayrollsForAdmin(filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
-next(error)
+      next(error)
     }
   };
-
 
   getAllPayrollsForGuru = async (req, res, next) => {
     try {
@@ -39,7 +37,6 @@ next(error)
         'page', 'limit', 'monthYear'
       ]);
 
-      // Get guru ID from authenticated user
       const guru = await prisma.guru.findUnique({
         where: { userId: req.user.id },
         select: { id: true }
@@ -81,7 +78,7 @@ next(error)
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error('Error handling disbursement callback:', error);
-next(error)
+      next(error)
     }
   };
 }

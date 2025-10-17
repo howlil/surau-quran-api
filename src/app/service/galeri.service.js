@@ -1,10 +1,13 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class GaleriService {
-    async create(data) {
+    async create(options) {
         try {
+            const { data } = options;
+            
             const galeri = await prisma.galeri.create({
                 data: {
                     judulFoto: data.judulFoto,
@@ -12,17 +15,24 @@ class GaleriService {
                 }
             });
 
-            return galeri;
+            const transformedResult = FileUtils.transformGaleriFiles(galeri);
+
+            return {
+                galeriId: transformedResult.id,
+                judulFoto: transformedResult.judulFoto,
+                coverGaleri: transformedResult.coverGaleri
+            };
         } catch (error) {
             throw error
         }
     }
 
-    async getAll(filters = {}) {
+    async getAll(options = {}) {
         try {
+            const { data: filters = {}, where: additionalWhere = {} } = options;
             const { page = 1, limit = 10, judul } = filters;
 
-            const where = {};
+            const where = { ...additionalWhere };
             
             if (judul) {
                 where.judulFoto = {
@@ -30,12 +40,23 @@ class GaleriService {
                 };
             }
 
-            return await PrismaUtils.paginate(prisma.galeri, {
+            const result = await PrismaUtils.paginate(prisma.galeri, {
                 page,
                 limit,
                 where,
                 orderBy: { createdAt: 'desc' }
             });
+
+            const transformedData = {
+                ...result,
+                data: result.data.map(galeri => ({
+                    galeriId: galeri.id,
+                    judulFoto: galeri.judulFoto,
+                    coverGaleri: FileUtils.getImageUrl(galeri.coverGaleri)
+                }))
+            };
+
+            return transformedData;
         } catch (error) {
             throw error
         }
@@ -43,8 +64,11 @@ class GaleriService {
 
 
 
-    async update(id, data) {
+    async update(options) {
         try {
+            const { data, where } = options;
+            const { id } = where;
+            
             // Check if galeri exists
             const galeri = await prisma.galeri.findUnique({
                 where: { id }
@@ -59,15 +83,24 @@ class GaleriService {
                 data
             });
 
-            return updated;
+            const transformedResult = FileUtils.transformGaleriFiles(updated);
+
+            return {
+                galeriId: transformedResult.id,
+                judulFoto: transformedResult.judulFoto,
+                coverGaleri: transformedResult.coverGaleri
+            };
         } catch (error) {
             if (error.statusCode) throw error;
             throw error
         }
     }
 
-    async delete(id) {
+    async delete(options) {
         try {
+            const { where } = options;
+            const { id } = where;
+            
             // Check if galeri exists
             const galeri = await prisma.galeri.findUnique({
                 where: { id }

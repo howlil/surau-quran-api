@@ -11,15 +11,6 @@ router.post(
     authMiddleware.authenticate,
     authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
     uploadCoverMiddleware,
-    (req, res, next) => {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cover wajib diisi'
-            });
-        }
-        next();
-    },
     validationMiddleware.validateBody(ProgramValidation.create()),
     ProgramController.create
 );
@@ -59,28 +50,5 @@ router.get(
     ProgramController.getAllPublic
 );
 
-// API untuk kelas pengganti (hanya untuk guru)
-router.post(
-    '/v1/program/kelas-pengganti',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['GURU']),
-    validationMiddleware.validateBody(ProgramValidation.addKelasPengganti()),
-    ProgramController.addKelasPengganti
-);
-
-router.delete(
-    '/v1/program/kelas-pengganti/:kelasProgramId',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['GURU']),
-    validationMiddleware.validateParams(ProgramValidation.removeKelasPengganti()),
-    ProgramController.removeKelasPengganti
-);
-
-router.get(
-    '/v1/program/siswa',
-    authMiddleware.authenticate,
-    authMiddleware.authorize(['GURU']),
-    ProgramController.getSiswaKelasPengganti
-);
 
 module.exports = router;

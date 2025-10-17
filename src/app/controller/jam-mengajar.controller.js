@@ -5,7 +5,7 @@ class JamMengajarController {
     create = async (req, res, next) => {
         try {
             const data = req.extract.getBody();
-            const result = await jamMengajarService.create(data);
+            const result = await jamMengajarService.create({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
             next(error)
@@ -16,7 +16,7 @@ class JamMengajarController {
         try {
             const { id } = req.extract.getParams(['id']);
             const data = req.extract.getBody();
-            const result = await jamMengajarService.update(id, data);
+            const result = await jamMengajarService.update({ data, where: { id } });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
             next(error)
@@ -26,13 +26,12 @@ class JamMengajarController {
     delete = async (req, res, next) => {
         try {
             const { id } = req.extract.getParams(['id']);
-            await jamMengajarService.delete(id);
+            await jamMengajarService.delete({ where: { id } });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
             next(error)
         }
     };
-
 
     getAll = async (req, res, next) => {
         try {

@@ -1,10 +1,9 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
 const WhatsAppUtils = require('../../lib/utils/whatsapp.utils');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class SppReminderCronService {
     static async sendSppReminders() {
@@ -120,7 +119,7 @@ class SppReminderCronService {
 
     static async createXenditInvoice(spp, siswa, program) {
         try {
-            const externalId = `SPP-${spp.id}-${moment().format('YYYYMMDDHHmmss')}`;
+            const externalId = CommonServiceUtils.generateExternalId('SPP', spp.id);
 
             const invoiceData = {
                 external_id: externalId,
@@ -189,7 +188,7 @@ class SppReminderCronService {
                     tipePembayaran: 'SPP',
                     jumlahTagihan: spp.totalTagihan,
                     statusPembayaran: 'PENDING',
-                    tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
+                    tanggalPembayaran: CommonServiceUtils.getCurrentDate()
                 }
             });
 
@@ -237,7 +236,7 @@ class SppReminderCronService {
                     jumlahTagihan: formattedAmount,
                     paymentUrl: xenditInvoice?.invoice_url,
                     dueDate: moment().add(7, 'days').format('DD MMMM YYYY'),
-                    logoUrl: `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/assets/surau.png`
+                    logoUrl: `${FileUtils.getBaseUrl()}/uploads/assets/surau.png`
                 }
             };
 
@@ -272,15 +271,7 @@ class SppReminderCronService {
             // Send WhatsApp message using Twilio
             const result = await WhatsAppUtils.sendSppReminder(siswa.noWhatsapp, sppData);
 
-            if (result.success) {
-                    messageSid: result.messageSid,
-                    status: result.status
-                });
-            } else {
-                    error: result.error,
-                    code: result.code
-                });
-            }
+
 
             return result;
 
@@ -290,7 +281,7 @@ class SppReminderCronService {
     }
 
     static generateWhatsAppMessage(spp, siswa, program, formattedAmount, xenditInvoice) {
-        const dueDate = moment().add(7, 'days').format('DD MMMM YYYY');
+        const dueDate = CommonServiceUtils.addDays(CommonServiceUtils.getCurrentDate(), 7, 'DD MMMM YYYY');
 
         return `Assalamu'alaikum Warrahmatullahi Wabarakatuh
 

@@ -1,16 +1,14 @@
 // File: src/lib/services/payroll-cron.service.js
 const cron = require('node-cron');
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
 const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class PayrollCronService {
 
   static async generateMonthlyPayroll() {
     try {
-      const bulan = moment().format('MM');  // Format "08" bukan "August"
-      const tahun = moment().year();
+      const { bulan, tahun } = CommonServiceUtils.getCurrentMonthYear();
       const periode = `${bulan} ${tahun}`;
 
       const gurus = await prisma.guru.findMany({
@@ -197,7 +195,7 @@ class PayrollCronService {
       let bulanMM;
       if (bulan.length > 2) {
         // Jika input "Agustus" convert ke "08"
-        const monthNumber = this.getMonthNumber(bulan);
+        const monthNumber = CommonServiceUtils.getMonthNumber(bulan);
         bulanMM = String(monthNumber).padStart(2, '0');
       } else {
         // Jika sudah format "08"

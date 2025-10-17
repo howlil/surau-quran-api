@@ -3,8 +3,7 @@ const ErrorFactory = require('../../lib/factories/error.factory');
 const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
-// todayDate akan dihitung di dalam setiap fungsi yang membutuhkannya
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 class AbsensiService {
 
     async getAbsensiSiswaForAdmin(filters = {}) {
@@ -95,7 +94,6 @@ class AbsensiService {
                 });
             });
 
-            const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
             // Convert the map to an array
             const result = Array.from(kelasMap.values())[0]; // Return single object since we're filtering by kelasId
             const transformedResult = {
@@ -104,7 +102,7 @@ class AbsensiService {
                     ...program,
                     absensi: program.absensi.map(record => ({
                         ...record,
-                        suratIzin: FileUtils.getSuratIzinUrl(baseUrl, record.suratIzin)
+                        suratIzin: FileUtils.getSuratIzinUrl(record.suratIzin)
                     }))
                 }))
             };
@@ -115,12 +113,12 @@ class AbsensiService {
     }
 
 
-    async getAbsensiGuruByDate(filters = {}, baseUrl) {
+    async getAbsensiGuruByDate(filters = {}) {
         try {
             const { tanggal, page = 1, limit = 10 } = filters;
 
             // Parse tanggal untuk mendapatkan hari
-            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
                 throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
@@ -265,7 +263,7 @@ class AbsensiService {
                     // Format surat izin URL jika ada
                     let suratIzinUrl = null;
                     if (absensiRecord && absensiRecord.suratIzin) {
-                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                        suratIzinUrl = FileUtils.getSuratIzinUrl(absensiRecord.suratIzin);
                     }
 
                     // Create absensi data entry
@@ -302,7 +300,7 @@ class AbsensiService {
                     // Format surat izin URL jika ada
                     let suratIzinUrl = null;
                     if (absensiRecord.suratIzin) {
-                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                        suratIzinUrl = FileUtils.getSuratIzinUrl(absensiRecord.suratIzin);
                     }
 
                     // Create absensi data entry untuk absensi yang tidak terkait jadwal hari ini
@@ -504,7 +502,7 @@ class AbsensiService {
 
     async updateAbsensiSiswa(kelasProgramId, siswaId, guruId, statusKehadiran) {
         try {
-            const tanggal = moment().format(DATE_FORMATS.DEFAULT);
+            const tanggal = CommonServiceUtils.getCurrentDate();
 
             // Cek apakah siswa ada di kelas pengganti untuk kelas program ini
             const kelasPengganti = await prisma.kelasPengganti.findFirst({
@@ -636,10 +634,6 @@ class AbsensiService {
         }
     }
 
-    static getSuratIzinUrl(baseUrl, filename) {
-        if (!filename) return null;
-        return `${baseUrl}/uploads/documents/surat_izin/${filename}`;
-    }
 
 
     getDayFromDate(dateString) {
@@ -716,7 +710,7 @@ class AbsensiService {
     async updateAbsensiSiswaTemporary(kelasProgramId, siswaId, guruId, statusKehadiran, tanggal) {
         try {
             // Validasi tanggal tidak boleh masa lalu
-            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
                 throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
@@ -848,7 +842,7 @@ class AbsensiService {
     async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId, tanggal = null) {
         try {
             // Use provided date or default to today's date
-            const targetDate = tanggal || moment().format(DATE_FORMATS.DEFAULT);
+            const targetDate = tanggal || CommonServiceUtils.getCurrentDate();
 
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
@@ -967,11 +961,10 @@ class AbsensiService {
         }
     }
 
-
     async createAbsensiSiswa(kelasProgramId, tanggal) {
         try {
             // Validasi format tanggal dan konversi ke hari
-            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
                 throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
@@ -1188,7 +1181,7 @@ class AbsensiService {
     async updateAbsensiGuruWithRfid(rfid, tanggal, jam) {
         try {
             // Parse tanggal untuk mendapatkan hari
-            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
                 throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
@@ -1529,12 +1522,12 @@ class AbsensiService {
         }
     }
 
-    async getAbsensiGuruTodayPublic(baseUrl) {
+    async getAbsensiGuruTodayPublic() {
         try {
-            const tanggal = moment().format(DATE_FORMATS.DEFAULT);
+            const tanggal = CommonServiceUtils.getCurrentDate();
 
             // Parse tanggal untuk mendapatkan hari
-            const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
+            const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
                 throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
@@ -1677,7 +1670,7 @@ class AbsensiService {
                     // Format surat izin URL jika ada
                     let suratIzinUrl = null;
                     if (absensiRecord && absensiRecord.suratIzin) {
-                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                        suratIzinUrl = FileUtils.getSuratIzinUrl(absensiRecord.suratIzin);
                     }
 
                     // Create absensi data entry
@@ -1714,7 +1707,7 @@ class AbsensiService {
                     // Format surat izin URL jika ada
                     let suratIzinUrl = null;
                     if (absensiRecord.suratIzin) {
-                        suratIzinUrl = `${baseUrl}/uploads/documents/surat_izin/${absensiRecord.suratIzin}`;
+                        suratIzinUrl = FileUtils.getSuratIzinUrl(absensiRecord.suratIzin);
                     }
 
                     // Create absensi data entry untuk absensi yang tidak terkait jadwal hari ini

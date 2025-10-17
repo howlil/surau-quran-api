@@ -1,10 +1,8 @@
-// src/app/service/spp.service.js
 const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
-const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
 const financeService = require('./finance.service');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class SppService {
     async getSppForAdmin(filters = {}) {
@@ -225,8 +223,8 @@ class SppService {
                 if (a.tahun !== b.tahun) {
                     return a.tahun - b.tahun;
                 }
-                const monthA = this.getMonthNumber(a.bulan);
-                const monthB = this.getMonthNumber(b.bulan);
+                const monthA = CommonServiceUtils.getMonthNumber(a.bulan);
+                const monthB = CommonServiceUtils.getMonthNumber(b.bulan);
                 return monthA - monthB;
             });
 
@@ -418,7 +416,7 @@ class SppService {
 
             // Sync ke finance record
 
-            const tanggalPembayaran = moment().format('DD-MM-YYYY');
+            const tanggalPembayaran = CommonServiceUtils.getCurrentDate('DD-MM-YYYY');
 
             await financeService.createFromSppPayment({
                 id: pembayaran.id,
@@ -489,9 +487,9 @@ class SppService {
         const siswa = periode.programSiswa.siswa;
 
         // Gunakan nominal dari pembayaran (sudah final amount setelah voucher)
-        const finalAmount = Number(pembayaran.jumlahTagihan);
-        const originalAmount = Number(periode.jumlahTagihan);
-        const discount = Number(periode.diskon) || 0;
+        const finalAmount = CommonServiceUtils.safeNumber(pembayaran.jumlahTagihan);
+        const originalAmount = CommonServiceUtils.safeNumber(periode.jumlahTagihan);
+        const discount = CommonServiceUtils.safeNumber(periode.diskon);
 
         return {
             invoiceNumber: pembayaran.id,
@@ -545,8 +543,8 @@ class SppService {
                 throw new Error('Program siswa tidak ditemukan');
             }
 
-            const registrationDate = moment(tanggalDaftar, DATE_FORMATS.DEFAULT);
-            const biayaSpp = Number(programSiswa.program.biayaSpp);
+            const registrationDate = moment(tanggalDaftar, 'DD-MM-YYYY');
+            const biayaSpp = CommonServiceUtils.safeNumber(programSiswa.program.biayaSpp);
             const createdSppRecords = [];
 
             // Generate SPP untuk 5 bulan ke depan
@@ -554,7 +552,7 @@ class SppService {
                 const sppMonth = registrationDate.clone().add(i, 'months');
                 const bulan = this.getMonthName(sppMonth.month() + 1);
                 const tahun = sppMonth.year();
-                const tanggalTagihan = sppMonth.format(DATE_FORMATS.DEFAULT);
+                const tanggalTagihan = CommonServiceUtils.formatDate(sppMonth);
 
                 // Check if SPP already exists for this month
                 const existingSpp = await db.periodeSpp.findFirst({
@@ -631,8 +629,8 @@ class SppService {
             const targetMonth = moment().add(monthOffset, 'months');
             const bulan = this.getMonthName(targetMonth.month() + 1);
             const tahun = targetMonth.year();
-            const tanggalTagihan = targetMonth.format(DATE_FORMATS.DEFAULT);
-            const biayaSpp = Number(programSiswa.program.biayaSpp);
+            const tanggalTagihan = CommonServiceUtils.formatDate(targetMonth);
+            const biayaSpp = CommonServiceUtils.safeNumber(programSiswa.program.biayaSpp);
 
             // Check if SPP already exists
             const existingSpp = await db.periodeSpp.findFirst({

@@ -1,7 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class StatisticsService {
     async getStudentCounts(filters = {}) {
@@ -16,14 +14,14 @@ class StatisticsService {
                     // Convert DD-MM-YYYY to DD-MM-YYYY for direct comparison
                     dateWhere = {
                         tanggal: {
-                            gte: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT),
-                            lte: moment(endDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                            gte: CommonServiceUtils.formatDate(startDate),
+                            lte: CommonServiceUtils.formatDate(endDate)
                         }
                     };
                 } else {
                     // If only startDate provided, search exactly on that date
                     dateWhere = {
-                        tanggal: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                        tanggal: CommonServiceUtils.formatDate(startDate)
                     };
                 }
             }
@@ -57,13 +55,13 @@ class StatisticsService {
                     // Convert DD-MM-YYYY to DD-MM-YYYY for pendaftaran date comparison
                     regDateWhere = {
                         tanggalDaftar: {
-                            gte: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT),
-                            lte: moment(endDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                            gte: CommonServiceUtils.formatDate(startDate),
+                            lte: CommonServiceUtils.formatDate(endDate)
                         }
                     };
                 } else {
                     regDateWhere = {
-                        tanggalDaftar: moment(startDate, DATE_FORMATS.DEFAULT).format(DATE_FORMATS.DEFAULT)
+                        tanggalDaftar: CommonServiceUtils.formatDate(startDate)
                     };
                 }
             }
@@ -81,7 +79,6 @@ class StatisticsService {
                 newStudents
             };
         } catch (error) {
-            logger.error('Error getting student counts:', error);
             throw error;
         }
     }
@@ -96,8 +93,8 @@ class StatisticsService {
                 if (endDate) {
                     // If both startDate and endDate provided, search in date range
                     // Convert DD-MM-YYYY to YYYY-MM-DD for database comparison
-                    const parsedStartDate = moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
-                    const parsedEndDate = moment(endDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
+                    const parsedStartDate = CommonServiceUtils.convertDateForDatabase(startDate);
+                    const parsedEndDate = CommonServiceUtils.convertDateForDatabase(endDate);
 
                     dateFilter = {
                         tanggalPembayaran: {
@@ -107,7 +104,7 @@ class StatisticsService {
                     };
                 } else {
                     // If only startDate provided, search exactly on that date
-                    const parsedStartDate = moment(startDate, DATE_FORMATS.DEFAULT).format('YYYY-MM-DD');
+                    const parsedStartDate = CommonServiceUtils.convertDateForDatabase(startDate);
                     dateFilter = {
                         tanggalPembayaran: parsedStartDate
                     };
@@ -115,7 +112,7 @@ class StatisticsService {
             } else {
                 // If no date filter provided, use default range for better visualization
                 const parsedStartDate = this.getDefaultStartDate(groupBy);
-                const parsedEndDate = moment().format('YYYY-MM-DD');
+                const parsedEndDate = CommonServiceUtils.getCurrentDate('YYYY-MM-DD');
 
                 dateFilter = {
                     tanggalPembayaran: {
@@ -155,10 +152,10 @@ class StatisticsService {
             if (startDate) {
                 if (endDate) {
                     // Date range filtering for payroll
-                    const startYear = moment(startDate, DATE_FORMATS.DEFAULT).year();
-                    const startMonth = moment(startDate, DATE_FORMATS.DEFAULT).month() + 1;
-                    const endYear = moment(endDate, DATE_FORMATS.DEFAULT).year();
-                    const endMonth = moment(endDate, DATE_FORMATS.DEFAULT).month() + 1;
+                    const startYear = moment(startDate, 'DD-MM-YYYY').year();
+                    const startMonth = moment(startDate, 'DD-MM-YYYY').month() + 1;
+                    const endYear = moment(endDate, 'DD-MM-YYYY').year();
+                    const endMonth = moment(endDate, 'DD-MM-YYYY').month() + 1;
 
                     payrollFilter = {
                         OR: [
@@ -202,8 +199,8 @@ class StatisticsService {
                     };
                 } else {
                     // Single date filtering for payroll
-                    const year = moment(startDate, DATE_FORMATS.DEFAULT).year();
-                    const month = moment(startDate, DATE_FORMATS.DEFAULT).month() + 1;
+                    const year = moment(startDate, 'DD-MM-YYYY').year();
+                    const month = moment(startDate, 'DD-MM-YYYY').month() + 1;
 
                     payrollFilter = {
                         tahun: year,
@@ -295,7 +292,6 @@ class StatisticsService {
                 }
             };
         } catch (error) {
-            logger.error('Error getting financial statistics:', error);
             throw error;
         }
     }
@@ -483,7 +479,7 @@ class StatisticsService {
     async getTodaySchedule() {
         try {
             // Get today's date
-            const today = moment().format(DATE_FORMATS.DEFAULT);
+            const today = CommonServiceUtils.getCurrentDate();
 
             // Get current day name in Indonesian format
             const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];

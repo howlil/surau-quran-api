@@ -1,11 +1,10 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
 const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class AbsensiCronService {
     static async createDailyAbsensiGuru() {
-        const formattedDate = moment().format(DATE_FORMATS.DEFAULT);
+        const formattedDate = CommonServiceUtils.getCurrentDate();
 
         // Get current day in Indonesian
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -87,7 +86,7 @@ class AbsensiCronService {
     }
 
     static async createDailyAbsensiSiswa() {
-        const formattedDate = moment().format(DATE_FORMATS.DEFAULT);
+        const formattedDate = CommonServiceUtils.getCurrentDate();
 
         // Get current day in Indonesian
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];

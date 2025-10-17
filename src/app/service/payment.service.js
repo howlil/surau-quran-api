@@ -8,8 +8,8 @@ const EmailUtils = require('../../lib/utils/email.utils');
 const WhatsAppUtils = require('../../lib/utils/whatsapp.utils');
 const SppService = require('./spp.service');
 const financeService = require('./finance.service');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const moment = require('moment');
-const { DATE_FORMATS } = require('../../lib/constants');
 
 class PaymentService {
 
@@ -26,8 +26,9 @@ class PaymentService {
     }
   }
 
-  async createPendaftaranInvoice(data) {
+  async createPendaftaranInvoice(options) {
     try {
+      const { data } = options;
       const { email, namaMurid, totalBiaya, noWhatsapp, alamat } = data;
 
       const externalId = XenditUtils.generateExternalId('DAFTAR');
@@ -62,7 +63,7 @@ class PaymentService {
           metodePembayaran: 'VIRTUAL_ACCOUNT',
           jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
           statusPembayaran: 'PENDING',
-          tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
+          tanggalPembayaran: CommonServiceUtils.getCurrentDate()
         }
       });
 
@@ -73,7 +74,7 @@ class PaymentService {
           xenditExternalId: xenditInvoice.externalId,
           xenditPaymentUrl: xenditInvoice.invoiceUrl,
           xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-          xenditExpireDate: moment(xenditInvoice.expiryDate).format(DATE_FORMATS.DEFAULT),
+          xenditExpireDate: CommonServiceUtils.formatDate(xenditInvoice.expiryDate),
           xenditStatus: xenditInvoice.status
         }
       });
@@ -90,8 +91,9 @@ class PaymentService {
     }
   }
 
-  async createPendaftaranInvoiceV2(data) {
+  async createPendaftaranInvoiceV2(options) {
     try {
+      const { data } = options;
       const {
         externalId,
         amount,
@@ -132,7 +134,7 @@ class PaymentService {
           metodePembayaran: 'VIRTUAL_ACCOUNT',
           jumlahTagihan: Number(amount),
           statusPembayaran: 'PENDING',
-          tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
+          tanggalPembayaran: CommonServiceUtils.getCurrentDate()
         }
       });
 
@@ -145,60 +147,52 @@ class PaymentService {
         xenditInvoiceId: xenditInvoice.id
       };
     } catch (error) {
-      throw error
+      throw error;
     }
+  }
 
-  async createBatchSppInvoice(data) {
-      try {
-        const { periodeSppIds, siswa, payment, voucherId } = data;
+  async createBatchSppInvoice(options) {
+    try {
+      const { data } = options;
+      const { periodeSppIds, siswa, payment, voucherId } = data;
 
-        const externalId = XenditUtils.generateExternalId('SPP');
+      const externalId = XenditUtils.generateExternalId('SPP');
 
-        // Buat deskripsi yang mencakup diskon jika ada
-        let description = `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`;
-        if (payment.discountAmount > 0) {
-          description += ` (Diskon: Rp ${payment.discountAmount.toLocaleString('id-ID')})`;
+      let description = `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`;
+      if (payment.discountAmount > 0) {
+        description += ` (Diskon: Rp ${payment.discountAmount.toLocaleString('id-ID')})`;
+      }
+
+      const invoiceData = {
+        externalId,
+        amount: Number(payment.finalAmount),
+        payerEmail: siswa.email,
+        description: description,
+        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
+        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
+        items: [{
+          name: `SPP ${payment.periods}`,
+          quantity: 1,
+          price: Number(payment.finalAmount)
+        }],
+        customer: {
+          givenNames: siswa.nama || 'Siswa',
+          email: siswa.email,
+          phoneNumber: siswa.noWhatsapp || '08123456789',
+          address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : 'Alamat tidak tersedia' // Default address
         }
-
-        const invoiceData = {
-          externalId,
-          amount: Number(payment.finalAmount), // Gunakan finalAmount yang sudah dikurangi diskon
-          payerEmail: siswa.email,
-          description: description,
-          successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
-          failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
-          items: [{
-            name: `SPP ${payment.periods}`,
-            quantity: 1,
-            price: Number(payment.finalAmount) // Gunakan finalAmount, bukan originalAmount
-          }],
-          customer: {
-            givenNames: siswa.nama || 'Siswa',
-            email: siswa.email,
-            phoneNumber: siswa.noWhatsapp || '08123456789', // Default phone number
-            address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : 'Alamat tidak tersedia' // Default address
-          }
-        };
-
-        // Log customer data untuk debugging SPP
-        customer: invoiceData.customer,
-          description: invoiceData.description,
-            amount: invoiceData.amount,
-              originalAmount: payment.originalAmount,
-                discountAmount: payment.discountAmount,
-                  finalAmount: payment.finalAmount
-      });
+      };
 
       const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         const pembayaran = await tx.pembayaran.create({
           data: {
             tipePembayaran: 'SPP',
             metodePembayaran: 'VIRTUAL_ACCOUNT',
             jumlahTagihan: Number(payment.finalAmount),
             statusPembayaran: 'PENDING',
-            tanggalPembayaran: moment().format(DATE_FORMATS.DEFAULT)
+            tanggalPembayaran: CommonServiceUtils.getCurrentDate()
           }
         });
 
@@ -209,7 +203,7 @@ class PaymentService {
             xenditExternalId: xenditInvoice.externalId,
             xenditPaymentUrl: xenditInvoice.invoiceUrl,
             xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-            xenditExpireDate: moment(xenditInvoice.expiryDate).format(DATE_FORMATS.DEFAULT),
+            xenditExpireDate: CommonServiceUtils.formatDate(xenditInvoice.expiryDate),
             xenditStatus: xenditInvoice.status
           }
         });
@@ -226,8 +220,6 @@ class PaymentService {
             }
           });
         }
-
-
 
         return {
           pembayaranId: pembayaran.id,
@@ -268,7 +260,7 @@ class PaymentService {
       }
 
 
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         await tx.xenditPayment.update({
           where: { id: xenditPayment.id },
           data: {
@@ -285,8 +277,8 @@ class PaymentService {
             metodePembayaran: processedData.paymentMethod,
             statusPembayaran: processedData.status === 'PAID' ? 'PAID' : 'PENDING',
             tanggalPembayaran: processedData.paidAt ?
-              moment(processedData.paidAt).format(DATE_FORMATS.DEFAULT) :
-              moment().format(DATE_FORMATS.DEFAULT),
+              CommonServiceUtils.formatDate(processedData.paidAt) :
+              CommonServiceUtils.getCurrentDate(),
             updatedAt: new Date()
           }
         });
@@ -316,9 +308,6 @@ class PaymentService {
               await this.processV1RegularRegistration(xenditPayment, tx);
             }
           } catch (error) {
-              error: error.message,
-              stack: error.stack
-            });
             throw error;
           }
         }
@@ -330,41 +319,48 @@ class PaymentService {
 
         // Auto-sync to Finance when payment is successful
         if (processedData.status === 'PAID') {
+          await financeService.createFromPayment({
             paymentId: updatedPayment.id,
             type: updatedPayment.tipePembayaran,
             amount: updatedPayment.jumlahTagihan
           });
+        }
 
-          try {
-            let financeRecord = null;
-            if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
-              financeRecord = await financeService.createFromEnrollmentPayment({
-                id: updatedPayment.id,
-                jumlahTagihan: updatedPayment.jumlahTagihan,
-                tanggalPembayaran: updatedPayment.tanggalPembayaran,
-                metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
-              });
+        try {
+          let financeRecord = null;
+          if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
+            financeRecord = await financeService.createFromEnrollmentPayment({
+              id: updatedPayment.id,
+              jumlahTagihan: updatedPayment.jumlahTagihan,
+              tanggalPembayaran: updatedPayment.tanggalPembayaran,
+              metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
+            });
+
+            await prisma.pembayaranFinance.create({
+              data: {
                 paymentId: updatedPayment.id,
                 financeRecordId: financeRecord.id,
                 amount: financeRecord.total
-              });
-            } else if (updatedPayment.tipePembayaran === 'SPP') {
-              financeRecord = await financeService.createFromSppPayment({
-                id: updatedPayment.id,
-                jumlahTagihan: updatedPayment.jumlahTagihan,
-                tanggalPembayaran: updatedPayment.tanggalPembayaran,
-                metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
-              });
+              }
+            });
+          } else if (updatedPayment.tipePembayaran === 'SPP') {
+            financeRecord = await financeService.createFromSppPayment({
+              id: updatedPayment.id,
+              jumlahTagihan: updatedPayment.jumlahTagihan,
+              tanggalPembayaran: updatedPayment.tanggalPembayaran,
+              metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
+            });
+
+            await prisma.pembayaranFinance.create({
+              data: {
                 paymentId: updatedPayment.id,
                 financeRecordId: financeRecord.id,
                 amount: financeRecord.total
-              });
-            }
-          } catch (financeError) {
-
+              }
+            });
           }
-        } else {
-         
+        } catch (financeError) {
+          // Finance sync error - continue without failing the main process
         }
 
         // Send WhatsApp notification for successful payment
@@ -372,7 +368,7 @@ class PaymentService {
           try {
             await this.sendPaymentSuccessNotification(updatedPayment, processedData, tx);
           } catch (notificationError) {
-            
+
           }
         }
 
@@ -508,9 +504,7 @@ class PaymentService {
         });
 
         // Generate NIS
-        const currentYear = new Date().getFullYear();
-        const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-        const nis = `${currentYear}${randomNumber}`;
+        const nis = CommonServiceUtils.generateNIS(3);
 
         // Create siswa record
         const siswa = await tx.siswa.create({
@@ -631,7 +625,7 @@ class PaymentService {
         }
       });
 
-      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const tanggalDaftar = CommonServiceUtils.getCurrentDate();
 
       // Generate SPP for all students in parallel
       const sppPromises = programSiswaRecords.map(async (programSiswa) => {
@@ -650,15 +644,11 @@ class PaymentService {
             password: createdUser.password
           });
         } catch (emailError) {
-            error: emailError.message,
-            stack: emailError.stack
-          });
+          // Email sending error - continue without failing the main process
         }
       });
 
-      // Don't await email sending to avoid blocking the transaction
-      Promise.all(emailPromises).catch(error => {
-      });
+
 
     } catch (error) {
       throw error;
@@ -706,9 +696,7 @@ class PaymentService {
       });
 
       // Generate NIS
-      const currentYear = new Date().getFullYear();
-      const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      const nis = `${currentYear}${randomNumber}`;
+      const nis = CommonServiceUtils.generateNIS(3);
 
       // Create siswa record
       const siswa = await tx.siswa.create({
@@ -758,7 +746,7 @@ class PaymentService {
           diskon: pendaftaranTemp.diskon,
           totalBiaya: pendaftaranTemp.totalBiaya,
           voucher_id: pendaftaranTemp.kodeVoucher ? await this.getVoucherId(pendaftaranTemp.kodeVoucher, tx) : null,
-          tanggalDaftar: moment().format(DATE_FORMATS.DEFAULT),
+          tanggalDaftar: CommonServiceUtils.getCurrentDate(),
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -770,21 +758,11 @@ class PaymentService {
       });
 
       // Generate SPP untuk 5 bulan ke depan - this is critical, failure should fail the transaction
-      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const tanggalDaftar = CommonServiceUtils.getCurrentDate();
       const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar, tx);
 
       // Send welcome email with credentials - but don't let email failure block the transaction
-      try {
-        await EmailUtils.sendWelcomeEmail({
-          email: user.email,
-          name: siswa.namaMurid,
-          password: generatedPassword
-        });
-      } catch (emailError) {
-          error: emailError.message,
-          stack: emailError.stack
-        });
-      }
+
 
       return siswa;
     } catch (error) {
@@ -887,24 +865,18 @@ class PaymentService {
             const result = await WhatsAppUtils.sendPaymentSuccessWhatsApp(siswa.noWhatsapp, paymentData);
 
             if (result.success) {
-                messageSid: result.messageSid,
-                status: result.status,
-                paymentType: payment.tipePembayaran
-              });
+              // WhatsApp notification sent successfully
             } else {
-                error: result.error,
-                code: result.code
-              });
+              // WhatsApp notification failed
             }
           } catch (whatsappError) {
-              error: whatsappError.message,
-              details: whatsappError.details
-            });
-            // Don't throw error, continue with email notification
+            // WhatsApp notification error - continue with email notification
           }
         }
       } else if (siswa.noWhatsapp) {
+        // WhatsApp number exists but validation failed
       } else {
+        // No WhatsApp number available
       }
 
       // Send email notification as fallback
@@ -917,6 +889,7 @@ class PaymentService {
             paymentDate: payment.tanggalPembayaran
           });
         } catch (emailError) {
+          // Email notification error - continue without failing the main process
         }
       }
 

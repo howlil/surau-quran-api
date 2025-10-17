@@ -1,22 +1,6 @@
 const { prisma } = require('../config/prisma.config');
-const { logger } = require('../config/logger.config');
 
 class PrismaUtils {
-  static async transaction(callback, options = {}) {
-    try {
-      return await prisma.$transaction(async (tx) => {
-        return await callback(tx);
-      }, {
-        maxWait: options.maxWait || 10000,
-        timeout: options.timeout || 30000,
-        isolationLevel: options.isolationLevel || 'ReadCommitted'
-      });
-    } catch (error) {
-      logger.error('Transaction failed:', error);
-      throw error;
-    }
-  }
-
   static async paginate(model, options = {}) {
     const {
       page: pageParam = 1,
@@ -27,16 +11,15 @@ class PrismaUtils {
       include = {}
     } = options;
 
-    // Pastikan page dan limit adalah angka
     const page = Number(pageParam);
     const limit = Number(limitParam);
+    const skip = (page - 1) * limit;
 
-    // Exclude createdAt and updatedAt from select if they exist
     const excludedFields = ['createdAt', 'updatedAt'];
     const filteredSelect = Object.fromEntries(
       Object.entries(select).filter(([key]) => !excludedFields.includes(key))
-    );
-    const skip = (page - 1) * limit;
+    )
+
 
     try {
       const [total, data] = await prisma.$transaction([
@@ -45,61 +28,26 @@ class PrismaUtils {
           skip,
           take: limit,
           where,
-          orderBy,
+          orderBy: Object.keys(orderBy).length ? orderBy : undefined,
           select: Object.keys(filteredSelect).length ? filteredSelect : undefined,
           include: Object.keys(include).length ? include : undefined
         })
       ]);
 
-      const filteredData = data.map(item => {
-        if (item) {
-          const { createdAt, updatedAt, ...rest } = item;
-          return rest;
-        }
-        return item;
-      });
-      
       return {
-        data: filteredData,
-        pagination: {
+        data,
+        meta: {
           total,
           limit,
           page,
           totalPages: Math.ceil(total / limit),
-
         }
       };
     } catch (error) {
-      logger.error('Pagination error:', error);
       throw error;
     }
   }
 
-  static buildWhereClause(filters = {}) {
-    const where = {};
-
-    Object.entries(filters).forEach(([key, value]) => {
-      if (key === 'createdAt' || key === 'updatedAt') {
-        return;
-      }
-
-      if (value !== undefined && value !== null && value !== '') {
-        if (typeof value === 'string' && !isNaN(value) && !isNaN(parseFloat(value))) {
-          if (value.includes('.')) {
-            where[key] = parseFloat(value);
-          } else {
-            where[key] = parseInt(value, 10);
-          }
-        } else if (typeof value === 'string') {
-          where[key] = { contains: value, mode: 'insensitive' };
-        } else {
-          where[key] = value;
-        }
-      }
-    });
-
-    return where;
-  }
 }
 
 module.exports = PrismaUtils;

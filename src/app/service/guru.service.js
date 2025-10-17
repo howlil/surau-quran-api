@@ -3,15 +3,18 @@ const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
+const FileUtils = require('../../lib/utils/file.utils');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class GuruService {
 
   //create guru 
-  async create(data) {
+  async create(options) {
     try {
-      const { email, baseUrl, rfid, ...guruData } = data;
+      const { data } = options;
+      const { email, rfid, ...guruData } = data;
 
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         const existingUser = await tx.user.findUnique({
           where: { email }
         });
@@ -30,7 +33,7 @@ class GuruService {
           }
         }
 
-        const NIP = Math.floor(Math.random() * 1000000);
+        const NIP = CommonServiceUtils.generateRandomNumber(6);
         const plainPassword = "@Test123";
         const hashedPassword = await PasswordUtils.hash(plainPassword);
 
@@ -47,7 +50,7 @@ class GuruService {
           data: {
             ...guruData,
             userId: user.id,
-            nip: NIP.toString().padStart(6, '0')
+            nip: NIP
           },
           include: {
             user: {
@@ -68,27 +71,8 @@ class GuruService {
           password: plainPassword
         });
 
-        const schema = {
-          id: guru.id,
-          nama: guru.nama,
-          nip: guru.nip,
-          noWhatsapp: guru.noWhatsapp,
-          alamat: guru.alamat,
-          jenisKelamin: guru.jenisKelamin,
-          tanggalLahir: guru.tanggalLahir,
-          fotoProfile: guru.fotoProfile,
-          keahlian: guru.keahlian,
-          pendidikanTerakhir: guru.pendidikanTerakhir,
-          noRekening: guru.noRekening,
-          namaBank: guru.namaBank,
-          suratKontrak: guru.suratKontrak,
-          user: {
-            email: guru.user.email,
-            rfid: guru.user.rfid,
-          }
-        }
-
-        return schema;
+        const transformedResult = FileUtils.transformGuruFiles(guru);
+        return transformedResult;
       });
     } catch (error) {
       throw error;
@@ -96,8 +80,11 @@ class GuruService {
   }
 
   //admin update guru
-  async update(id, data) {
+  async update(options) {
     try {
+      const { data, where } = options;
+      const { id } = where;
+      
       const guru = await prisma.guru.findUnique({
         where: { id },
         include: {
@@ -109,9 +96,9 @@ class GuruService {
         throw ErrorFactory.notFound(`Guru dengan ID ${id} tidak ditemukan`);
       }
 
-      const { email, password, rfid, baseUrl, ...guruData } = data;
+      const { email, password, rfid, ...guruData } = data;
 
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         if (email && email !== guru.user.email) {
           const existingUser = await tx.user.findFirst({
             where: {
@@ -183,27 +170,8 @@ class GuruService {
           }
         });
 
-        const schema = {
-          id: updated.id,
-          nama: updated.nama,
-          nip: updated.nip,
-          noWhatsapp: updated.noWhatsapp,
-          alamat: updated.alamat,
-          jenisKelamin: updated.jenisKelamin,
-          tanggalLahir: updated.tanggalLahir,
-          fotoProfile: updated.fotoProfile,
-          keahlian: updated.keahlian,
-          pendidikanTerakhir: updated.pendidikanTerakhir,
-          noRekening: updated.noRekening,
-          namaBank: updated.namaBank,
-          suratKontrak: updated.suratKontrak,
-          user: {
-            email: updated.user.email,
-            rfid: updated.user.rfid,
-          }
-        }
-
-        return schema;
+        const transformedResult = FileUtils.transformGuruFiles(updated);
+        return transformedResult;
       });
     } catch (error) {
       throw error;
@@ -211,8 +179,11 @@ class GuruService {
   }
 
   //admin delete guru
-  async delete(id) {
+  async delete(options) {
     try {
+      const { where } = options;
+      const { id } = where;
+      
       const guru = await prisma.guru.findUnique({
         where: { id },
         include: {
@@ -233,7 +204,7 @@ class GuruService {
         throw ErrorFactory.badRequest('Guru memiliki data payroll dan tidak dapat dihapus');
       }
 
-      await PrismaUtils.transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         await tx.guru.delete({
           where: { id }
         });
@@ -249,11 +220,12 @@ class GuruService {
     }
   }
 
-  async getAll(filters = {}) {
+  async getAll(options = {}) {
     try {
+      const { data: filters = {}, where: additionalWhere = {} } = options;
       const { page = 1, limit = 10, nama } = filters;
 
-      const where = {};
+      const where = { ...additionalWhere };
 
       if (nama) {
         where.nama = {
@@ -261,7 +233,7 @@ class GuruService {
         };
       }
 
-      return await PrismaUtils.paginate(prisma.guru, {
+      const result = await PrismaUtils.paginate(prisma.guru, {
         page,
         limit,
         where,
@@ -288,6 +260,13 @@ class GuruService {
         },
         orderBy: { createdAt: 'desc' }
       });
+
+      const transformedData = {
+        ...result,
+        data: FileUtils.transformGuruListFiles(result.data)
+      };
+
+      return transformedData;
     } catch (error) {
       throw error;
     }
@@ -333,13 +312,8 @@ class GuruService {
       return {
         ...paginatedResult,
         data: paginatedResult.data.map(guru => ({
-          id: guru.id,
-          nama: guru.nama,
-          keahlian: guru.keahlian,
-          fotoProfile: guru.fotoProfile,
-          pendidikanTerakhir: guru.pendidikanTerakhir,
-          tanggalLahir: guru.tanggalLahir,
-          suratKontrak: guru.suratKontrak,
+          ...guru,
+          fotoProfile: FileUtils.getImageUrl(guru.fotoProfile),
           jadwalGuru: guru.kelasProgram.map(kp => ({
             kelasProgramId: kp.id,
             kelasId: kp.kelasId,

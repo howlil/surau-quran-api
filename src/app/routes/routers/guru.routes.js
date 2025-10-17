@@ -8,7 +8,6 @@ const guruValidation = require('../../validation/guru.validation');
 const multer = require('multer');
 const { storage, imageFileFilter, documentFileFilter } = require('../../middleware/upload.middleware');
 
-// Combined upload middleware
 const uploadGuruFiles = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
@@ -41,6 +40,12 @@ const handleFileUpload = (req, res, next) => {
     next();
   });
 };
+
+/**
+==================== 
+MANAJEMEN GURU
+====================
+ */
 
 router.post(
   '/v1/guru',
@@ -75,7 +80,14 @@ router.get(
   guruController.getAll
 );
 
-// Admin routes for teacher schedules
+
+
+/**
+==================== 
+ Data Guru
+====================
+ */
+
 router.get(
   '/v1/guru/jadwal',
   authMiddleware.authenticate,

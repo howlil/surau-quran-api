@@ -1,6 +1,5 @@
 const sppService = require('../service/spp.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
-const ErrorFactory = require('../../lib/factories/error.factory');
 
 class SppController {
     getSppForAdmin = async (req, res, next) => {

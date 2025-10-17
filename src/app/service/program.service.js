@@ -1,11 +1,13 @@
 const { prisma } = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const FileUtils = require('../../lib/utils/file.utils');
 
 class ProgramService {
-  async create(data) {
+  async create(options) {
     try {
-      // Check if program with same name already exists
+      const { data } = options;
+      
       const existing = await prisma.program.findFirst({
         where: { namaProgram: data.namaProgram }
       });
@@ -18,14 +20,24 @@ class ProgramService {
         data
       });
 
-      return program;
+      const transformedResult = FileUtils.transformProgramFiles(program);
+
+      return {
+        programId: transformedResult.id,
+        namaProgram: transformedResult.namaProgram,
+        deskripsi: transformedResult.deskripsi,
+        cover: transformedResult.cover
+      };
     } catch (error) {
       throw error;
     }
   }
 
-  async update(id, data) {
+  async update(options) {
     try {
+      const { data, where } = options;
+      const { id } = where;
+      
       // Check if program exists
       const program = await prisma.program.findUnique({
         where: { id }
@@ -54,14 +66,24 @@ class ProgramService {
         data
       });
 
-      return updated;
+      const transformedResult = FileUtils.transformProgramFiles(updated);
+
+      return {
+        programId: transformedResult.id,
+        namaProgram: transformedResult.namaProgram,
+        deskripsi: transformedResult.deskripsi,
+        cover: transformedResult.cover
+      };
     } catch (error) {
       throw error;
     }
   }
 
-  async delete(id) {
+  async delete(options) {
     try {
+      const { where } = options;
+      const { id } = where;
+      
       // Check if program exists
       const program = await prisma.program.findUnique({
         where: { id }
@@ -98,11 +120,12 @@ class ProgramService {
     }
   }
 
-  async getAll(filters = {}) {
+  async getAll(options = {}) {
     try {
+      const { data: filters = {}, where: additionalWhere = {} } = options;
       const { page, limit, namaProgram } = filters;
 
-      const where = {};
+      const where = { ...additionalWhere };
 
       if (namaProgram) {
         where.namaProgram = {
@@ -131,16 +154,19 @@ class ProgramService {
     }
   }
 
-  async getAllNoPagination(filters = {}) {
+  async getAllNoPagination(options = {}) {
     try {
+      const { data: filters = {}, where: additionalWhere = {} } = options;
       const { namaProgram } = filters;
-      const where = {};
+      const where = { ...additionalWhere };
+      
       if (namaProgram) {
         where.namaProgram = {
           contains: namaProgram
         };
       }
-      return await prisma.program.findMany({
+      
+      const programs = await prisma.program.findMany({
         where,
         select: {
           id: true,
@@ -154,6 +180,17 @@ class ProgramService {
         },
         orderBy: { namaProgram: 'asc' }
       });
+
+      return programs.map(program => ({
+        programId: program.id,
+        namaProgram: program.namaProgram,
+        deskripsi: program.deskripsi,
+        cover: FileUtils.getImageUrl(program.cover),
+        tipeProgram: program.tipeProgram,
+        biayaSpp: Number(program.biayaSpp),
+        createdAt: program.createdAt,
+        updatedAt: program.updatedAt
+      }));
     } catch (error) {
       throw error;
     }
@@ -172,7 +209,14 @@ class ProgramService {
         orderBy: { namaProgram: 'asc' }
       });
 
-      return programList;
+      const transformedResult = FileUtils.transformProgramListFiles(programList);
+      return transformedResult.map(program => ({
+        programId: program.id,
+        namaProgram: program.namaProgram,
+        deskripsi: program.deskripsi,
+        tipeProgram: program.tipeProgram,
+        cover: program.cover
+      }));
     } catch (error) {
       throw error;
     }
@@ -351,435 +395,6 @@ class ProgramService {
     }
   }
 
-  async addKelasPengganti(guruId, data) {
-    try {
-      const { kelasProgramId, siswaId, tanggal } = data;
-
-      // Validasi bahwa kelas program ada
-      const kelasProgram = await prisma.kelasProgram.findUnique({
-        where: {
-          id: kelasProgramId
-        }
-      });
-
-      if (!kelasProgram) {
-        throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
-      }
-
-      // Validasi bahwa guru berwenang untuk kelas program ini
-      if (kelasProgram.guruId !== guruId) {
-        throw ErrorFactory.notFound('Guru tidak berwenang untuk kelas program ini');
-      }
-
-      // Validasi bahwa siswa ada
-      const siswa = await prisma.siswa.findUnique({
-        where: { id: siswaId }
-      });
-
-      if (!siswa) {
-        throw ErrorFactory.notFound('Siswa tidak ditemukan');
-      }
-
-      // Validasi bahwa siswa memiliki kelas program aktif
-      const activeProgramSiswa = await prisma.programSiswa.findFirst({
-        where: {
-          siswaId,
-          status: 'AKTIF',
-          kelasProgramId: { not: null } // Harus sudah terdaftar di kelas program
-        },
-        include: {
-          kelasProgram: {
-            include: {
-              program: true,
-              kelas: true
-            }
-          }
-        }
-      });
-
-      if (!activeProgramSiswa) {
-        throw ErrorFactory.badRequest('Siswa belum terdaftar dalam kelas program manapun. Siswa harus memiliki kelas program aktif untuk bisa mengikuti kelas pengganti');
-      }
-
-
-      const [tanggalDay, tanggalMonth, tanggalYear] = tanggal.split('-');
-      const formattedDate = `${tanggalYear}-${tanggalMonth}-${tanggalDay}`;
-      const today = new Date().toISOString().split('T')[0];
-      if (formattedDate < today) {
-        throw ErrorFactory.badRequest('Tanggal tidak boleh di masa lalu');
-      }
-
-      // Validasi bahwa tanggal sesuai dengan hari kelas program
-      const inputDate = new Date(formattedDate);
-      const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
-      const inputDayName = dayNames[inputDate.getDay()];
-
-      if (inputDayName !== kelasProgram.hari) {
-        throw ErrorFactory.badRequest(`Tanggal ${tanggal} adalah hari ${inputDayName}, tidak sesuai dengan jadwal kelas program yang adalah hari ${kelasProgram.hari}`);
-      }
-
-      // Cek apakah sudah ada kelas pengganti untuk siswa ini di tanggal yang sama
-      const existingKelasPengganti = await prisma.kelasPengganti.findFirst({
-        where: {
-          kelasProgramId,
-          siswaId,
-          tanggal
-        }
-      });
-
-      if (existingKelasPengganti) {
-        if (existingKelasPengganti.deletedAt) {
-          // Jika sudah ada tapi soft deleted, reaktivasi saja
-          const result = await PrismaUtils.transaction(async (tx) => {
-            const reactivated = await tx.kelasPengganti.update({
-              where: { id: existingKelasPengganti.id },
-              data: {
-                deletedAt: null,
-                isTemp: true,
-                count: existingKelasPengganti.count + 1,
-                updatedAt: new Date()
-              },
-              include: {
-                siswa: {
-                  select: {
-                    id: true,
-                    namaMurid: true,
-                    nis: true
-                  }
-                },
-                kelasProgram: {
-                  include: {
-                    program: {
-                      select: {
-                        namaProgram: true
-                      }
-                    },
-                    jamMengajar: {
-                      select: {
-                        jamMulai: true,
-                        jamSelesai: true
-                      }
-                    }
-                  }
-                }
-              }
-            });
-
-            // Cek apakah absensi sudah ada
-            const existingAbsensi = await tx.absensiSiswa.findFirst({
-              where: {
-                kelasProgramId,
-                siswaId,
-                tanggal
-              }
-            });
-
-            // Buat absensi jika belum ada
-            if (!existingAbsensi) {
-              await tx.absensiSiswa.create({
-                data: {
-                  kelasProgramId,
-                  siswaId,
-                  tanggal,
-                  statusKehadiran: 'TIDAK_HADIR' // Status default, guru bisa ubah nanti
-                }
-              });
-            }
-
-            return reactivated;
-          });
-
-
-          return {
-            id: result.id,
-            siswaId: result.siswa.id,
-            namaSiswa: result.siswa.namaMurid,
-            nis: result.siswa.nis,
-            tanggal: result.tanggal,
-            namaProgram: result.kelasProgram.program.namaProgram,
-            jamMengajar: {
-              jamMulai: result.kelasProgram.jamMengajar.jamMulai,
-              jamSelesai: result.kelasProgram.jamMengajar.jamSelesai
-            },
-            absensiCreated: true
-          };
-        } else {
-          throw ErrorFactory.badRequest('Siswa sudah ditambahkan ke kelas pengganti ini di tanggal yang sama');
-        }
-      }
-
-      const [dayPart, monthPart, yearPart] = tanggal.split('-');
-
-      // Count using string pattern matching for DD-MM-YYYY format
-      const monthlyCount = await prisma.kelasPengganti.count({
-        where: {
-          siswaId,
-          tanggal: {
-            contains: `-${monthPart}-${yearPart}`
-          },
-          isTemp: true,
-          deletedAt: null
-        }
-      });
-
-      if (monthlyCount >= 2) {
-        throw ErrorFactory.badRequest('Siswa sudah mencapai batas maksimal kelas pengganti dalam 1 bulan (2x)');
-      }
-
-      // Cek apakah siswa sudah ada di kelas program ini secara permanen
-      const existingProgramSiswa = await prisma.programSiswa.findFirst({
-        where: {
-          siswaId,
-          kelasProgramId,
-          status: 'AKTIF'
-        }
-      });
-
-      if (existingProgramSiswa) {
-        throw ErrorFactory.badRequest('Siswa sudah terdaftar di kelas program ini secara permanen');
-      }
-
-      // Gunakan transaction untuk memastikan data konsisten
-      const result = await PrismaUtils.transaction(async (tx) => {
-        // Tambahkan siswa ke kelas pengganti
-        const kelasPengganti = await tx.kelasPengganti.create({
-          data: {
-            kelasProgramId,
-            siswaId,
-            tanggal,
-            isTemp: true,
-            count: 1
-          },
-          include: {
-            siswa: {
-              select: {
-                id: true,
-                namaMurid: true,
-                nis: true
-              }
-            },
-            kelasProgram: {
-              include: {
-                program: {
-                  select: {
-                    namaProgram: true
-                  }
-                },
-                jamMengajar: {
-                  select: {
-                    jamMulai: true,
-                    jamSelesai: true
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        // Cek apakah absensi sudah ada
-        const existingAbsensi = await tx.absensiSiswa.findFirst({
-          where: {
-            kelasProgramId,
-            siswaId,
-            tanggal
-          }
-        });
-
-        // Buat absensi jika belum ada
-        if (!existingAbsensi) {
-          await tx.absensiSiswa.create({
-            data: {
-              kelasProgramId,
-              siswaId,
-              tanggal,
-              statusKehadiran: 'TIDAK_HADIR' // Status default, guru bisa ubah nanti
-            }
-          });
-        }
-
-        return kelasPengganti;
-      });
-
-
-      return {
-        id: result.id,
-        siswaId: result.siswa.id,
-        namaSiswa: result.siswa.namaMurid,
-        nis: result.siswa.nis,
-        tanggal: result.tanggal,
-        namaProgram: result.kelasProgram.program.namaProgram,
-        jamMengajar: {
-          jamMulai: result.kelasProgram.jamMengajar.jamMulai,
-          jamSelesai: result.kelasProgram.jamMengajar.jamSelesai
-        },
-        absensiCreated: true
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async removeKelasPengganti(guruId, kelasProgramId) {
-    try {
-      // Validasi bahwa kelas program ada
-      const kelasProgram = await prisma.kelasProgram.findUnique({
-        where: {
-          id: kelasProgramId
-        }
-      });
-
-      if (!kelasProgram) {
-        throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
-      }
-
-      // Validasi bahwa guru berwenang untuk kelas program ini
-      if (kelasProgram.guruId !== guruId) {
-        throw ErrorFactory.notFound('Guru tidak berwenang untuk kelas program ini');
-      }
-
-      // Cari semua kelas pengganti yang aktif untuk kelas program ini
-      const kelasPenggantiList = await prisma.kelasPengganti.findMany({
-        where: {
-          kelasProgramId,
-          isTemp: true,
-          deletedAt: null // Hanya yang belum di soft delete
-        },
-        include: {
-          siswa: {
-            select: {
-              id: true,
-              namaMurid: true,
-              nis: true
-            }
-          }
-        }
-      });
-
-      if (kelasPenggantiList.length === 0) {
-        throw ErrorFactory.notFound('Tidak ada siswa dalam kelas pengganti untuk kelas program ini');
-      }
-
-      // Soft delete semua kelas pengganti untuk kelas program ini dan hapus absensinya
-      const deletedIds = kelasPenggantiList.map(kp => kp.id);
-
-      await PrismaUtils.transaction(async (tx) => {
-        // Soft delete kelas pengganti
-        await tx.kelasPengganti.updateMany({
-          where: {
-            id: { in: deletedIds }
-          },
-          data: {
-            deletedAt: new Date(),
-            updatedAt: new Date()
-          }
-        });
-
-        // Hapus absensi siswa yang terkait
-        for (const kp of kelasPenggantiList) {
-          await tx.absensiSiswa.deleteMany({
-            where: {
-              kelasProgramId,
-              siswaId: kp.siswaId,
-              tanggal: kp.tanggal
-            }
-          });
-        }
-      });
-
-
-      return {
-        message: `${kelasPenggantiList.length} siswa berhasil dihapus dari kelas pengganti`,
-        kelasProgramId,
-        totalDeleted: kelasPenggantiList.length,
-        deletedStudents: kelasPenggantiList.map(kp => ({
-          siswaId: kp.siswaId,
-          namaSiswa: kp.siswa.namaMurid,
-          nis: kp.siswa.nis,
-          tanggal: kp.tanggal
-        }))
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async getSiswaKelasPengganti(filters = {}) {
-    try {
-      const { search, page = 1, limit = 10 } = filters;
-
-      // Filter hanya siswa yang sudah memiliki kelas program aktif
-      const whereClause = {
-        programSiswa: {
-          some: {
-            status: 'AKTIF',
-            kelasProgramId: { not: null } // Harus sudah terdaftar di kelas program
-          }
-        }
-      };
-
-      if (search) {
-        whereClause.namaMurid = {
-          contains: search
-        };
-      }
-
-      const siswa = await PrismaUtils.paginate(prisma.siswa, {
-        limit,
-        page,
-        where: whereClause,
-        select: {
-          id: true,
-          namaMurid: true,
-          nis: true,
-          programSiswa: {
-            where: {
-              status: 'AKTIF',
-              kelasProgramId: { not: null }
-            },
-            select: {
-              kelasProgram: {
-                select: {
-                  id: true,
-                  kelas: {
-                    select: {
-                      namaKelas: true
-                    }
-                  },
-                  program: {
-                    select: {
-                      namaProgram: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        orderBy: [
-          { namaMurid: 'asc' }
-        ]
-      });
-
-      // Transform data untuk menambahkan info kelas program
-      const transformedData = {
-        ...siswa,
-        data: siswa.data.map(s => ({
-          siswaId: s.id,
-          namaSiswa: s.namaMurid,
-          NIS: s.nis,
-          kelasProgram: s.programSiswa.map(ps => ({
-            kelasProgramId: ps.kelasProgram.id,
-            namaKelas: ps.kelasProgram.kelas?.namaKelas || 'Tidak Ada Kelas',
-            namaProgram: ps.kelasProgram.program.namaProgram
-          }))
-        }))
-      };
-
-      return transformedData;
-    } catch (error) {
-      throw error;
-    }
-  }
 
 }
 

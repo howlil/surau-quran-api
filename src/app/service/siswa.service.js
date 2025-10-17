@@ -4,13 +4,11 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const paymentService = require('./payment.service');
-const bcrypt = require('bcrypt');
 const XenditUtils = require('../../lib/utils/xendit.utils');
 const financeService = require('./finance.service');
 const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
-const EmailUtils = require('../../lib/utils/email.utils');
 const SppService = require('./spp.service');
-const { DATE_FORMATS } = require('../../lib/constants');
+const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 
 class SiswaService {
 
@@ -37,8 +35,8 @@ class SiswaService {
         evidence,
       } = pendaftaranData;
 
-      const cleanedNamaMurid = namaMurid.trim().replace(/\s+/g, ' ');
-      const cleanedNamaPanggilan = namaPanggilan ? namaPanggilan.trim().replace(/\s+/g, ' ') : null;
+      const cleanedNamaMurid = CommonServiceUtils.cleanString(namaMurid);
+      const cleanedNamaPanggilan = CommonServiceUtils.cleanString(namaPanggilan);
 
       // Check if email exists in user table
       const existingUser = await prisma.user.findUnique({
@@ -216,6 +214,7 @@ class SiswaService {
 
 
         return {
+          success: false,
           pendaftaranId: pendaftaranTemp.id,
           paymentInfo: paymentData
         };
@@ -316,7 +315,7 @@ class SiswaService {
       });
 
       // Update finance record dengan format tanggal DD-MM-YYYY
-      const tanggalPembayaran = moment().format('DD-MM-YYYY');
+      const tanggalPembayaran = CommonServiceUtils.getCurrentDate('DD-MM-YYYY');
       await financeService.createFromEnrollmentPayment({
         id: pembayaran.id,
         jumlahTagihan: calculatedTotal,
@@ -324,13 +323,14 @@ class SiswaService {
         metodePembayaran: 'TUNAI'
       });
 
+      await EmailUtils.sendStudentRegistrationEmail({
         userId: user.id,
         siswaId: siswa.id,
         pembayaranId: pembayaran.id,
         email
       });
 
-      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const tanggalDaftar = CommonServiceUtils.getCurrentDate();
       const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
 
       return {
@@ -454,7 +454,7 @@ class SiswaService {
       }
 
       // Update finance record dengan format tanggal DD-MM-YYYY
-      const tanggalPembayaran = moment().format('DD-MM-YYYY');
+      const tanggalPembayaran = CommonServiceUtils.getCurrentDate('DD-MM-YYYY');
       await financeService.createFromEnrollmentPayment({
         id: pembayaran.id,
         jumlahTagihan: finalTotal,
@@ -462,12 +462,9 @@ class SiswaService {
         metodePembayaran: 'TUNAI'
       });
 
-        pembayaranId: pembayaran.id,
-        siswaCount: createdSiswa.length
-      });
-
+ 
       // Generate SPP untuk 5 bulan ke depan untuk semua siswa
-      const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
+      const tanggalDaftar = CommonServiceUtils.getCurrentDate();
       const sppPromises = createdSiswa.map(async (siswaData) => {
         // Get programSiswaId untuk siswa ini
         const programSiswa = await prisma.programSiswa.findFirst({
@@ -508,7 +505,7 @@ class SiswaService {
     }
     if (tanggal) {
       filteredInvoices = filteredInvoices.filter(inv => {
-        const invoiceDate = moment(inv.createdAt).format(DATE_FORMATS.DEFAULT);
+        const invoiceDate = CommonServiceUtils.formatDate(inv.createdAt);
         return invoiceDate === tanggal;
       });
     }
@@ -519,7 +516,7 @@ class SiswaService {
     });
 
     const startIdx = (page - 1) * limit;
-    const pagedInvoices = filteredInvoices.slice(startIdx, startIdx + Number(limit));
+    const pagedInvoices = filteredInvoices.slice(startIdx, startIdx + CommonServiceUtils.safeNumber(limit));
     const result = [];
 
 
@@ -530,13 +527,7 @@ class SiswaService {
       });
       const pembayaranId = xenditPayment?.pembayaranId || null;
 
-      // Logging debug (boleh dihapus kalau sudah stabil)
-      console.log('[DEBUG getPendaftaranInvoice]', {
-        invoiceId: invoice.id,
-        status: invoice.status,
-        pembayaranId,
-      });
-
+   
       let data = {
         invoice: {
           id: invoice.id,
@@ -763,11 +754,12 @@ class SiswaService {
    * - Siswa B: Tahsin (AKTIF) → Tahfidz (AKTIF) → Tahfidz (TIDAK_AKTIF)
    * - Yang ditampilkan: Tahfidz dengan status TIDAK_AKTIF
    */
-  async getAll(filters = {}) {
+  async getAll(options = {}) {
     try {
+      const { data: filters = {}, where: additionalWhere = {} } = options;
       const { nama, programId, page = 1, limit = 10 } = filters;
 
-      const where = {};
+      const where = { ...additionalWhere };
 
       if (nama) {
         where.OR = [
@@ -1012,7 +1004,7 @@ class SiswaService {
       // Calculate pagination values
       const skip = (page - 1) * limit;
       const take = parseInt(limit);
-      const totalPages = Math.ceil(totalAbsensi / limit);
+      const totalPages = CommonServiceUtils.calculateTotalPages(totalAbsensi, limit);
 
       // Fetch attendance records with pagination
       const absensi = await prisma.absensiSiswa.findMany({
@@ -1127,10 +1119,10 @@ class SiswaService {
       } = data;
 
       // Clean and normalize namaMurid and namaPanggilan before use
-      const cleanedNamaMurid = namaMurid ? namaMurid.trim().replace(/\s+/g, ' ') : namaMurid;
-      const cleanedNamaPanggilan = namaPanggilan ? namaPanggilan.trim().replace(/\s+/g, ' ') : namaPanggilan;
+      const cleanedNamaMurid = CommonServiceUtils.cleanString(namaMurid);
+      const cleanedNamaPanggilan = CommonServiceUtils.cleanString(namaPanggilan);
 
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         // Update data siswa dasar
         const siswaUpdateData = {};
         const fields = [
@@ -1409,8 +1401,11 @@ class SiswaService {
     }
   }
 
-  async updateStatusSiswa(programId, siswaId, status) {
+  async updateStatusSiswa(options) {
     try {
+      const { data, where } = options;
+      const { programId, siswaId, status } = data;
+      
       // Find the program for this student (bisa aktif atau tidak aktif)
       const programSiswa = await prisma.programSiswa.findFirst({
         where: {
@@ -1455,7 +1450,7 @@ class SiswaService {
               select: { id: true }
             });
             if (anggota.length > 0) {
-              const randomIndex = Math.floor(Math.random() * anggota.length);
+              const randomIndex = CommonServiceUtils.getRandomIndex(anggota.length);
               const ketuaBaru = anggota[randomIndex];
               await prisma.siswa.update({ where: { id: ketuaBaru.id }, data: { keluargaId: null } });
               const otherMemberIds = anggota.filter(a => a.id !== ketuaBaru.id).map(a => a.id);
@@ -1494,25 +1489,22 @@ class SiswaService {
           programSiswaId: updatedProgramSiswa.id,
           statusLama: oldStatus,
           statusBaru: status,
-          tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
+          tanggalPerubahan: CommonServiceUtils.getCurrentDate()
         }
       });
 
 
       return {
-        programId: updatedProgramSiswa.programId,
-        status: updatedProgramSiswa.status,
-        siswa: {
-          id: updatedProgramSiswa.siswa.id,
-          namaMurid: updatedProgramSiswa.siswa.namaMurid,
-          nis: updatedProgramSiswa.siswa.nis
-        },
-        program: {
-          id: updatedProgramSiswa.program.id,
-          namaProgram: updatedProgramSiswa.program.namaProgram
-        },
-        statusLama: oldStatus,
-        statusBaru: status
+        message: 'Status program siswa berhasil diperbarui',
+        data: {
+          siswaId: updatedProgramSiswa.siswa.id,
+          siswaNama: updatedProgramSiswa.siswa.namaMurid,
+          siswaNis: updatedProgramSiswa.siswa.nis,
+          programId: updatedProgramSiswa.programId,
+          programNama: updatedProgramSiswa.program.namaProgram,
+          statusLama: oldStatus,
+          statusBaru: status
+        }
       };
     } catch (error) {
       throw error;
@@ -1985,10 +1977,7 @@ class SiswaService {
       let voucherId = null;
       
       if (kodeVoucher) {
-        // Log voucher query untuk debugging
-          kodeVoucher: kodeVoucher.toUpperCase(),
-          isActive: true
-        });
+  
 
         // Clear cache dan ambil voucher dengan query yang lebih spesifik
         voucher = await prisma.voucher.findFirst({
@@ -2015,53 +2004,22 @@ class SiswaService {
           }
         });
 
-        if (allVouchersWithSameCode.length > 1) {
-            kodeVoucher: kodeVoucher.toUpperCase(),
-            vouchers: allVouchersWithSameCode.map(v => ({
-              id: v.id,
-              tipe: v.tipe,
-              nominal: v.nominal,
-              isActive: v.isActive,
-              createdAt: v.createdAt
-            }))
-          });
-        }
-
+ 
         // Set voucherId for later use
         voucherId = voucher.id;
 
-        // Calculate voucher discount on total
-          voucherTipe: voucher.tipe,
-          voucherNominal: voucher.nominal,
-          voucherNominalNumber: Number(voucher.nominal),
-          calculatedTotal
-        });
 
         if (voucher.tipe === 'PERSENTASE') {
           totalDiskon = calculatedTotal * (Number(voucher.nominal) / 100);
-            percentage: Number(voucher.nominal) / 100,
-            totalDiskon
-          });
+     
         } else {
           totalDiskon = Math.min(Number(voucher.nominal), calculatedTotal * 0.5);
-            voucherNominal: Number(voucher.nominal),
-            maxDiscount: calculatedTotal * 0.5,
-            totalDiskon
-          });
+      
         }
       }
 
       const finalTotal = calculatedTotal - totalDiskon;
 
-      // Log perhitungan untuk debugging
-        calculatedTotal,
-        voucherType: voucher?.tipe,
-        voucherNominal: voucher?.nominal,
-        totalDiskon,
-        finalTotal,
-        discountPercentage: voucher ? (totalDiskon / calculatedTotal * 100).toFixed(2) + '%' : '0%',
-        expectedFinalTotal: calculatedTotal - totalDiskon
-      });
 
       // Handle berdasarkan metode pembayaran
       if (metodePembayaran === 'TUNAI') {
@@ -2083,12 +2041,7 @@ class SiswaService {
         // Create Xendit invoice via payment service
         let xenditPaymentData;
         try {
-          // Log Xendit request untuk debugging
-            amount: finalTotal,
-            description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
-            itemsCount: siswa.length,
-            expectedTotal: finalTotal
-          });
+
 
           xenditPaymentData = await paymentService.createPendaftaranInvoiceV2({
             externalId: XenditUtils.generateExternalId('DAFTAR_V2'),
@@ -2102,17 +2055,8 @@ class SiswaService {
             items: siswa.map((s, index) => {
               const originalPrice = calculatedFees[index].totalBiaya;
               const discountRatio = totalDiskon / calculatedTotal;
-              const discountedPrice = Math.round(originalPrice * (1 - discountRatio));
+              const discountedPrice = CommonServiceUtils.safeRound(originalPrice * (1 - discountRatio));
 
-              // Log untuk debugging
-                studentName: s.namaMurid,
-                originalPrice,
-                discountRatio: (discountRatio * 100).toFixed(2) + '%',
-                discountedPrice,
-                totalDiskon,
-                calculatedTotal,
-                expectedItemTotal: Math.round(originalPrice * (1 - discountRatio))
-              });
 
               return {
                 name: `Pendaftaran - ${s.namaMurid}`,
@@ -2211,16 +2155,10 @@ class SiswaService {
         }
 
 
-        // Log payment data untuk debugging
-          pembayaranId: xenditPaymentData.pembayaranId,
-          xenditInvoiceUrl: xenditPaymentData.xenditInvoiceUrl,
-          expireDate: xenditPaymentData.expireDate,
-          amount: xenditPaymentData.amount,
-          xenditInvoiceId: xenditPaymentData.xenditInvoiceId,
-          fullPaymentData: JSON.stringify(xenditPaymentData, null, 2)
-        });
+  
 
         return {
+          success: false,
           pendaftaranId: pendaftaranPrivateTemp.id,
           pembayaranId: xenditPaymentData.pembayaranId,
           invoiceUrl: xenditPaymentData.xenditInvoiceUrl,
@@ -2296,7 +2234,7 @@ class SiswaService {
               totalBiaya: biayaPendaftaran
             };
           } else {
-            const currentPrice = Math.round(previousPrice * 0.8); // 80% dari harga sebelumnya
+            const currentPrice = CommonServiceUtils.safeRound(previousPrice * 0.8); // 80% dari harga sebelumnya
             const diskon = previousPrice - currentPrice;
             previousPrice = currentPrice; // Update untuk siswa berikutnya
             return {
@@ -2322,7 +2260,7 @@ class SiswaService {
             };
           } else if (index === 1) {
             // Siswa kedua: 50% dari harga pertama
-            const currentPrice = Math.round(biayaPendaftaran * 0.5);
+            const currentPrice = CommonServiceUtils.safeRound(biayaPendaftaran * 0.5);
             const diskon = biayaPendaftaran - currentPrice;
             return {
               biayaPendaftaran: biayaPendaftaran,
@@ -2338,8 +2276,8 @@ class SiswaService {
             };
           } else if (index === 2 && siswa.length === 4) {
             // Siswa ketiga (jika total 4 siswa): 50% dari siswa kedua
-            const siswaKeduaPrice = Math.round(biayaPendaftaran * 0.5);
-            const currentPrice = Math.round(siswaKeduaPrice * 0.5);
+            const siswaKeduaPrice = CommonServiceUtils.safeRound(biayaPendaftaran * 0.5);
+            const currentPrice = CommonServiceUtils.safeRound(siswaKeduaPrice * 0.5);
             const diskon = biayaPendaftaran - currentPrice;
             return {
               biayaPendaftaran: biayaPendaftaran,
@@ -2421,7 +2359,7 @@ class SiswaService {
       }
 
       // 5. Proses pindah program dalam transaction
-      return await PrismaUtils.transaction(async (tx) => {
+      return await prisma.$transaction(async (tx) => {
         // a. Update status program lama menjadi TIDAK_AKTIF
         await tx.programSiswa.update({
           where: { id: programLama.id },
@@ -2434,7 +2372,7 @@ class SiswaService {
             programSiswaId: programLama.id,
             statusLama: 'AKTIF',
             statusBaru: 'TIDAK_AKTIF',
-            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
+            tanggalPerubahan: CommonServiceUtils.getCurrentDate()
           }
         });
 
@@ -2466,7 +2404,7 @@ class SiswaService {
             programSiswaId: programSiswaBaru.id,
             statusLama: 'TIDAK_AKTIF',
             statusBaru: 'AKTIF',
-            tanggalPerubahan: moment().format(DATE_FORMATS.DEFAULT)
+            tanggalPerubahan: CommonServiceUtils.getCurrentDate()
           }
         });
 
@@ -2500,7 +2438,7 @@ class SiswaService {
         }
 
         // g. Generate SPP 5 bulan ke depan untuk program baru
-        const tanggalPindah = moment().format(DATE_FORMATS.DEFAULT);
+        const tanggalPindah = CommonServiceUtils.getCurrentDate();
         const sppBaru = await SppService.generateFiveMonthsAhead(
           programSiswaBaru.id,
           tanggalPindah,
@@ -2509,22 +2447,7 @@ class SiswaService {
 
 
         // h. Send email notification
-        try {
-          await EmailUtils.sendEmail({
-            to: siswa.user.email,
-            subject: 'Pemberitahuan Pindah Program',
-            template: 'program-change',
-            context: {
-              namaSiswa: siswa.namaMurid,
-              programLama: programLama.program.namaProgram,
-              programBaru: programBaru.namaProgram,
-              tanggalPindah: tanggalPindah
-            }
-          });
-        } catch (emailError) {
-          // Don't throw, let the process continue
-        }
-
+  
         // Return complete data
         const result = await tx.siswa.findUnique({
           where: { id: siswaId },

@@ -29,7 +29,7 @@ class PrismaConfig {
   }
 
   #setupLogging(prisma) {
-    if (globalUtils.isDevelopment) {
+    if (process.env.NODE_ENV = "development") {
       prisma.$on('query', (e) => {
         logger.debug(`Query: ${e.query}`);
         logger.debug(`Params: ${e.params}`);
