@@ -4,90 +4,70 @@ require('dotenv').config();
 
 
 class PrismaConfig {
-  #client;
-  #isConnected = false;
-  static #instance;
 
   constructor() {
-    this.#client = new PrismaClient({
-      log: [
-        { level: 'error', emit: 'event' },
-        { level: 'info', emit: 'event' },
-        { level: 'warn', emit: 'event' },
-        // Only enable query logging in development
-        ...(process.env.NODE_ENV === 'development' ? [{ level: 'query', emit: 'event' }] : [])
-      ],
-      errorFormat: process.env.NODE_ENV === 'production' ? 'minimal' : 'pretty'
-    });
-
-    this.#setupLogging();
+    this.prisma = this.#createPrismaClient();
+    this.#setupLogging(this.prisma);
   }
 
-  #setupLogging() {
-    // Only setup query logging in development
-    if (process.env.NODE_ENV === 'development') {
-      this.#client.$on('query', e => {
+  #createPrismaClient() {
+    return new PrismaClient({
+      log: [
+        { emit: 'event', level: 'query' },
+        { emit: 'event', level: 'info' },
+        { emit: 'event', level: 'warn' },
+        { emit: 'event', level: 'error' }
+      ],
+      errorFormat: process.env.NODE_ENV = "development" ? 'pretty' : 'colorless',
+
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
+      }
+    });
+  }
+
+  #setupLogging(prisma) {
+    if (globalUtils.isDevelopment) {
+      prisma.$on('query', (e) => {
         logger.debug(`Query: ${e.query}`);
+        logger.debug(`Params: ${e.params}`);
         logger.debug(`Duration: ${e.duration}ms`);
       });
     }
-
-    this.#client.$on('error', e => {
-      logger.error('Prisma Client error:', e);
+    prisma.$on('info', (e) => {
+      logger.info(e.message);
+    }
+    );
+    prisma.$on('warn', (e) => {
+      logger.warn(e.message);
     });
-
-    this.#client.$on('info', e => {
-      logger.info('Prisma info:', e);
-    });
-
-    this.#client.$on('warn', e => {
-      logger.warn('Prisma warning:', e);
+    prisma.$on('error', (e) => {
+      logger.error(e.message);
     });
   }
 
   async connect() {
-    if (!this.#isConnected) {
-      try {
-        await this.#client.$connect();
-        this.#isConnected = true;
-        logger.info('Successfully connected to the database');
-      } catch (error) {
-        logger.error('Failed to connect to the database:', error);
-        throw error;
-      }
+    try {
+      await this.prisma.$connect();
+    } catch (error) {
+      logger.error(`Error connecting to the database: ${error.message}`);
     }
-    return this.#client;
   }
 
   async disconnect() {
-    if (this.#isConnected) {
-      try {
-        await this.#client.$disconnect();
-        this.#isConnected = false;
-        logger.info('Successfully disconnected from the database');
-      } catch (error) {
-        logger.error('Failed to disconnect from the database:', error);
-        throw error;
-      }
+    try {
+      await this.prisma.$disconnect();
+    } catch (error) {
+      logger.error(`Error disconnecting from the database: ${error.message}`);
     }
   }
 
   getClient() {
-    if (!this.#isConnected) {
-      logger.warn('Attempting to use Prisma client before connecting');
-    }
-    return this.#client;
+    return this.prisma;
   }
 
-  static getInstance() {
-    if (!PrismaConfig.#instance) {
-      PrismaConfig.#instance = new PrismaConfig();
-    }
-    return PrismaConfig.#instance;
-  }
 }
 
-module.exports = {
-  prisma: PrismaConfig.getInstance().getClient(),
-  prismaConfig: PrismaConfig.getInstance()
-};
+module.exports = new PrismaConfig().getClient();

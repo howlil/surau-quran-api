@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class PaymentValidation {
   static createSppPayment() {
-    return ValidatorFactory.create({
+    return Joi.object({
       periodeSppIds: Joi.array().items(
         Joi.string().guid({ version: 'uuidv4' }).required()
           .messages({
@@ -40,7 +39,7 @@ class PaymentValidation {
 
 
   static xenditCallback() {
-    return ValidatorFactory.create({
+    return Joi.object({
       id: Joi.string().required()
         .messages({
           'any.required': 'Invoice ID wajib diisi'

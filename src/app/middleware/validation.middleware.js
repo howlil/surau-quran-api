@@ -1,210 +1,54 @@
-const { BadRequestError, ValidationError } = require('../../lib/http/errors.http');
+
+const ErrorFactory = require("../../lib/factories/error.factory")
 
 class ValidationMiddleware {
 
-  static validateBody(schema) {
-    return (req, res, next) => {
-      try {
-        if (!schema || typeof schema.validate !== 'function') {
-          throw new ValidationError('Invalid validation schema');
-        }
+    #validate(type, schema, validation) {
+        return (req, res, next) => {
+            try {
 
-        const result = schema.validate(req.body);
-        if (!result || result.error) {
-          const error = result?.error;
-          if (error) {
-            const errors = error.details.map(detail => ({
-              field: detail.path[0],
-              message: detail.message
-            }));
-            throw new BadRequestError('Validation failed', errors);
-          } else {
-            throw new ValidationError('Validation failed - invalid schema result');
-          }
-        }
-        req.validatedBody = result.value;
-        next();
-      } catch (err) {
-        next(err);
-      }
-    };
-  }
+                if (!schema || typeof schema.validate !== 'function') {
+                    throw ErrorFactory.validationError("Schema is not a valid Joi schema")
+                }
 
-  static validateQuery(schema) {
-    return (req, res, next) => {
-      try {
-        if (!schema || typeof schema.validate !== 'function') {
-          throw new ValidationError('Invalid validation schema');
-        }
+                const result = schema.validate(req[type])
+                if (result.error) {
+                    const error = result?.error
 
-        const result = schema.validate(req.query);
-        if (!result || result.error) {
-          const error = result?.error;
-          if (error) {
-            const errors = error.details.map(detail => ({
-              field: detail.path[0],
-              message: detail.message
-            }));
-            throw new BadRequestError('Validation failed', errors);
-          } else {
-            throw new ValidationError('Validation failed - invalid schema result');
-          }
-        }
-        req.validatedQuery = result.value;
-        next();
-      } catch (err) {
-        next(err);
-      }
-    };
-  }
+                    if (error) {
+                        const errors = error.details.map(detail => ({
+                            field: detail.path.join("."),
+                            message: detail.message.replace(/\\"/g, '"'),
+                            type: detail.type
+                        }))
 
-  static validateParams(schema) {
-    return (req, res, next) => {
-      try {
-        if (!schema || typeof schema.validate !== 'function') {
-          throw new ValidationError('Invalid validation schema');
-        }
+                        throw ErrorFactory.validationError(errors)
+                    }
 
-        const result = schema.validate(req.params);
-        if (!result || result.error) {
-          const error = result?.error;
-          if (error) {
-            const errors = error.details.map(detail => ({
-              field: detail.path[0],
-              message: detail.message
-            }));
-            throw new BadRequestError('Validation failed', errors);
-          } else {
-            throw new ValidationError('Validation failed - invalid schema result');
-          }
-        }
-        req.validatedParams = result.value;
-        next();
-      } catch (err) {
-        next(err);
-      }
-    };
-  }
+                }
 
-  static validate(validators = {}) {
-    return (req, res, next) => {
-      try {
-        const errors = [];
+                req[validation] = result.value;
 
-        if (validators.body) {
-          if (typeof validators.body.validate !== 'function') {
-            throw new ValidationError('Invalid body validation schema');
-          }
-          const result = validators.body.validate(req.body);
-          if (!result || result.error) {
-            const error = result?.error;
-            if (error) {
-              errors.push(...error.details.map(detail => ({
-                field: detail.path[0],
-                message: detail.message
-              })));
+                next()
+
+            } catch (error) {
+                next(error)
             }
-          } else {
-            req.validatedBody = result.value;
-          }
         }
-
-        if (validators.query) {
-          if (typeof validators.query.validate !== 'function') {
-            throw new ValidationError('Invalid query validation schema');
-          }
-          const result = validators.query.validate(req.query);
-          if (!result || result.error) {
-            const error = result?.error;
-            if (error) {
-              errors.push(...error.details.map(detail => ({
-                field: detail.path[0],
-                message: detail.message
-              })));
-            }
-          } else {
-            req.validatedQuery = result.value;
-          }
-        }
-
-        if (validators.params) {
-          if (typeof validators.params.validate !== 'function') {
-            throw new ValidationError('Invalid params validation schema');
-          }
-          const result = validators.params.validate(req.params);
-          if (!result || result.error) {
-            const error = result?.error;
-            if (error) {
-              errors.push(...error.details.map(detail => ({
-                field: detail.path[0],
-                message: detail.message
-              })));
-            }
-          } else {
-            req.validatedParams = result.value;
-          }
-        }
-
-        if (errors.length > 0) {
-          throw new BadRequestError('Validation failed', errors);
-        }
-
-        next();
-      } catch (error) {
-        next(error);
-      }
-    };
-  }
-
-  static validateRequest(schema, property = 'body') {
-    return (req, res, next) => {
-      try {
-        if (!schema || typeof schema.validate !== 'function') {
-          throw new ValidationError('Invalid validation schema');
-        }
-
-        const result = schema.validate(req[property], { abortEarly: false });
-
-        if (!result || result.error) {
-          const error = result?.error;
-          if (error) {
-            const errorDetails = error.details.map(detail => ({
-              message: detail.message,
-              path: detail.path
-            }));
-
-            throw new ValidationError('Validation error', errorDetails);
-          } else {
-            throw new ValidationError('Validation failed - invalid schema result');
-          }
-        }
-
-        req[property] = result.value;
-        next();
-      } catch (err) {
-        next(err);
-      }
-    };
-  }
-
-  static handleErrors(err, req, res, next) {
-    if (err instanceof ValidationError) {
-      return res.status(422).json({
-        success: false,
-        message: err.message,
-        errors: err.data
-      });
     }
 
-    next(err);
-  }
+    validateBody(schema) {
+        return this.#validate("body", schema, "validatedBody")
+    }
+
+    validateQuery(schema) {
+        return this.#validate("query", schema, "validatedQuery")
+    }
+
+    validateParams(schema) {
+        return this.#validate("params", schema, "validatedParams")
+    }
+
 }
 
-module.exports = {
-  validateBody: ValidationMiddleware.validateBody,
-  validateQuery: ValidationMiddleware.validateQuery,
-  validateParams: ValidationMiddleware.validateParams,
-  validate: ValidationMiddleware.validate,
-  validateRequest: ValidationMiddleware.validateRequest,
-  handleErrors: ValidationMiddleware.handleErrors
-};
+module.exports = new ValidationMiddleware();

@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class TestimoniValidation {
     static create() {
-        return ValidatorFactory.create({
+        return Joi.object({
             nama: Joi.string().required()
                 .messages({
                     'string.empty': 'Nama tidak boleh kosong',
@@ -27,7 +26,7 @@ class TestimoniValidation {
     }
 
     static update() {
-        return ValidatorFactory.create({
+        return Joi.object({
             nama: Joi.string().optional()
                 .messages({
                     'string.empty': 'Nama tidak boleh kosong'
@@ -48,7 +47,7 @@ class TestimoniValidation {
     }
 
     static getTestimoniQuery() {
-        return ValidatorFactory.create({
+        return Joi.object({
             nama: Joi.string().min(1).max(191).optional()
                 .messages({
                     'string.min': 'Nama minimal 1 karakter',

@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class SppValidation {
     static getSppForAdmin() {
-        return ValidatorFactory.create({
+        return Joi.object({
             status: Joi.string().valid(
                 'UNPAID',
                 'PENDING',
@@ -42,7 +41,7 @@ class SppValidation {
     }
 
     static getSppForSiswa() {
-        return ValidatorFactory.create({
+        return Joi.object({
 
             page: Joi.number().integer().min(1).optional()
                 .messages({

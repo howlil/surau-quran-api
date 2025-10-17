@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
@@ -18,7 +17,7 @@ class GuruService {
         });
 
         if (existingUser) {
-          throw new ConflictError(`User dengan email ${email} sudah ada`);
+          throw ErrorFactory.badRequest(`User dengan email ${email} sudah ada`);
         }
 
         if (rfid) {
@@ -27,7 +26,7 @@ class GuruService {
           });
 
           if (existingRfid) {
-            throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+            throw ErrorFactory.badRequest(`RFID ${rfid} sudah terdaftar untuk user lain`);
           }
         }
 
@@ -89,11 +88,9 @@ class GuruService {
           }
         }
 
-        logger.info(`Created guru with ID: ${guru.id}`);
         return schema;
       });
     } catch (error) {
-      logger.error('Error creating guru:', error);
       throw error;
     }
   }
@@ -109,7 +106,7 @@ class GuruService {
       });
 
       if (!guru) {
-        throw new NotFoundError(`Guru dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Guru dengan ID ${id} tidak ditemukan`);
       }
 
       const { email, password, rfid, baseUrl, ...guruData } = data;
@@ -124,7 +121,7 @@ class GuruService {
           });
 
           if (existingUser) {
-            throw new ConflictError(`User dengan email ${email} sudah ada`);
+            throw ErrorFactory.badRequest(`User dengan email ${email} sudah ada`);
           }
 
           await tx.user.update({
@@ -153,7 +150,7 @@ class GuruService {
             });
 
             if (existingRfid) {
-              throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+              throw ErrorFactory.badRequest(`RFID ${rfid} sudah terdaftar untuk user lain`);
             }
           }
 
@@ -206,11 +203,9 @@ class GuruService {
           }
         }
 
-        logger.info(`Updated guru with ID: ${id}`);
         return schema;
       });
     } catch (error) {
-      logger.error(`Error updating guru with ID ${id}:`, error);
       throw error;
     }
   }
@@ -227,15 +222,15 @@ class GuruService {
       });
 
       if (!guru) {
-        throw new NotFoundError(`Guru dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Guru dengan ID ${id} tidak ditemukan`);
       }
 
       if (guru.kelasProgram.length > 0) {
-        throw new ConflictError('Guru sedang mengajar di kelas program dan tidak dapat dihapus');
+        throw ErrorFactory.badRequest('Guru sedang mengajar di kelas program dan tidak dapat dihapus');
       }
 
       if (guru.payroll.length > 0) {
-        throw new ConflictError('Guru memiliki data payroll dan tidak dapat dihapus');
+        throw ErrorFactory.badRequest('Guru memiliki data payroll dan tidak dapat dihapus');
       }
 
       await PrismaUtils.transaction(async (tx) => {
@@ -248,10 +243,8 @@ class GuruService {
         });
       });
 
-      logger.info(`Deleted guru with ID: ${id}`);
       return { id };
     } catch (error) {
-      logger.error(`Error deleting guru with ID ${id}:`, error);
       throw error;
     }
   }
@@ -296,7 +289,6 @@ class GuruService {
         orderBy: { createdAt: 'desc' }
       });
     } catch (error) {
-      logger.error('Error getting all gurus:', error);
       throw error;
     }
   }
@@ -358,7 +350,6 @@ class GuruService {
         }))
       };
     } catch (error) {
-      logger.error('Error getting simplified guru list:', error);
       throw error;
     }
   }
@@ -461,7 +452,6 @@ class GuruService {
         };
       });
     } catch (error) {
-      logger.error('Error getting kelas programs with students:', error);
       throw error;
     }
   }
@@ -478,11 +468,11 @@ class GuruService {
       });
 
       if (!guru) {
-        throw new NotFoundError(`Guru dengan ID ${guruId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Guru dengan ID ${guruId} tidak ditemukan`);
       }
 
       if (!guru.suratKontrak) {
-        throw new NotFoundError('Surat kontrak tidak ditemukan');
+        throw ErrorFactory.notFound('Surat kontrak tidak ditemukan');
       }
 
       return {
@@ -490,7 +480,6 @@ class GuruService {
         fileName: `Surat_Kontrak_${guru.nama.replace(/\s+/g, '_')}.pdf`
       };
     } catch (error) {
-      logger.error(`Error getting contract file for guru ${guruId}:`, error);
       throw error;
     }
   }

@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, handlePrismaError } = require('../../lib/http/error.handler.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 
@@ -18,11 +17,9 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Created finance record with ID: ${finance.id}`);
             return finance;
         } catch (error) {
-            logger.error('Error creating finance record:', error);
-            throw handlePrismaError(error);
+            throw error
         }
     }
 
@@ -124,8 +121,7 @@ class FinanceService {
                 }
             };
         } catch (error) {
-            logger.error('Error getting finance records:', error);
-            throw handlePrismaError(error);
+            throw error
         }
     }
 
@@ -204,8 +200,7 @@ class FinanceService {
                 };
             }
         } catch (error) {
-            logger.error('Error calculating finance totals:', error);
-            throw handlePrismaError(error);
+            throw error
         }
     }
 
@@ -218,7 +213,7 @@ class FinanceService {
             });
 
             if (!finance) {
-                throw new NotFoundError(`Finance record dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Finance record dengan ID ${id} tidak ditemukan`);
             }
 
             const updated = await prisma.finance.update({
@@ -226,11 +221,10 @@ class FinanceService {
                 data
             });
 
-            logger.info(`Updated finance record with ID: ${id}`);
             return updated;
         } catch (error) {
-            logger.error(`Error updating finance record with ID ${id}:`, error);
-            throw error;
+            if (error.statusCode) throw error;
+            throw error
         }
     }
 
@@ -242,18 +236,17 @@ class FinanceService {
             });
 
             if (!finance) {
-                throw new NotFoundError(`Finance record dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Finance record dengan ID ${id} tidak ditemukan`);
             }
 
             await prisma.finance.delete({
                 where: { id }
             });
 
-            logger.info(`Deleted finance record with ID: ${id}`);
             return { id };
         } catch (error) {
-            logger.error(`Error deleting finance record with ID ${id}:`, error);
-            throw error;
+            if (error.statusCode) throw error;
+            throw error
         }
     }
 
@@ -269,7 +262,6 @@ class FinanceService {
             });
 
             if (existingRecord) {
-                logger.info(`Finance record already exists for SPP payment ID: ${id}`);
                 return existingRecord;
             }
 
@@ -289,17 +281,14 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Auto-created finance record for SPP payment ID: ${id}, Amount: ${jumlahTagihan}, Method: ${metodePembayaran || 'PAYMENT_GATEWAY'}`);
             return financeRecord;
         } catch (error) {
-            logger.error(`Error creating finance record from SPP payment:`, error);
-            throw error;
+            throw error
         }
     }
 
     async createFromEnrollmentPayment(pembayaranData) {
         try {
-            logger.info('Creating finance record from enrollment payment:', pembayaranData);
             const { id, jumlahTagihan, tanggalPembayaran, metodePembayaran } = pembayaranData;
 
             // Check if finance record already exists for this payment
@@ -310,10 +299,6 @@ class FinanceService {
             });
 
             if (existingRecord) {
-                logger.info(`Finance record already exists for enrollment payment ID: ${id}`, {
-                    financeRecordId: existingRecord.id,
-                    amount: existingRecord.total
-                });
                 return existingRecord;
             }
 
@@ -333,21 +318,9 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Successfully auto-created finance record for enrollment payment:`, {
-                paymentId: id,
-                financeRecordId: financeRecord.id,
-                amount: Number(jumlahTagihan),
-                date: tanggalPembayaran,
-                metodePembayaran: metodePembayaran
-            });
             return financeRecord;
         } catch (error) {
-            logger.error(`Error creating finance record from enrollment payment:`, {
-                paymentData: pembayaranData,
-                error: error.message,
-                stack: error.stack
-            });
-            throw error;
+            throw error
         }
     }
 
@@ -363,7 +336,6 @@ class FinanceService {
             });
 
             if (existingRecord) {
-                logger.info(`Finance record already exists for payroll ID: ${id}`);
                 return existingRecord;
             }
 
@@ -381,10 +353,8 @@ class FinanceService {
                 }
             });
 
-            logger.info(`Auto-created finance record for payroll ID: ${id}, Guru: ${guru.nama}, Amount: ${totalGaji}`);
             return financeRecord;
         } catch (error) {
-            logger.error(`Error creating finance record from payroll disbursement:`, error);
             throw error;
         }
     }

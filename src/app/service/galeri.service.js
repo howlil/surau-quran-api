@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, handlePrismaError } = require('../../lib/http/error.handler.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class GaleriService {
@@ -13,11 +12,9 @@ class GaleriService {
                 }
             });
 
-            logger.info(`Created galeri with ID: ${galeri.id}`);
             return galeri;
         } catch (error) {
-            logger.error('Error creating galeri:', error);
-            throw handlePrismaError(error);
+            throw error
         }
     }
 
@@ -40,8 +37,7 @@ class GaleriService {
                 orderBy: { createdAt: 'desc' }
             });
         } catch (error) {
-            logger.error('Error getting all galeri:', error);
-            throw handlePrismaError(error);
+            throw error
         }
     }
 
@@ -55,7 +51,7 @@ class GaleriService {
             });
 
             if (!galeri) {
-                throw new NotFoundError(`Galeri dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Galeri dengan ID ${id} tidak ditemukan`);
             }
 
             const updated = await prisma.galeri.update({
@@ -63,11 +59,10 @@ class GaleriService {
                 data
             });
 
-            logger.info(`Updated galeri with ID: ${id}`);
             return updated;
         } catch (error) {
-            logger.error(`Error updating galeri with ID ${id}:`, error);
-            throw error;
+            if (error.statusCode) throw error;
+            throw error
         }
     }
 
@@ -79,18 +74,17 @@ class GaleriService {
             });
 
             if (!galeri) {
-                throw new NotFoundError(`Galeri dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Galeri dengan ID ${id} tidak ditemukan`);
             }
 
             await prisma.galeri.delete({
                 where: { id }
             });
 
-            logger.info(`Deleted galeri with ID: ${id}`);
             return { id };
         } catch (error) {
-            logger.error(`Error deleting galeri with ID ${id}:`, error);
-            throw error;
+            if (error.statusCode) throw error;
+            throw error
         }
     }
 }

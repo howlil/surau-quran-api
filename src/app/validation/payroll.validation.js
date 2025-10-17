@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class PayrollValidation {
     static getAllPayrollsForAdmin() {
-        return ValidatorFactory.create({
+        return Joi.object({
             page: Joi.number().integer().min(1).default(1).optional(),
             limit: Joi.number().integer().min(1).max(100).default(10).optional(),
             monthYear: Joi.string().pattern(/^(0[1-9]|1[0-2])-\d{4}$/).optional()
@@ -14,7 +13,7 @@ class PayrollValidation {
     }
 
     static getAllPayrollsForGuru() {
-        return ValidatorFactory.create({
+        return Joi.object({
             page: Joi.number().integer().min(1).default(1).optional(),
             limit: Joi.number().integer().min(1).max(100).default(10).optional(),
             monthYear: Joi.string().pattern(/^(0[1-9]|1[0-2])-\d{4}$/).optional()
@@ -25,7 +24,7 @@ class PayrollValidation {
     }
 
     static updatePayroll() {
-        return ValidatorFactory.create({
+        return Joi.object({
             tanggalKalkulasi: Joi.string().pattern(/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$/).optional()
                 .messages({
                     'string.pattern.base': 'Tanggal harus dalam format DD-MM-YYYY'
@@ -66,7 +65,7 @@ class PayrollValidation {
     }
 
     static batchPayrollDisbursement() {
-        return ValidatorFactory.create({
+        return Joi.object({
             payrollIds: Joi.array().items(
                 Joi.string().guid({ version: 'uuidv4' }).required()
             ).min(1).required()

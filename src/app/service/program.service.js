@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class ProgramService {
@@ -12,17 +11,15 @@ class ProgramService {
       });
 
       if (existing) {
-        throw new ConflictError(`Program dengan nama ${data.namaProgram} sudah ada`);
+        throw ErrorFactory.badRequest(`Program dengan nama ${data.namaProgram} sudah ada`);
       }
 
       const program = await prisma.program.create({
         data
       });
 
-      logger.info(`Created program with ID: ${program.id}`);
       return program;
     } catch (error) {
-      logger.error('Error creating program:', error);
       throw error;
     }
   }
@@ -35,7 +32,7 @@ class ProgramService {
       });
 
       if (!program) {
-        throw new NotFoundError(`Program dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Program dengan ID ${id} tidak ditemukan`);
       }
 
       // Check if name is being changed and if it already exists
@@ -48,7 +45,7 @@ class ProgramService {
         });
 
         if (existing) {
-          throw new ConflictError(`Program dengan nama ${data.namaProgram} sudah ada`);
+          throw ErrorFactory.badRequest(`Program dengan nama ${data.namaProgram} sudah ada`);
         }
       }
 
@@ -57,10 +54,8 @@ class ProgramService {
         data
       });
 
-      logger.info(`Updated program with ID: ${id}`);
       return updated;
     } catch (error) {
-      logger.error(`Error updating program with ID ${id}:`, error);
       throw error;
     }
   }
@@ -73,7 +68,7 @@ class ProgramService {
       });
 
       if (!program) {
-        throw new NotFoundError(`Program dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Program dengan ID ${id} tidak ditemukan`);
       }
 
       // Check if program is being used in KelasProgram or ProgramSiswa
@@ -82,7 +77,7 @@ class ProgramService {
       });
 
       if (kelasProgram) {
-        throw new ConflictError('Program sedang digunakan dalam kelas program dan tidak dapat dihapus');
+        throw ErrorFactory.badRequest('Program sedang digunakan dalam kelas program dan tidak dapat dihapus');
       }
 
       const programSiswa = await prisma.programSiswa.findFirst({
@@ -90,17 +85,15 @@ class ProgramService {
       });
 
       if (programSiswa) {
-        throw new ConflictError('Program sedang digunakan oleh siswa dan tidak dapat dihapus');
+        throw ErrorFactory.badRequest('Program sedang digunakan oleh siswa dan tidak dapat dihapus');
       }
 
       await prisma.program.delete({
         where: { id }
       });
 
-      logger.info(`Deleted program with ID: ${id}`);
       return { id };
     } catch (error) {
-      logger.error(`Error deleting program with ID ${id}:`, error);
       throw error;
     }
   }
@@ -134,7 +127,6 @@ class ProgramService {
         orderBy: { namaProgram: 'asc' }
       });
     } catch (error) {
-      logger.error('Error getting all programs:', error);
       throw error;
     }
   }
@@ -163,7 +155,6 @@ class ProgramService {
         orderBy: { namaProgram: 'asc' }
       });
     } catch (error) {
-      logger.error('Error getting all programs (no pagination):', error);
       throw error;
     }
   }
@@ -183,7 +174,6 @@ class ProgramService {
 
       return programList;
     } catch (error) {
-      logger.error('Error getting all public programs:', error);
       throw error;
     }
   }
@@ -357,7 +347,6 @@ class ProgramService {
       };
 
     } catch (error) {
-      logger.error('Error getting program students:', error);
       throw error;
     }
   }
@@ -374,12 +363,12 @@ class ProgramService {
       });
 
       if (!kelasProgram) {
-        throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
       }
 
       // Validasi bahwa guru berwenang untuk kelas program ini
       if (kelasProgram.guruId !== guruId) {
-        throw new NotFoundError('Guru tidak berwenang untuk kelas program ini');
+        throw ErrorFactory.notFound('Guru tidak berwenang untuk kelas program ini');
       }
 
       // Validasi bahwa siswa ada
@@ -388,7 +377,7 @@ class ProgramService {
       });
 
       if (!siswa) {
-        throw new NotFoundError('Siswa tidak ditemukan');
+        throw ErrorFactory.notFound('Siswa tidak ditemukan');
       }
 
       // Validasi bahwa siswa memiliki kelas program aktif
@@ -409,7 +398,7 @@ class ProgramService {
       });
 
       if (!activeProgramSiswa) {
-        throw new BadRequestError('Siswa belum terdaftar dalam kelas program manapun. Siswa harus memiliki kelas program aktif untuk bisa mengikuti kelas pengganti');
+        throw ErrorFactory.badRequest('Siswa belum terdaftar dalam kelas program manapun. Siswa harus memiliki kelas program aktif untuk bisa mengikuti kelas pengganti');
       }
 
 
@@ -417,7 +406,7 @@ class ProgramService {
       const formattedDate = `${tanggalYear}-${tanggalMonth}-${tanggalDay}`;
       const today = new Date().toISOString().split('T')[0];
       if (formattedDate < today) {
-        throw new BadRequestError('Tanggal tidak boleh di masa lalu');
+        throw ErrorFactory.badRequest('Tanggal tidak boleh di masa lalu');
       }
 
       // Validasi bahwa tanggal sesuai dengan hari kelas program
@@ -426,7 +415,7 @@ class ProgramService {
       const inputDayName = dayNames[inputDate.getDay()];
 
       if (inputDayName !== kelasProgram.hari) {
-        throw new BadRequestError(`Tanggal ${tanggal} adalah hari ${inputDayName}, tidak sesuai dengan jadwal kelas program yang adalah hari ${kelasProgram.hari}`);
+        throw ErrorFactory.badRequest(`Tanggal ${tanggal} adalah hari ${inputDayName}, tidak sesuai dengan jadwal kelas program yang adalah hari ${kelasProgram.hari}`);
       }
 
       // Cek apakah sudah ada kelas pengganti untuk siswa ini di tanggal yang sama
@@ -495,13 +484,11 @@ class ProgramService {
                   statusKehadiran: 'TIDAK_HADIR' // Status default, guru bisa ubah nanti
                 }
               });
-              logger.info(`Created attendance record for reactivated temporary student ${siswaId} in class ${kelasProgramId} for date ${tanggal}`);
             }
 
             return reactivated;
           });
 
-          logger.info(`Reactivated student ${siswaId} to substitute class ${kelasProgramId} for date ${tanggal}`);
 
           return {
             id: result.id,
@@ -517,7 +504,7 @@ class ProgramService {
             absensiCreated: true
           };
         } else {
-          throw new ConflictError('Siswa sudah ditambahkan ke kelas pengganti ini di tanggal yang sama');
+          throw ErrorFactory.badRequest('Siswa sudah ditambahkan ke kelas pengganti ini di tanggal yang sama');
         }
       }
 
@@ -536,7 +523,7 @@ class ProgramService {
       });
 
       if (monthlyCount >= 2) {
-        throw new BadRequestError('Siswa sudah mencapai batas maksimal kelas pengganti dalam 1 bulan (2x)');
+        throw ErrorFactory.badRequest('Siswa sudah mencapai batas maksimal kelas pengganti dalam 1 bulan (2x)');
       }
 
       // Cek apakah siswa sudah ada di kelas program ini secara permanen
@@ -549,7 +536,7 @@ class ProgramService {
       });
 
       if (existingProgramSiswa) {
-        throw new ConflictError('Siswa sudah terdaftar di kelas program ini secara permanen');
+        throw ErrorFactory.badRequest('Siswa sudah terdaftar di kelas program ini secara permanen');
       }
 
       // Gunakan transaction untuk memastikan data konsisten
@@ -608,13 +595,11 @@ class ProgramService {
               statusKehadiran: 'TIDAK_HADIR' // Status default, guru bisa ubah nanti
             }
           });
-          logger.info(`Created attendance record for temporary student ${siswaId} in class ${kelasProgramId} for date ${tanggal}`);
         }
 
         return kelasPengganti;
       });
 
-      logger.info(`Added student ${siswaId} to substitute class ${kelasProgramId} for date ${tanggal}`);
 
       return {
         id: result.id,
@@ -630,7 +615,6 @@ class ProgramService {
         absensiCreated: true
       };
     } catch (error) {
-      logger.error('Error adding student to substitute class:', error);
       throw error;
     }
   }
@@ -645,12 +629,12 @@ class ProgramService {
       });
 
       if (!kelasProgram) {
-        throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
       }
 
       // Validasi bahwa guru berwenang untuk kelas program ini
       if (kelasProgram.guruId !== guruId) {
-        throw new NotFoundError('Guru tidak berwenang untuk kelas program ini');
+        throw ErrorFactory.notFound('Guru tidak berwenang untuk kelas program ini');
       }
 
       // Cari semua kelas pengganti yang aktif untuk kelas program ini
@@ -672,7 +656,7 @@ class ProgramService {
       });
 
       if (kelasPenggantiList.length === 0) {
-        throw new NotFoundError('Tidak ada siswa dalam kelas pengganti untuk kelas program ini');
+        throw ErrorFactory.notFound('Tidak ada siswa dalam kelas pengganti untuk kelas program ini');
       }
 
       // Soft delete semua kelas pengganti untuk kelas program ini dan hapus absensinya
@@ -702,7 +686,6 @@ class ProgramService {
         }
       });
 
-      logger.info(`Soft deleted ${kelasPenggantiList.length} students from substitute class ${kelasProgramId} and removed their attendance`);
 
       return {
         message: `${kelasPenggantiList.length} siswa berhasil dihapus dari kelas pengganti`,
@@ -716,7 +699,6 @@ class ProgramService {
         }))
       };
     } catch (error) {
-      logger.error('Error removing students from substitute class:', error);
       throw error;
     }
   }
@@ -795,7 +777,6 @@ class ProgramService {
 
       return transformedData;
     } catch (error) {
-      logger.error('Error getting substitute class students:', error);
       throw error;
     }
   }

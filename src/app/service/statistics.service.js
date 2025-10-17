@@ -421,7 +421,6 @@ class StatisticsService {
                 }
             };
         } catch (error) {
-            logger.error('Error getting student distribution:', error);
             throw error;
         }
     }
@@ -492,7 +491,6 @@ class StatisticsService {
 
             // Validasi hari Minggu - tidak ada jadwal
             if (todayDayName === 'MINGGU') {
-                logger.info(`Today is Sunday (${today}) - No class schedules available`);
                 return {
                     tanggal: today,
                     hari: todayDayName,
@@ -578,11 +576,9 @@ class StatisticsService {
                 schedules
             };
 
-            logger.info(`Retrieved today's schedule for ${today} (${todayDayName}) with ${schedules.length} time slots`);
             return result;
 
         } catch (error) {
-            logger.error('Error getting today schedule:', error);
             throw error;
         }
     }

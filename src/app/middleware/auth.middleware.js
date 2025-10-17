@@ -39,26 +39,6 @@ class AuthMiddleware {
     };
   }
 
-  // Method baru untuk menangani role-based access control yang lebih kompleks
-  authorizeByRole(restrictedRoles = []) {
-    return (req, res, next) => {
-      try {
-        if (!req.user) {
-          return next(new UnauthorizedError('Akses ditolak. User tidak terautentikasi'));
-        }
-        
-        // Jika role user ada dalam daftar restricted, tolak akses
-        if (restrictedRoles.includes(req.user.role)) {
-          return next(new ForbiddenError('Akses ditolak. Anda tidak memiliki hak akses'));
-        }
-        
-        next();
-      } catch (error) {
-        next(error);
-      }
-    };
-  }
-
 
 }
 

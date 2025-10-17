@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class ProgramValidation {
   static create() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaProgram: Joi.string().required()
         .messages({
           'string.empty': 'Nama program tidak boleh kosong',
@@ -28,7 +27,7 @@ class ProgramValidation {
   }
 
   static update() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaProgram: Joi.string().optional()
         .messages({
           'string.empty': 'Nama program tidak boleh kosong'
@@ -50,7 +49,7 @@ class ProgramValidation {
   }
 
   static getProgramQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaProgram: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama program minimal 1 karakter',
@@ -73,7 +72,7 @@ class ProgramValidation {
   }
 
   static addKelasPengganti() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kelasProgramId: Joi.string().required().messages({
         'string.empty': 'ID Kelas Program wajib diisi',
         'any.required': 'ID Kelas Program wajib diisi'
@@ -95,7 +94,7 @@ class ProgramValidation {
 
 
   static removeKelasPengganti() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kelasProgramId: Joi.string().guid({ version: 'uuidv4' }).required().messages({
         'string.guid': 'Kelas Program ID harus berupa UUID yang valid',
         'any.required': 'Kelas Program ID wajib diisi'

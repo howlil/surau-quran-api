@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class GuruValidation {
   static create() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().required()
         .messages({
           'string.email': 'Email harus valid',
@@ -45,7 +44,7 @@ class GuruValidation {
   }
 
   static update() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().optional()
         .messages({
           'string.email': 'Email harus valid'
@@ -83,7 +82,7 @@ class GuruValidation {
   }
 
   static getGuruQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       nama: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama minimal 1 karakter',
@@ -106,7 +105,7 @@ class GuruValidation {
   }
 
   static getJadwalGuruQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       nama: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama minimal 1 karakter',

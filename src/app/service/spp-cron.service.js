@@ -34,7 +34,6 @@ class SppCronService {
             });
 
             if (programSiswa.length === 0) {
-                logger.info('No active program siswa found');
                 return { message: 'No active program siswa found' };
             }
 
@@ -59,7 +58,6 @@ class SppCronService {
                     });
 
                     if (existingSpp) {
-                        logger.info(`SPP already exists for siswa ${ps.siswa.namaMurid} for ${this.getMonthName(currentMonth)} ${currentYear}`);
                         return null;
                     }
 
@@ -72,7 +70,6 @@ class SppCronService {
                     });
 
                     if (!program) {
-                        logger.error(`Program not found for ID ${ps.programId}`);
                         return null;
                     }
 
@@ -100,7 +97,6 @@ class SppCronService {
                         }
                     });
 
-                    logger.info(`Created SPP for siswa ${sppRecord.programSiswa.siswa.namaMurid} for ${this.getMonthName(currentMonth)} ${currentYear}`);
                     return sppRecord;
                 })
             );
@@ -112,7 +108,6 @@ class SppCronService {
                 records: successfulRecords
             };
         } catch (error) {
-            logger.error('Error creating monthly SPP:', error);
             throw error;
         }
     }

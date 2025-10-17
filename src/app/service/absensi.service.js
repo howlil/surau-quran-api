@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, BadRequestError, ForbiddenError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
@@ -13,7 +12,7 @@ class AbsensiService {
             const { kelasId, tanggal } = filters;
 
             if (!kelasId) {
-                throw new BadRequestError('ID Kelas wajib diisi');
+                throw ErrorFactory.badRequest('ID Kelas wajib diisi');
             }
 
             const where = {
@@ -111,11 +110,9 @@ class AbsensiService {
             };
             return transformedResult;
         } catch (error) {
-            logger.error('Error getting siswa attendance by kelas:', error);
             throw error;
         }
     }
-
 
 
     async getAbsensiGuruByDate(filters = {}, baseUrl) {
@@ -125,7 +122,7 @@ class AbsensiService {
             // Parse tanggal untuk mendapatkan hari
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
             if (!dateObj.isValid()) {
-                throw new BadRequestError('Format tanggal tidak valid');
+                throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
 
             // Get current day name in Indonesian format
@@ -255,9 +252,7 @@ class AbsensiService {
                                 }
                             });
 
-                            logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
                         } catch (error) {
-                            logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
                             // Jika gagal create, tetap tampilkan dengan status BELUM_ABSEN
                         }
                     }
@@ -346,7 +341,6 @@ class AbsensiService {
                 pagination: result.pagination
             };
         } catch (error) {
-            logger.error('Error getting absensi guru by date:', error);
             throw error;
         }
     }
@@ -385,16 +379,16 @@ class AbsensiService {
             });
 
             if (!absensi) {
-                throw new NotFoundError(`Absensi guru dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Absensi guru dengan ID ${id} tidak ditemukan`);
             }
 
             // Additional validation for IZIN/SAKIT status
             if (data.statusKehadiran === 'IZIN' || data.statusKehadiran === 'SAKIT') {
                 if (!data.keterangan || data.keterangan.trim() === '') {
-                    throw new BadRequestError('Keterangan wajib diisi untuk status IZIN atau SAKIT');
+                    throw ErrorFactory.badRequest('Keterangan wajib diisi untuk status IZIN atau SAKIT');
                 }
                 if (!data.suratIzin && !absensi.suratIzin) {
-                    throw new BadRequestError('Surat izin wajib diupload untuk status IZIN atau SAKIT');
+                    throw ErrorFactory.badRequest('Surat izin wajib diupload untuk status IZIN atau SAKIT');
                 }
             }
 
@@ -431,7 +425,6 @@ class AbsensiService {
                     updateData.suratIzin = null; // Clear surat izin for HADIR
 
                     updateData.sks = 2;
-                    logger.info(`Set SKS: 2 for HADIR status`);
                 }
             } else {
                 // Update individual fields if no statusKehadiran change
@@ -503,10 +496,8 @@ class AbsensiService {
                 suratIzin: updated.suratIzin
             };
 
-            logger.info(`Updated absensi guru with ID: ${id}, SKS: ${updated.sks}`);
             return result;
         } catch (error) {
-            logger.error(`Error updating absensi guru with ID ${id}:`, error);
             throw error;
         }
     }
@@ -534,11 +525,11 @@ class AbsensiService {
                 });
 
                 if (!kelasProgram) {
-                    throw new NotFoundError('Kelas program tidak ditemukan');
+                    throw ErrorFactory.notFound('Kelas program tidak ditemukan');
                 }
 
                 if (kelasProgram.guruId !== guruId) {
-                    throw new ForbiddenError('Guru tidak berwenang mengubah absensi siswa kelas pengganti');
+                    throw ErrorFactory.forbidden('Guru tidak berwenang mengubah absensi siswa kelas pengganti');
                 }
 
                 // Update absensi langsung di kelas pengganti
@@ -551,7 +542,7 @@ class AbsensiService {
                 });
 
                 if (!absensi) {
-                    throw new NotFoundError('Absensi siswa tidak ditemukan untuk kelas pengganti ini');
+                    throw ErrorFactory.notFound('Absensi siswa tidak ditemukan untuk kelas pengganti ini');
                 }
 
                 const updated = await prisma.absensiSiswa.update({
@@ -568,7 +559,6 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Updated attendance for temporary student ${updated.siswa.namaMurid} to ${statusKehadiran} for today (${tanggal}) in substitute class ${kelasProgramId}`);
 
                 return {
                     id: updated.id,
@@ -588,11 +578,11 @@ class AbsensiService {
             });
 
             if (!kelasProgram) {
-                throw new NotFoundError('Kelas program tidak ditemukan');
+                throw ErrorFactory.notFound('Kelas program tidak ditemukan');
             }
 
             if (kelasProgram.guruId !== guruId) {
-                throw new ForbiddenError('Guru tidak berwenang mengubah absensi siswa');
+                throw ErrorFactory.forbidden('Guru tidak berwenang mengubah absensi siswa');
             }
 
             // Logic untuk siswa regular
@@ -612,7 +602,7 @@ class AbsensiService {
             });
 
             if (!absensi) {
-                throw new NotFoundError(`Absensi siswa tidak ditemukan untuk hari ini di kelas program ${kelasProgramId} atau guru tidak berwenang mengubah absensi ini`);
+                throw ErrorFactory.notFound(`Absensi siswa tidak ditemukan untuk hari ini di kelas program ${kelasProgramId} atau guru tidak berwenang mengubah absensi ini`);
             }
 
             // Update absensi
@@ -632,7 +622,6 @@ class AbsensiService {
                 }
             });
 
-            logger.info(`Updated attendance for regular student ${updated.siswa.namaMurid} to ${statusKehadiran} for today (${tanggal}) in kelas program ${kelasProgramId}`);
 
             return {
                 id: updated.id,
@@ -643,7 +632,6 @@ class AbsensiService {
                 isTemporary: false
             };
         } catch (error) {
-            logger.error(`Error updating siswa attendance:`, error);
             throw error;
         }
     }
@@ -686,7 +674,6 @@ class AbsensiService {
             });
 
             if (!programSiswa || programSiswa.JadwalProgramSiswa.length === 0) {
-                logger.warn(`No active program or schedule found for student ${siswaId} on ${hariAbsensi}`);
                 return null;
             }
 
@@ -710,7 +697,6 @@ class AbsensiService {
             }
 
             // Jika tidak ada yang cocok, ambil jadwal pertama untuk hari tersebut
-            logger.warn(`No exact time match found for student ${siswaId}, using first schedule for ${hariAbsensi}`);
             const firstSchedule = programSiswa.JadwalProgramSiswa[0];
 
             return {
@@ -723,7 +709,6 @@ class AbsensiService {
             };
 
         } catch (error) {
-            logger.error('Error finding original schedule for temporary student:', error);
             return null;
         }
     }
@@ -733,14 +718,14 @@ class AbsensiService {
             // Validasi tanggal tidak boleh masa lalu
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
             if (!dateObj.isValid()) {
-                throw new BadRequestError('Format tanggal tidak valid');
+                throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
 
             const today = moment().startOf('day');
             const inputDate = dateObj.startOf('day');
 
             if (inputDate.isBefore(today)) {
-                throw new BadRequestError('Tanggal tidak boleh masa lalu. Hanya bisa update absensi untuk hari ini atau masa depan');
+                throw ErrorFactory.badRequest('Tanggal tidak boleh masa lalu. Hanya bisa update absensi untuk hari ini atau masa depan');
             }
 
             // Validate guru access to kelas program
@@ -755,7 +740,7 @@ class AbsensiService {
             });
 
             if (!kelasProgram) {
-                throw new NotFoundError('Kelas program tidak ditemukan atau guru tidak berwenang');
+                throw ErrorFactory.notFound('Kelas program tidak ditemukan atau guru tidak berwenang');
             }
 
             // Validate temporary student assignment
@@ -770,7 +755,7 @@ class AbsensiService {
             });
 
             if (!kelasPengganti) {
-                throw new NotFoundError('Siswa tidak ditemukan dalam kelas pengganti untuk hari ini');
+                throw ErrorFactory.notFound('Siswa tidak ditemukan dalam kelas pengganti untuk hari ini');
             }
 
             // Cari jadwal asli siswa
@@ -782,7 +767,7 @@ class AbsensiService {
             );
 
             if (!originalSchedule) {
-                throw new BadRequestError('Tidak dapat menemukan jadwal asli siswa');
+                throw ErrorFactory.badRequest('Tidak dapat menemukan jadwal asli siswa');
             }
 
             // Cari kelas program asli berdasarkan jadwal
@@ -800,7 +785,7 @@ class AbsensiService {
             });
 
             if (!originalKelasProgram) {
-                throw new BadRequestError('Tidak dapat menemukan kelas program asli');
+                throw ErrorFactory.badRequest('Tidak dapat menemukan kelas program asli');
             }
 
             // Cek apakah sudah ada absensi untuk jadwal asli di tanggal yang sama
@@ -822,7 +807,6 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Updated existing attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id} for today (${tanggal})`);
 
                 return {
                     message: 'Absensi berhasil diupdate',
@@ -844,7 +828,6 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Created new attendance for temporary student ${siswaId} on original schedule ${originalKelasProgram.id} for today (${tanggal})`);
 
                 return {
                     message: 'Absensi berhasil dibuat',
@@ -858,7 +841,6 @@ class AbsensiService {
             }
 
         } catch (error) {
-            logger.error('Error updating attendance for temporary student:', error);
             throw error;
         }
     }
@@ -935,12 +917,12 @@ class AbsensiService {
             });
 
             if (!kelasProgram) {
-                throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
             }
 
             // Check if guru has access to this kelas program
             if (kelasProgram.guruId !== guruId) {
-                throw new ForbiddenError('Anda tidak memiliki akses ke kelas program ini');
+                throw ErrorFactory.forbidden('Anda tidak memiliki akses ke kelas program ini');
             }
 
 
@@ -979,10 +961,8 @@ class AbsensiService {
                 absensiSiswa: absensiSiswaFormatted
             };
 
-            logger.info(`Retrieved attendance (${targetDate}) for kelas program: ${kelasProgramId} by guru: ${guruId}`);
             return result;
         } catch (error) {
-            logger.error('Error getting absensi siswa by kelas program:', error);
             throw error;
         }
     }
@@ -993,7 +973,7 @@ class AbsensiService {
             // Validasi format tanggal dan konversi ke hari
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
             if (!dateObj.isValid()) {
-                throw new BadRequestError('Format tanggal tidak valid');
+                throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
 
             // Validasi tanggal tidak boleh masa lalu
@@ -1001,7 +981,7 @@ class AbsensiService {
             const inputDate = dateObj.startOf('day');
 
             if (inputDate.isBefore(today)) {
-                throw new BadRequestError('Tanggal tidak boleh masa lalu. Hanya bisa create absensi untuk hari ini atau masa depan');
+                throw ErrorFactory.badRequest('Tanggal tidak boleh masa lalu. Hanya bisa create absensi untuk hari ini atau masa depan');
             }
 
             // Get day from date (0 = Sunday, 1 = Monday, etc.)
@@ -1017,7 +997,7 @@ class AbsensiService {
 
             const dayFromDate = dayMapping[dayNumber];
             if (!dayFromDate) {
-                throw new BadRequestError('Tidak ada jadwal kelas pada hari Minggu');
+                throw ErrorFactory.badRequest('Tidak ada jadwal kelas pada hari Minggu');
             }
 
             // Cari kelas program dan validasi jadwal
@@ -1086,12 +1066,12 @@ class AbsensiService {
             });
 
             if (!kelasProgram) {
-                throw new NotFoundError('Kelas program tidak ditemukan');
+                throw ErrorFactory.notFound('Kelas program tidak ditemukan');
             }
 
             // Validasi jadwal: kelas program harus ada jadwal di hari tersebut
             if (kelasProgram.hari !== dayFromDate) {
-                throw new BadRequestError(`Kelas program ini tidak ada jadwal pada hari ${dayFromDate}. Jadwal kelas ini pada hari ${kelasProgram.hari}`);
+                throw ErrorFactory.badRequest(`Kelas program ini tidak ada jadwal pada hari ${dayFromDate}. Jadwal kelas ini pada hari ${kelasProgram.hari}`);
             }
 
             // Cek apakah sudah ada absensi untuk tanggal tersebut
@@ -1103,7 +1083,7 @@ class AbsensiService {
             });
 
             if (existingAbsensi) {
-                throw new BadRequestError(`Absensi untuk kelas program ini pada tanggal ${tanggal} sudah ada`);
+                throw ErrorFactory.badRequest(`Absensi untuk kelas program ini pada tanggal ${tanggal} sudah ada`);
             }
 
             // Get all students (regular + substitute)
@@ -1126,7 +1106,7 @@ class AbsensiService {
             ];
 
             if (allSiswa.length === 0) {
-                throw new BadRequestError('Tidak ada siswa aktif dalam kelas program ini');
+                throw ErrorFactory.badRequest('Tidak ada siswa aktif dalam kelas program ini');
             }
 
             // Create absensi records
@@ -1151,7 +1131,6 @@ class AbsensiService {
                     statusKehadiran: absensi.statusKehadiran
                 });
 
-                logger.info(`Created attendance record for student ${siswa.namaSiswa} (${siswa.isKelasPengganti ? 'substitute' : 'regular'}) in class ${kelasProgramId}`);
             }
 
             const result = {
@@ -1172,10 +1151,8 @@ class AbsensiService {
                 absensiSiswa: absensiRecords
             };
 
-            logger.info(`Created ${absensiRecords.length} attendance records for kelas program ${kelasProgramId} on ${tanggal}`);
             return result;
         } catch (error) {
-            logger.error('Error creating absensi siswa:', error);
             throw error;
         }
     }
@@ -1213,7 +1190,7 @@ class AbsensiService {
             // Parse tanggal untuk mendapatkan hari
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
             if (!dateObj.isValid()) {
-                throw new BadRequestError('Format tanggal tidak valid');
+                throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
 
             // Validasi tanggal hanya hari ini (tidak boleh masa lalu atau masa depan)
@@ -1221,7 +1198,7 @@ class AbsensiService {
             const inputDate = dateObj.startOf('day');
 
             if (!inputDate.isSame(today, 'day')) {
-                throw new BadRequestError('Absensi hanya bisa dilakukan pada hari ini. Tanggal tidak boleh masa lalu atau masa depan');
+                throw ErrorFactory.badRequest('Absensi hanya bisa dilakukan pada hari ini. Tanggal tidak boleh masa lalu atau masa depan');
             }
 
             // Get current day name in Indonesian format
@@ -1230,7 +1207,7 @@ class AbsensiService {
 
             // Validasi hari Minggu - tidak ada jadwal
             if (hari === 'MINGGU') {
-                throw new BadRequestError('Tidak ada jadwal kelas pada hari Minggu');
+                throw ErrorFactory.badRequest('Tidak ada jadwal kelas pada hari Minggu');
             }
 
             // Cari guru dengan RFID
@@ -1250,7 +1227,7 @@ class AbsensiService {
             });
 
             if (!guru) {
-                throw new NotFoundError('Guru dengan RFID tersebut tidak ditemukan');
+                throw ErrorFactory.notFound('Guru dengan RFID tersebut tidak ditemukan');
             }
 
             // Cari jadwal kelas program guru pada hari tersebut
@@ -1286,13 +1263,13 @@ class AbsensiService {
             });
 
             if (jadwalKelasProgram.length === 0) {
-                throw new BadRequestError(`Guru tidak memiliki jadwal mengajar pada hari ${hari}. Absensi hanya bisa dilakukan jika ada jadwal mengajar`);
+                throw ErrorFactory.badRequest(`Guru tidak memiliki jadwal mengajar pada hari ${hari}. Absensi hanya bisa dilakukan jika ada jadwal mengajar`);
             }
 
             // Parse jam input
             const jamInput = moment(jam, 'HH:mm');
             if (!jamInput.isValid()) {
-                throw new BadRequestError('Format jam tidak valid');
+                throw ErrorFactory.badRequest('Format jam tidak valid');
             }
 
             // Logic Per Shift - Tentukan shift yang sedang berjalan
@@ -1313,7 +1290,7 @@ class AbsensiService {
             const jamSelesaiTerakhir = moment(shiftTerakhir.jamMengajar.jamSelesai, 'HH:mm');
 
             if (jamInput.isAfter(jamSelesaiTerakhir)) {
-                throw new BadRequestError(`Jam absen (${jam}) sudah lewat dari shift terakhir. Tidak bisa absen lagi setelah jam ${shiftTerakhir.jamMengajar.jamSelesai}`);
+                throw ErrorFactory.badRequest(`Jam absen (${jam}) sudah lewat dari shift terakhir. Tidak bisa absen lagi setelah jam ${shiftTerakhir.jamMengajar.jamSelesai}`);
             }
 
             // Tentukan shift yang sedang berjalan
@@ -1374,7 +1351,7 @@ class AbsensiService {
             if (!jadwalYangCocok) {
                 const jadwalPertama = jadwalTerurut[0];
                 const jamMulaiPertama = jadwalPertama.jamMengajar.jamMulai;
-                throw new BadRequestError(`Jam absen (${jam}) tidak valid. Jadwal mengajar pertama dimulai pada ${jamMulaiPertama}`);
+                throw ErrorFactory.badRequest(`Jam absen (${jam}) tidak valid. Jadwal mengajar pertama dimulai pada ${jamMulaiPertama}`);
             }
 
             // Cek absensi yang sudah ada untuk semua jadwal hari ini
@@ -1406,7 +1383,6 @@ class AbsensiService {
                         }
                     });
 
-                    logger.info(`Auto-created TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
                 } else if (existingAbsensiAutoUpdate.statusKehadiran === 'BELUM_ABSEN') {
                     // Hanya update status BELUM_ABSEN menjadi TIDAK_HADIR
                     await prisma.absensiGuru.update({
@@ -1418,10 +1394,8 @@ class AbsensiService {
                         }
                     });
 
-                    logger.info(`Auto-updated BELUM_ABSEN to TIDAK_HADIR for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai}`);
                 } else {
                     // Jika status bukan BELUM_ABSEN, tidak diubah (HADIR, TERLAMBAT, IZIN, SAKIT tetap tidak berubah)
-                    logger.info(`Skip auto-update for shift ${jadwalAutoUpdate.jamMengajar.jamMulai}-${jadwalAutoUpdate.jamMengajar.jamSelesai} with status ${existingAbsensiAutoUpdate.statusKehadiran}`);
                 }
             }
 
@@ -1432,15 +1406,15 @@ class AbsensiService {
             if (existingAbsensi) {
                 // Validasi: Jangan overwrite status yang sudah final
                 if (existingAbsensi.statusKehadiran === 'HADIR' && statusKehadiran === 'TIDAK_HADIR') {
-                    throw new BadRequestError(`Guru sudah hadir di shift ini. Tidak dapat mengubah status dari HADIR menjadi TIDAK_HADIR.`);
+                    throw ErrorFactory.badRequest(`Guru sudah hadir di shift ini. Tidak dapat mengubah status dari HADIR menjadi TIDAK_HADIR.`);
                 }
 
                 if (existingAbsensi.statusKehadiran === 'TERLAMBAT' && statusKehadiran === 'TIDAK_HADIR') {
-                    throw new BadRequestError(`Guru sudah terlambat di shift ini. Tidak dapat mengubah status dari TERLAMBAT menjadi TIDAK_HADIR.`);
+                    throw ErrorFactory.badRequest(`Guru sudah terlambat di shift ini. Tidak dapat mengubah status dari TERLAMBAT menjadi TIDAK_HADIR.`);
                 }
 
                 if (existingAbsensi.statusKehadiran === 'IZIN' || existingAbsensi.statusKehadiran === 'SAKIT') {
-                    throw new BadRequestError(`Guru sudah memiliki status ${existingAbsensi.statusKehadiran} di shift ini. Tidak dapat mengubah status.`);
+                    throw ErrorFactory.badRequest(`Guru sudah memiliki status ${existingAbsensi.statusKehadiran} di shift ini. Tidak dapat mengubah status.`);
                 }
 
                 // Update data absensi yang sudah ada
@@ -1479,7 +1453,6 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Updated absensi guru ${guru.nama} (RFID: ${rfid}) untuk tanggal ${tanggal} jam ${jam} - Status: ${statusKehadiran}`);
             } else {
                 // Buat data absensi baru
                 result = await prisma.absensiGuru.create({
@@ -1516,7 +1489,6 @@ class AbsensiService {
                     }
                 });
 
-                logger.info(`Created absensi guru ${guru.nama} (RFID: ${rfid}) untuk tanggal ${tanggal} jam ${jam} - Status: ${statusKehadiran}`);
             }
 
             return {
@@ -1553,7 +1525,6 @@ class AbsensiService {
             };
 
         } catch (error) {
-            logger.error('Error updating absensi guru with RFID:', error);
             throw error;
         }
     }
@@ -1565,7 +1536,7 @@ class AbsensiService {
             // Parse tanggal untuk mendapatkan hari
             const dateObj = moment(tanggal, DATE_FORMATS.DEFAULT);
             if (!dateObj.isValid()) {
-                throw new BadRequestError('Format tanggal tidak valid');
+                throw ErrorFactory.badRequest('Format tanggal tidak valid');
             }
 
             // Get current day name in Indonesian format
@@ -1693,9 +1664,7 @@ class AbsensiService {
                                 }
                             });
 
-                            logger.info(`Auto-created BELUM_ABSEN for guru ${guru.nama} in kelas program ${kelasProgram.id} on ${tanggal}`);
                         } catch (error) {
-                            logger.error(`Error creating BELUM_ABSEN record: ${error.message}`);
                             // Jika gagal create, tetap tampilkan dengan status BELUM_ABSEN
                         }
                     }
@@ -1783,7 +1752,6 @@ class AbsensiService {
                 data: transformedData
             };
         } catch (error) {
-            logger.error('Error getting today\'s absensi guru (public):', error);
             throw error;
         }
     }

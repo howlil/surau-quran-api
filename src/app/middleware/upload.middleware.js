@@ -1,7 +1,6 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const Http = require('../../lib/http');
 const { BadRequestError } = require('../../lib/http/errors.http');
 
 // Ensure upload directories exist
@@ -21,7 +20,6 @@ const createUploadDirectories = () => {
     });
 };
 
-// Create directories on startup
 createUploadDirectories();
 
 const storage = multer.diskStorage({

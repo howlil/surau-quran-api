@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class KelasValidation {
   static create() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaKelas: Joi.string().required()
         .messages({
           'string.empty': 'Nama kelas tidak boleh kosong',
@@ -22,7 +21,7 @@ class KelasValidation {
   }
 
   static update() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaKelas: Joi.string().optional()
         .messages({
           'string.empty': 'Nama kelas tidak boleh kosong'
@@ -41,7 +40,7 @@ class KelasValidation {
 
 
   static createKelasProgram() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kelasId: Joi.string().guid({ version: 'uuidv4' }).required()
         .messages({
           'string.guid': 'Kelas ID harus berupa UUID yang valid',
@@ -80,7 +79,7 @@ class KelasValidation {
   }
 
   static patchInitialStudentIntoClass() {
-    return ValidatorFactory.create({
+    return Joi.object({
       programId: Joi.string().guid({ version: 'uuidv4' }).optional()
         .messages({
           'string.guid': 'Program ID harus berupa UUID yang valid'
@@ -119,7 +118,7 @@ class KelasValidation {
   }
 
   static getInitialStudentQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       page: Joi.number().integer().min(1).default(1)
         .messages({
           'number.base': 'Page harus berupa angka',

@@ -23,11 +23,9 @@ class AbsensiCronService {
 
         const prismaDay = dayMapping[currentDay];
         if (!prismaDay) {
-            logger.warn('No classes scheduled for today (Sunday)');
             return { message: 'No classes scheduled for today (Sunday)' };
         }
 
-        logger.info(`Creating attendance records for ${currentDay} (${formattedDate})`);
 
         const kelasPrograms = await prisma.kelasProgram.findMany({
             where: {
@@ -39,17 +37,14 @@ class AbsensiCronService {
         });
 
         if (!kelasPrograms.length) {
-            logger.warn(`No classes found for ${currentDay}`);
             return { message: `No classes found for ${currentDay}` };
         }
 
-        logger.info(`Found ${kelasPrograms.length} classes for ${currentDay}`);
 
         const absensiRecords = [];
 
         for (const kelasProgram of kelasPrograms) {
             if (!kelasProgram.guru) {
-                logger.warn(`No teacher assigned to class ${kelasProgram.id}`);
                 continue;
             }
 
@@ -62,7 +57,6 @@ class AbsensiCronService {
             });
 
             if (existingAbsensi) {
-                logger.info(`Attendance record already exists for class ${kelasProgram.id} on ${formattedDate}`);
                 continue;
             }
 
@@ -84,7 +78,6 @@ class AbsensiCronService {
                 statusKehadiran: absensi.statusKehadiran
             });
 
-            logger.info(`Created attendance record for teacher ${kelasProgram.guru.nama} in class ${kelasProgram.id}`);
         }
 
         return {
@@ -112,11 +105,9 @@ class AbsensiCronService {
 
         const prismaDay = dayMapping[currentDay];
         if (!prismaDay) {
-            logger.warn('No classes scheduled for today (Sunday)');
             return { message: 'No classes scheduled for today (Sunday)' };
         }
 
-        logger.info(`Creating student attendance records for ${currentDay} (${formattedDate})`);
 
         const kelasPrograms = await prisma.kelasProgram.findMany({
             where: {
@@ -157,11 +148,9 @@ class AbsensiCronService {
         });
 
         if (!kelasPrograms.length) {
-            logger.warn(`No classes found for ${currentDay}`);
             return { message: `No classes found for ${currentDay}` };
         }
 
-        logger.info(`Found ${kelasPrograms.length} classes for ${currentDay}`);
 
         const absensiRecords = [];
 
@@ -189,7 +178,6 @@ class AbsensiCronService {
             ];
 
             if (allSiswa.length === 0) {
-                logger.warn(`No students found for class ${kelasProgram.id}`);
                 continue;
             }
 
@@ -204,7 +192,6 @@ class AbsensiCronService {
                 });
 
                 if (existingAbsensi) {
-                    logger.info(`Attendance record already exists for student ${siswa.namaSiswa} in class ${kelasProgram.id} on ${formattedDate}`);
                     continue;
                 }
 
@@ -228,7 +215,6 @@ class AbsensiCronService {
                     statusKehadiran: absensi.statusKehadiran
                 });
 
-                logger.info(`Created attendance record for student ${siswa.namaSiswa} (${siswa.isKelasPengganti ? 'substitute' : 'regular'}) in class ${kelasProgram.id}`);
             }
         }
 

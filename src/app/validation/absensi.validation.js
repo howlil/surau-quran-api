@@ -15,7 +15,6 @@ class AbsensiValidation {
                         return helpers.error('custom.invalidDate');
                     }
                     
-                    // Check if date falls on Sunday (day() === 0)
                     if (dateObj.day() === 0) {
                         return helpers.error('custom.sundayNotAllowed');
                     }

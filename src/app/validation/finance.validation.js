@@ -1,5 +1,4 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 const moment = require('moment');
 
 // Define valid categories based on type
@@ -9,7 +8,7 @@ const ALL_CATEGORIES = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
 
 class FinanceValidation {
     static create() {
-        return ValidatorFactory.create({
+        return Joi.object({
             tanggal: Joi.string()
                 .pattern(/^\d{2}-\d{2}-\d{4}$/)
                 .required()
@@ -46,7 +45,7 @@ class FinanceValidation {
     }
 
     static update() {
-        return ValidatorFactory.create({
+        return Joi.object({
             tanggal: Joi.string()
                 .pattern(/^\d{2}-\d{2}-\d{4}$/)
                 .optional()

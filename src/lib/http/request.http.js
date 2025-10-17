@@ -1,101 +1,42 @@
-class HttpRequest {
+class RequestHttp {
 
-  static getQueryParams(req, allowed = []) {
-    // Use validatedQuery when available, otherwise fallback to regular query
-    const querySource = req.validatedQuery || req.query;
-    const query = {};
+  constructor(req) {
+      this.req = req
+  }
 
-    if (allowed.length === 0) {
-      return { ...querySource };
-    }
-
-    allowed.forEach(param => {
-      if (querySource[param] !== undefined) {
-        query[param] = querySource[param];
+  #extract(source, allow = []) {
+      if (allow.length === 0) {
+          return { ...(source) }
       }
-    });
 
-    return query;
+      const result = {}
+
+      allow.forEach(field => {
+          if (source && source[field] !== undefined) {
+              result[field] = source[field];
+          }
+      });
+
+      return result
   }
 
-  static getBodyParams(req, allowed = []) {
-    const body = {};
-
-    if (allowed.length === 0) {
-      return { ...req.body };
-    }
-
-    allowed.forEach(param => {
-      if (req.body[param] !== undefined) {
-        body[param] = req.body[param];
-      }
-    });
-
-    return body;
+  getBody(allow = []) {
+      return this.#extract(this.req.body, allow)
   }
 
-  static getUrlParams(req, allowed = []) {
-    const params = {};
-
-    if (allowed.length === 0) {
-      return { ...req.params };
-    }
-
-    allowed.forEach(param => {
-      if (req.params[param] !== undefined) {
-        params[param] = req.params[param];
-      }
-    });
-
-    return params;
+  getQuery(allow = []) {
+      const querySource = this.req.validatedQuery || this.req.query || {};
+      return this.#extract(querySource, allow);
   }
 
-
-  static getIpAddress(req) {
-    return req.ip ||
-      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-      req.connection.remoteAddress;
+  getParams(allow = []) {
+      return this.#extract(this.req.params, allow);
   }
 
-
-  static getUserAgent(req) {
-    return req.headers['user-agent'] || '';
+  getHeaders(allow = []) {
+      return this.#extract(this.req.headers, allow);
   }
 
-
-  static getFiles(req) {
-    return req.files || {};
-  }
-
-
-  static isAjax(req) {
-    return req.xhr ||
-      req.headers['x-requested-with'] === 'XMLHttpRequest';
-  }
-
-
-  static getHeaders(req, allowed = []) {
-    const headers = {};
-
-    if (allowed.length === 0) {
-      return { ...req.headers };
-    }
-
-    allowed.forEach(header => {
-      if (req.headers[header.toLowerCase()] !== undefined) {
-        headers[header] = req.headers[header.toLowerCase()];
-      }
-    });
-
-    return headers;
-  }
-
-
-  static getAuthToken(req) {
-    const authHeader = req.headers.authorization || '';
-    const match = authHeader.match(/Bearer\s+(\S+)/i);
-    return match ? match[1] : null;
-  }
 }
 
-module.exports = HttpRequest;
+module.exports =  RequestHttp

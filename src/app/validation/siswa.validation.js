@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class SiswaValidation {
   static pendaftaranSiswa() {
-    return ValidatorFactory.create({
+    return Joi.object({
       namaMurid: Joi.string().min(3).max(191).required()
         .messages({
           'string.min': 'Nama murid minimal 3 karakter',
@@ -127,7 +126,7 @@ class SiswaValidation {
   }
 
   static adminUpdateSiswa() {
-    return ValidatorFactory.create({
+    return Joi.object({
       // Basic student information
       namaMurid: Joi.string().min(2).max(191).optional()
         .messages({
@@ -238,7 +237,7 @@ class SiswaValidation {
   }
 
   static getProfileQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       bulan: Joi.string().pattern(/^\d{2}-\d{4}$/).optional()
         .messages({
           'string.pattern.base': 'Format bulan harus MM-YYYY (contoh: 07-2025)'
@@ -260,7 +259,7 @@ class SiswaValidation {
   }
 
   static getAllSiswa() {
-    return ValidatorFactory.create({
+    return Joi.object({
       nama: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama minimal 1 karakter',
@@ -287,7 +286,7 @@ class SiswaValidation {
   }
 
   static getJadwalSiswa() {
-    return ValidatorFactory.create({
+    return Joi.object({
       rfid: Joi.string().min(1).max(191).required()
         .messages({
           'string.min': 'RFID minimal 1 karakter',
@@ -297,7 +296,7 @@ class SiswaValidation {
   }
 
   static pindahProgram() {
-    return ValidatorFactory.create({
+    return Joi.object({
       programBaruId: Joi.string().guid({ version: 'uuidv4' }).required()
         .messages({
           'string.guid': 'Program Baru ID harus berupa UUID yang valid',
@@ -324,7 +323,7 @@ class SiswaValidation {
   }
 
   static getPendaftaranInvoiceQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       tanggal: Joi.string().pattern(/^\d{2}-\d{2}-\d{4}$/).optional()
         .messages({
           'string.pattern.base': 'Format tanggal harus DD-MM-YYYY'
@@ -355,7 +354,7 @@ class SiswaValidation {
   }
 
   static pendaftaranSiswaV2() {
-    return ValidatorFactory.create({
+    return Joi.object({
       siswa: Joi.array().items(
         Joi.object({
           namaMurid: Joi.string().min(3).max(191).required()

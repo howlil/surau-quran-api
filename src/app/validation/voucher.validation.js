@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class VoucherValidation {
   static create() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kodeVoucher: Joi.string().uppercase().required()
         .messages({
           'string.empty': 'Kode voucher tidak boleh kosong',
@@ -33,7 +32,7 @@ class VoucherValidation {
   }
 
   static update() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kodeVoucher: Joi.string().uppercase().optional()
         .messages({
           'string.empty': 'Kode voucher tidak boleh kosong'
@@ -59,7 +58,7 @@ class VoucherValidation {
   }
 
   static getVoucherQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       nama: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama minimal 1 karakter',
@@ -82,7 +81,7 @@ class VoucherValidation {
   }
 
   static getVoucherByKode() {
-    return ValidatorFactory.create({
+    return Joi.object({
       kodeVoucher: Joi.string().uppercase().required()
         .messages({
           'string.empty': 'Kode voucher tidak boleh kosong',

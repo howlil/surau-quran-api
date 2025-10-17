@@ -1,163 +1,93 @@
 const winston = require('winston');
-const { format, transports, createLogger } = winston;
-const path = require('path');
-const fs = require('fs');
+const { createLogger, format, transports } = require('winston');
+const { combine, timestamp, printf, colorize } = format;
 require('dotenv').config();
 
-const logDirectory = path.join(process.cwd(), 'logs');
-if (!fs.existsSync(logDirectory)) {
-  fs.mkdirSync(logDirectory);
-}
-
 class LoggerConfig {
+  static levels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    debug: 5
+  };
+
+  static colors = {
+    error: 'red',
+    warn: 'yellow',
+    info: 'green',
+    http: 'magenta',
+    debug: 'blue',
+  };
+
   constructor() {
-    this.levels = {
-      error: 0,
-      warn: 1,
-      info: 2,
-      http: 3,
-      verbose: 4,
-      debug: 5,
-      silly: 6
-    };
-
-    this.colors = {
-      error: 'red',
-      warn: 'yellow',
-      info: 'green',
-      http: 'magenta',
-      verbose: 'cyan',
-      debug: 'blue',
-      silly: 'gray'
-    };
-
-    winston.addColors(this.colors);
-
-    // Format utk console (warna-warni)
-    this.consoleFormat = format.combine(
-      format.colorize({ all: true }),
-      format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      format.printf(info => {
-        // Handle multiple arguments ("splat") supaya semua argumen kelihatan
-        const splat = info[Symbol.for('splat')];
-        let msg = info.message;
-        if (splat) {
-          msg += ' ' + splat.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-          ).join(' ');
-        }
-        return `${info.timestamp} ${info.level}: ${msg}${info.stack ? '\n' + info.stack : ''}`;
-      })
-    );
-
-    // Format utk file (tanpa warna, lebih rapi)
-    this.fileFormat = format.combine(
-      format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      format.printf(info => {
-        // Splat handle biar banyak argumen bisa ikut ke log
-        const splat = info[Symbol.for('splat')];
-        let msg = info.message;
-        if (splat) {
-          msg += ' ' + splat.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-          ).join(' ');
-        }
-        return `${info.timestamp} ${info.level}: ${msg}${info.stack ? '\n' + info.stack : ''}`;
-      })
-    );
-
-    this.jsonFileFormat = format.combine(
-      format.timestamp(),
-      format.errors({ stack: true }),
-      format.json()
-    );
-
-    this.logger = this.createLogger();
+    winston.addColors(LoggerConfig.colors);
+    this.logger = this.#createLogger();
   }
 
-  getLogLevel() {
-    const env = process.env.NODE_ENV || 'development';
-    return env === 'production' ? 'info' : 'debug';
-  }
-
-  createLogger() {
-    const env = process.env.NODE_ENV || 'development';
-
-    const transportList = [
-      // Console pake format warna-warni
-      new transports.Console({
-        level: this.getLogLevel(),
-        format: this.consoleFormat,
-      }),
-      // File log (tanpa warna)
-      new transports.File({
-        filename: path.join(logDirectory, 'combined.log'),
-        level: 'debug',
-        format: this.fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-      new transports.File({
-        filename: path.join(logDirectory, 'warn.log'),
-        level: 'warn',
-        format: this.fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-      new transports.File({
-        filename: path.join(logDirectory, 'info.log'),
-        level: 'info',
-        format: this.fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-      new transports.File({
-        filename: path.join(logDirectory, 'errors.log'),
-        level: 'error',
-        format: this.fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-      new transports.File({
-        filename: path.join(logDirectory, 'http.log'),
-        level: 'http',
-        format: this.fileFormat,
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-    ];
-
-    const logger = createLogger({
-      level: this.getLogLevel(),
+  #createLogger() {
+    return this.logger = createLogger({
       levels: this.levels,
-      transports: transportList,
+      transports: this.#getTransports(),
       exitOnError: false
     });
-
-    logger.stream = {
-      write: (message) => {
-        logger.http(message.trim());
-      }
-    };
-
-    return logger;
   }
+
+  #fileFormat() {
+    return format.combine(
+      format.timestamp({ format: ' HH:mm:ss DD-MM-YYYY' }),
+      format.json(),
+      format.errors({ stack: true }),
+    );
+  }
+
+  #consoleFormat() {
+    return combine(
+      colorize({ all: true }),
+      timestamp({ format: ' HH:mm:ss DD-MM-YYYY' }),
+      format.errors({ stack: true }),
+      printf(({ timestamp, level, message, stack }) => {
+        return `${timestamp} ${level}: ${stack || message}`;
+      })
+    );
+  }
+
+  #getTransports() {
+    const transportsList = [
+      new transports.Console({
+        format: this.#consoleFormat(),
+        level: this.#getLogLevel(),
+      }),
+
+      new transports.File({
+        filename: 'logs/info/app.log',
+        format: this.#fileFormat(),
+        level: 'info',
+      }),
+
+      new transports.File({
+        filename: 'logs/errors/error.log',
+        format: this.#fileFormat(),
+        level: 'error',
+      }),
+
+      new transports.File({
+        filename: 'logs/info/http.log',
+        format: this.#fileFormat(),
+        level: 'http',
+      }),
+    ]
+    return transportsList;
+  }
+
+  #getLogLevel() {
+    return process.env.NODE_ENV = "development" ? 'debug' : 'info';
+  }
+
 
   getLogger() {
     return this.logger;
   }
-
-  static getInstance() {
-    if (!LoggerConfig.instance) {
-      LoggerConfig.instance = new LoggerConfig();
-    }
-    return LoggerConfig.instance;
-  }
 }
 
-LoggerConfig.instance = null;
-
-module.exports = {
-  logger: LoggerConfig.getInstance().getLogger(),
-  stream: LoggerConfig.getInstance().getLogger().stream
-};
+module.exports = new LoggerConfig().getLogger();

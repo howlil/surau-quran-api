@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class AuthValidation {
   static login() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().required()
         .messages({
           'string.email': 'Email harus valid',
@@ -22,7 +21,7 @@ class AuthValidation {
   }
 
   static createGuru() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().required()
         .messages({
           'string.email': 'Email harus valid',
@@ -64,7 +63,7 @@ class AuthValidation {
   }
 
   static createAdmin() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().required()
         .messages({
           'string.email': 'Email harus valid',
@@ -87,7 +86,7 @@ class AuthValidation {
   }
 
   static updateAdmin() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string().email().optional()
         .messages({
           'string.email': 'Email harus valid'
@@ -105,7 +104,7 @@ class AuthValidation {
   }
 
   static forgotPassword() {
-    return ValidatorFactory.create({
+    return Joi.object({
       email: Joi.string()
         .email()
         .required()
@@ -117,7 +116,7 @@ class AuthValidation {
   }
 
   static resetPassword() {
-    return ValidatorFactory.create({
+    return Joi.object({
       token: Joi.string()
         .required()
         .messages({
@@ -136,7 +135,7 @@ class AuthValidation {
   }
 
   static changePassword() {
-    return ValidatorFactory.create({
+    return Joi.object({
       oldPassword: Joi.string()
         .required()
         .messages({
@@ -155,7 +154,7 @@ class AuthValidation {
   }
 
   static getAdminQuery() {
-    return ValidatorFactory.create({
+    return Joi.object({
       nama: Joi.string().min(1).max(191).optional()
         .messages({
           'string.min': 'Nama minimal 1 karakter',
@@ -178,7 +177,7 @@ class AuthValidation {
   }
 
   static checkRoleByRfid() {
-    return ValidatorFactory.create({
+    return Joi.object({
       rfid: Joi.string().required()
         .messages({
           'any.required': 'RFID wajib diisi'

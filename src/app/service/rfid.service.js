@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class RfidService {
@@ -105,7 +104,6 @@ class RfidService {
                 }
             };
         } catch (error) {
-            logger.error('Error searching users:', error);
             throw error;
         }
     }
@@ -122,12 +120,12 @@ class RfidService {
             });
 
             if (!user) {
-                throw new NotFoundError(`User dengan ID ${userId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`User dengan ID ${userId} tidak ditemukan`);
             }
 
             // Check if user already has RFID
             if (user.rfid) {
-                throw new ConflictError(`User sudah memiliki RFID: ${user.rfid}`);
+                throw ErrorFactory.badRequest(`User sudah memiliki RFID: ${user.rfid}`);
             }
 
             // Check if RFID already exists
@@ -136,7 +134,7 @@ class RfidService {
             });
 
             if (existingRfid) {
-                throw new ConflictError(`RFID ${rfidCode} sudah terdaftar untuk user lain`);
+                throw ErrorFactory.badRequest(`RFID ${rfidCode} sudah terdaftar untuk user lain`);
             }
 
             // Update user with RFID
@@ -151,8 +149,6 @@ class RfidService {
 
             const userName = updatedUser.guru?.nama || updatedUser.siswa?.namaMurid || 'Unknown';
             
-            logger.info(`RFID ${rfidCode} berhasil didaftarkan untuk user: ${userName} (${updatedUser.role})`);
-
             return {
                 userId: updatedUser.id,
                 nama: userName,
@@ -162,7 +158,6 @@ class RfidService {
                 registeredAt: new Date()
             };
         } catch (error) {
-            logger.error('Error registering RFID:', error);
             throw error;
         }
     }
@@ -179,7 +174,7 @@ class RfidService {
             });
 
             if (!user) {
-                throw new NotFoundError(`User dengan ID ${userId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`User dengan ID ${userId} tidak ditemukan`);
             }
 
             if (!user.rfid) {
@@ -195,7 +190,7 @@ class RfidService {
             });
 
             if (existingRfid) {
-                throw new ConflictError(`RFID ${newRfidCode} sudah terdaftar untuk user lain`);
+                throw ErrorFactory.badRequest(`RFID ${newRfidCode} sudah terdaftar untuk user lain`);
             }
 
             const oldRfid = user.rfid;
@@ -212,8 +207,6 @@ class RfidService {
 
             const userName = updatedUser.guru?.nama || updatedUser.siswa?.namaMurid || 'Unknown';
             
-            logger.info(`RFID updated for user: ${userName} (${updatedUser.role}) from ${oldRfid} to ${newRfidCode}`);
-
             return {
                 userId: updatedUser.id,
                 nama: userName,
@@ -224,7 +217,6 @@ class RfidService {
                 updatedAt: new Date()
             };
         } catch (error) {
-            logger.error('Error updating RFID:', error);
             throw error;
         }
     }
@@ -241,7 +233,7 @@ class RfidService {
             });
 
             if (!user) {
-                throw new NotFoundError(`User dengan ID ${userId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`User dengan ID ${userId} tidak ditemukan`);
             }
 
             if (!user.rfid) {
@@ -258,8 +250,6 @@ class RfidService {
 
             const userName = user.guru?.nama || user.siswa?.namaMurid || 'Unknown';
             
-            logger.info(`RFID ${deletedRfid} berhasil dihapus untuk user: ${userName} (${user.role})`);
-
             return {
                 userId: user.id,
                 nama: userName,
@@ -269,7 +259,6 @@ class RfidService {
                 deletedAt: new Date()
             };
         } catch (error) {
-            logger.error('Error deleting RFID:', error);
             throw error;
         }
     }
@@ -405,7 +394,6 @@ class RfidService {
                 }
             };
         } catch (error) {
-            logger.error('Error getting RFID list:', error);
             throw error;
         }
     }

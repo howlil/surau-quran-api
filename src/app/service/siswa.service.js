@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const PasswordUtils = require('../../lib/utils/password.utils');
@@ -47,7 +46,7 @@ class SiswaService {
       });
 
       if (existingUser) {
-        throw new ConflictError(`Email ${email} sudah terdaftar`);
+        throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar`);
       }
 
       const existingPendaftaranTemp = await prisma.pendaftaranTemp.findFirst({
@@ -63,7 +62,6 @@ class SiswaService {
 
         // If there's an expired or failed registration, delete it
         if (existingPayment && ['EXPIRED', 'FAILED'].includes(existingPayment.statusPembayaran)) {
-          logger.info(`Found expired/failed registration for email ${email}, cleaning up...`);
           await prisma.$transaction(async (tx) => {
             // Delete the payment record first
             await tx.pembayaran.delete({
@@ -74,9 +72,8 @@ class SiswaService {
               where: { id: existingPendaftaranTemp.id }
             });
           });
-          logger.info(`Successfully cleaned up expired/failed registration for email ${email}`);
         } else if (existingPayment && existingPayment.statusPembayaran === 'PENDING') {
-          throw new ConflictError(`Email ${email} sedang dalam proses pendaftaran`);
+          throw ErrorFactory.badRequest(`Email ${email} sedang dalam proses pendaftaran`);
         }
       }
 
@@ -97,9 +94,9 @@ class SiswaService {
 
       if (existingSiswa) {
         if (existingSiswa.programSiswa.length > 0) {
-          throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
+          throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
         }
-        throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa`);
+        throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai siswa`);
       }
 
       const program = await prisma.program.findUnique({
@@ -107,7 +104,7 @@ class SiswaService {
       });
 
       if (!program) {
-        throw new NotFoundError(`Program dengan ID ${programId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Program dengan ID ${programId} tidak ditemukan`);
       }
 
       let actualDiskon = 0;
@@ -123,7 +120,7 @@ class SiswaService {
         });
 
         if (!voucher) {
-          throw new NotFoundError(`Voucher ${kodeVoucher} tidak valid atau tidak aktif`);
+          throw ErrorFactory.notFound(`Voucher ${kodeVoucher} tidak valid atau tidak aktif`);
         }
 
         // Set voucherId for later use
@@ -134,12 +131,12 @@ class SiswaService {
 
           // Validasi diskon nominal tidak boleh lebih besar dari biaya pendaftaran
           if (actualDiskon >= Number(jumlahPembayaran)) {
-            throw new BadRequestError(`Diskon voucher Rp ${actualDiskon.toLocaleString('id-ID')} tidak boleh lebih besar atau sama dengan biaya pendaftaran Rp ${Number(jumlahPembayaran).toLocaleString('id-ID')}`);
+            throw ErrorFactory.badRequest(`Diskon voucher Rp ${actualDiskon.toLocaleString('id-ID')} tidak boleh lebih besar atau sama dengan biaya pendaftaran Rp ${Number(jumlahPembayaran).toLocaleString('id-ID')}`);
           }
         } else if (voucher.tipe === 'PERSENTASE') {
           // Validasi persentase maksimal 100%
           if (Number(voucher.nominal) > 100) {
-            throw new BadRequestError(`Persentase diskon tidak boleh lebih dari 100%`);
+            throw ErrorFactory.badRequest(`Persentase diskon tidak boleh lebih dari 100%`);
           }
 
           actualDiskon = Number(jumlahPembayaran) * (Number(voucher.nominal) / 100);
@@ -149,13 +146,13 @@ class SiswaService {
 
         // Validasi total biaya minimal Rp 1.000 (requirement Xendit)
         if (calculatedTotal < 1000) {
-          throw new BadRequestError(`Total biaya setelah diskon minimal Rp 1.000. Saat ini: Rp ${calculatedTotal.toLocaleString('id-ID')}`);
+          throw ErrorFactory.badRequest(`Total biaya setelah diskon minimal Rp 1.000. Saat ini: Rp ${calculatedTotal.toLocaleString('id-ID')}`);
         }
       }
 
       if (totalBiaya !== undefined) {
         if (Math.abs(calculatedTotal - Number(totalBiaya)) > 0.01) {
-          throw new BadRequestError('Total biaya tidak sesuai dengan perhitungan diskon');
+          throw ErrorFactory.badRequest('Total biaya tidak sesuai dengan perhitungan diskon');
         }
       }
 
@@ -217,7 +214,6 @@ class SiswaService {
           }
         });
 
-        logger.info(`Created pendaftaran temp with ID: ${pendaftaranTemp.id} for email: ${email}`);
 
         return {
           pendaftaranId: pendaftaranTemp.id,
@@ -225,7 +221,6 @@ class SiswaService {
         };
       }
     } catch (error) {
-      logger.error('Error creating pendaftaran:', error);
       throw error;
     }
   }
@@ -254,7 +249,6 @@ class SiswaService {
         evidence
       } = data;
 
-      logger.info(`Creating siswa directly from tunai payment for email: ${email}`);
 
       // Buat pembayaran dengan status PAID untuk tunai
       const pembayaran = await prisma.pembayaran.create({
@@ -330,7 +324,6 @@ class SiswaService {
         metodePembayaran: 'TUNAI'
       });
 
-      logger.info(`Successfully created siswa with tunai payment:`, {
         userId: user.id,
         siswaId: siswa.id,
         pembayaranId: pembayaran.id,
@@ -339,7 +332,6 @@ class SiswaService {
 
       const tanggalDaftar = moment().format(DATE_FORMATS.DEFAULT);
       const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
-      logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswa.namaMurid}`);
 
       return {
         success: true,
@@ -356,7 +348,6 @@ class SiswaService {
         }
       };
     } catch (error) {
-      logger.error('Error creating siswa from tunai payment:', error);
       throw error;
     }
   }
@@ -376,7 +367,6 @@ class SiswaService {
         hubunganKeluarga
       } = data;
 
-      logger.info(`Creating ${siswa.length} siswa directly from tunai payment V2`);
 
       const pembayaran = await prisma.pembayaran.create({
         data: {
@@ -472,7 +462,6 @@ class SiswaService {
         metodePembayaran: 'TUNAI'
       });
 
-      logger.info(`Successfully created ${siswa.length} siswa with tunai payment V2:`, {
         pembayaranId: pembayaran.id,
         siswaCount: createdSiswa.length
       });
@@ -487,7 +476,6 @@ class SiswaService {
         
         if (programSiswa) {
           const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
-          logger.info(`Generated ${sppRecords.length} SPP records for siswa: ${siswaData.namaMurid}`);
           return sppRecords;
         }
         return [];
@@ -507,7 +495,6 @@ class SiswaService {
         }
       };
     } catch (error) {
-      logger.error('Error creating siswa V2 from tunai payment:', error);
       throw error;
     }
   }
@@ -535,7 +522,6 @@ class SiswaService {
     const pagedInvoices = filteredInvoices.slice(startIdx, startIdx + Number(limit));
     const result = [];
 
-    logger.info(pagedInvoices)
 
     for (const invoice of pagedInvoices) {
       // 1. Ambil pembayaranId dari XenditPayment
@@ -882,7 +868,6 @@ class SiswaService {
 
           if (activeProgram) {
             selectedProgram = activeProgram;
-            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
           } else {
             // 2. Prioritas kedua: program yang CUTI (yang terbaru diupdate)
             const cutiProgram = siswa.programSiswa
@@ -891,7 +876,6 @@ class SiswaService {
 
             if (cutiProgram) {
               selectedProgram = cutiProgram;
-              logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
             } else {
               // 3. Prioritas ketiga: program TIDAK_AKTIF yang terbaru diupdate
               selectedProgram = siswa.programSiswa
@@ -899,16 +883,13 @@ class SiswaService {
                 .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
 
               if (selectedProgram) {
-                logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgram.program?.namaProgram}`);
               }
             }
           }
 
           // Debug log untuk semua program siswa (untuk tracking)
           if (siswa.programSiswa.length > 1) {
-            logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki ${siswa.programSiswa.length} program:`);
             siswa.programSiswa.forEach((program, index) => {
-              logger.info(`  Program ${index + 1}: ${program.program?.namaProgram} - Status: ${program.status} - Updated: ${program.updatedAt}`);
             });
           }
         }
@@ -926,7 +907,6 @@ class SiswaService {
 
         // Debug log untuk siswa yang statusnya CUTI
         if (selectedProgram && selectedProgram.status === 'CUTI') {
-          logger.info(`Siswa ${siswa.namaMurid} (${siswa.nis}) memiliki status program: ${selectedProgram.status} pada program: ${selectedProgram.program?.namaProgram}`);
         }
 
         return transformedSiswa;
@@ -937,7 +917,6 @@ class SiswaService {
         data: transformedData
       };
     } catch (error) {
-      logger.error('Error getting all siswa:', error);
       throw error;
     }
   }
@@ -976,7 +955,7 @@ class SiswaService {
       });
 
       if (!siswa) {
-        throw new NotFoundError('Profil siswa tidak ditemukan');
+        throw ErrorFactory.notFound('Profil siswa tidak ditemukan');
       }
 
       // Pilih program yang akan ditampilkan (prioritaskan AKTIF -> CUTI -> TIDAK_AKTIF)
@@ -987,7 +966,6 @@ class SiswaService {
 
         if (activeProgram) {
           selectedProgramSiswa = activeProgram;
-          logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program AKTIF: ${activeProgram.program?.namaProgram}`);
         } else {
           // 2. Prioritas kedua: program yang CUTI (yang terbaru diupdate)
           const cutiProgram = siswa.programSiswa
@@ -996,7 +974,6 @@ class SiswaService {
 
           if (cutiProgram) {
             selectedProgramSiswa = cutiProgram;
-            logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program CUTI: ${cutiProgram.program?.namaProgram}`);
           } else {
             // 3. Prioritas ketiga: program TIDAK_AKTIF yang terbaru diupdate
             selectedProgramSiswa = siswa.programSiswa
@@ -1004,7 +981,6 @@ class SiswaService {
               .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
 
             if (selectedProgramSiswa) {
-              logger.info(`Profile siswa ${siswa.namaMurid} (${siswa.nis}) menggunakan program TIDAK_AKTIF terbaru: ${selectedProgramSiswa.program?.namaProgram}`);
             }
           }
         }
@@ -1018,7 +994,7 @@ class SiswaService {
       if (bulan) {
         const [month, year] = bulan.split('-');
         if (!month || !year || month.length !== 2 || year.length !== 4) {
-          throw new BadRequestError('Format bulan harus MM-YYYY');
+          throw ErrorFactory.badRequest('Format bulan harus MM-YYYY');
         }
 
         // Use pattern matching for DD-MM-YYYY format in database
@@ -1026,7 +1002,6 @@ class SiswaService {
           contains: `-${month}-${year}`
         };
 
-        logger.info(`Filtering absensi for month ${bulan}: pattern "-${month}-${year}"`);
       }
 
       // Get the total count of attendance records matching the filter
@@ -1102,7 +1077,6 @@ class SiswaService {
         }
       };
     } catch (error) {
-      logger.error('Error getting profile siswa:', error);
       throw error;
     }
   }
@@ -1129,7 +1103,7 @@ class SiswaService {
       });
 
       if (!siswa) {
-        throw new NotFoundError(`Siswa dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Siswa dengan ID ${id} tidak ditemukan`);
       }
 
       // Ekstrak data dasar siswa
@@ -1192,7 +1166,7 @@ class SiswaService {
           });
 
           if (existingUser) {
-            throw new ConflictError(`Email ${email} sudah digunakan`);
+            throw ErrorFactory.badRequest(`Email ${email} sudah digunakan`);
           }
 
           await tx.user.update({
@@ -1213,7 +1187,7 @@ class SiswaService {
             });
 
             if (existingRfid) {
-              throw new ConflictError(`RFID ${rfid} sudah terdaftar untuk user lain`);
+              throw ErrorFactory.badRequest(`RFID ${rfid} sudah terdaftar untuk user lain`);
             }
           }
 
@@ -1257,13 +1231,11 @@ class SiswaService {
                 }
               });
 
-              logger.info(`Deactivated ${activeProgramSiswas.length - 1} other active programs for siswa ${siswa.id}`);
             }
 
             programSiswaInstance = currentProgramSiswa;
             programSiswaInstance.programId = programId; // Update for subsequent use
 
-            logger.info(`Program siswa diupdate: ${currentProgramSiswa.id} -> Program ID: ${programId}`);
           } else {
             // Only create new if no active program exists (edge case)
             programSiswaInstance = await tx.programSiswa.create({
@@ -1274,7 +1246,6 @@ class SiswaService {
               }
             });
 
-            logger.info(`Program siswa baru dibuat: ${programSiswaInstance.id} -> Program ID: ${programId}`);
           }
         } else {
           // If no programId provided, use existing active program
@@ -1296,7 +1267,6 @@ class SiswaService {
             orderBy: { urutan: 'asc' }
           });
 
-          logger.info(`Current jadwal count: ${currentJadwals.length}, New jadwal count: ${jadwal.length}`);
 
           // Count schedules properly:
           // - Existing schedules that will be updated (with id)
@@ -1309,10 +1279,9 @@ class SiswaService {
           // Calculate final count: current - deleted + added
           const finalScheduleCount = currentJadwals.length - schedulesToDelete.length + schedulesToAdd.length;
 
-          logger.info(`Schedules to update: ${schedulesToUpdate.length}, to add: ${schedulesToAdd.length}, to delete: ${schedulesToDelete.length}, final count: ${finalScheduleCount}`);
 
           if (finalScheduleCount > 2) {
-            throw new BadRequestError('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
+            throw ErrorFactory.badRequest('Setiap siswa hanya boleh memiliki maksimal 2 jadwal per program.');
           }
 
           // Sort jadwal by hari to ensure consistent ordering
@@ -1330,12 +1299,11 @@ class SiswaService {
                 await tx.jadwalProgramSiswa.delete({
                   where: { id: jadwalItem.id }
                 });
-                logger.info(`Deleted jadwal: ${jadwalItem.id}`);
               }
             } else if (jadwalItem.id) {
               // Update existing schedule
               if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
-                throw new BadRequestError('Hari dan Jam Mengajar ID wajib diisi untuk mengubah jadwal');
+                throw ErrorFactory.badRequest('Hari dan Jam Mengajar ID wajib diisi untuk mengubah jadwal');
               }
 
               // Verify the jamMengajar exists
@@ -1343,7 +1311,7 @@ class SiswaService {
                 where: { id: jadwalItem.jamMengajarId }
               });
               if (!jamMengajar) {
-                throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
               }
 
               await tx.jadwalProgramSiswa.update({
@@ -1354,19 +1322,18 @@ class SiswaService {
                   urutan: currentUrutan
                 }
               });
-              logger.info(`Updated jadwal: ${jadwalItem.id} -> ${jadwalItem.hari} ${jamMengajar.jamMulai}-${jamMengajar.jamSelesai}`);
               currentUrutan++;
             } else {
               // Create new schedule
               if (!jadwalItem.hari || !jadwalItem.jamMengajarId) {
-                throw new BadRequestError('Hari dan Jam Mengajar ID wajib diisi untuk jadwal baru');
+                throw ErrorFactory.badRequest('Hari dan Jam Mengajar ID wajib diisi untuk jadwal baru');
               }
 
               const jamMengajar = await tx.jamMengajar.findUnique({
                 where: { id: jadwalItem.jamMengajarId }
               });
               if (!jamMengajar) {
-                throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
               }
 
               await tx.jadwalProgramSiswa.create({
@@ -1377,7 +1344,6 @@ class SiswaService {
                   urutan: currentUrutan
                 }
               });
-              logger.info(`Created new jadwal: ${jadwalItem.hari} ${jamMengajar.jamMulai}-${jamMengajar.jamSelesai}`);
               currentUrutan++;
             }
           }
@@ -1405,10 +1371,9 @@ class SiswaService {
           }
         } else if (jadwal && jadwal.length > 0 && !programSiswaInstance) {
           // If jadwal is provided but no programSiswaInstance, throw error
-          throw new BadRequestError('Program ID wajib diisi untuk menambah atau mengubah jadwal');
+          throw ErrorFactory.badRequest('Program ID wajib diisi untuk menambah atau mengubah jadwal');
         }
 
-        logger.info(`Admin updated siswa with ID: ${id}`);
 
         // Ambil data siswa yang telah diperbarui dengan relasi yang lengkap
         const updatedSiswaWithRelations = await tx.siswa.findUnique({
@@ -1440,7 +1405,6 @@ class SiswaService {
         return updatedSiswaWithRelations;
       });
     } catch (error) {
-      logger.error(`Error in admin update siswa for ID ${id}:`, error);
       throw error;
     }
   }
@@ -1473,7 +1437,7 @@ class SiswaService {
       });
 
       if (!programSiswa) {
-        throw new NotFoundError(`Program siswa tidak ditemukan untuk siswa ID ${siswaId}${programId ? ` dan program ID ${programId}` : ''}`);
+        throw ErrorFactory.notFound(`Program siswa tidak ditemukan untuk siswa ID ${siswaId}${programId ? ` dan program ID ${programId}` : ''}`);
       }
 
       const oldStatus = programSiswa.status;
@@ -1534,7 +1498,6 @@ class SiswaService {
         }
       });
 
-      logger.info(`Successfully updated status for siswa ${updatedProgramSiswa.siswa.namaMurid} (${updatedProgramSiswa.siswa.nis}) from ${oldStatus} to ${status} in program ${updatedProgramSiswa.program.namaProgram}`);
 
       return {
         programId: updatedProgramSiswa.programId,
@@ -1552,7 +1515,6 @@ class SiswaService {
         statusBaru: status
       };
     } catch (error) {
-      logger.error(`Error updating status for siswa ID ${siswaId}:`, error);
       throw error;
     }
   }
@@ -1631,7 +1593,6 @@ class SiswaService {
         periodeSppId: periodeSppId
       };
     } catch (error) {
-      logger.error(`Error getting SPP this month status for siswa ${siswaId}:`, error);
       // Return default values on error
       return {
         spp: false,
@@ -1712,10 +1673,10 @@ class SiswaService {
         });
 
         if (!siswa) {
-          throw new NotFoundError(`Siswa dengan RFID ${rfid} tidak ditemukan`);
+          throw ErrorFactory.notFound(`Siswa dengan RFID ${rfid} tidak ditemukan`);
         }
       } else {
-        throw new BadRequestError('Parameter RFID wajib diisi');
+        throw ErrorFactory.badRequest('Parameter RFID wajib diisi');
       }
 
       // Get SPP status for this month
@@ -1726,7 +1687,6 @@ class SiswaService {
 
       // Process each active program
       for (const programSiswa of siswa.programSiswa) {
-        logger.info(`Processing program ${programSiswa.program.namaProgram} for siswa ${siswa.namaMurid}`);
 
         // Group jadwal by kelas program
         const kelasPrograms = new Map();
@@ -1734,7 +1694,6 @@ class SiswaService {
         // Add from kelasProgram if exists (this is the main schedule)
         if (programSiswa.kelasProgram) {
           const kp = programSiswa.kelasProgram;
-          logger.info(`Found kelas program: ${kp.kelas?.namaKelas} for program: ${kp.program.namaProgram}`);
 
           const scheduleEntry = {
             kelasProgramId: kp.id,
@@ -1751,17 +1710,14 @@ class SiswaService {
               jamMulai: kp.jamMengajar.jamMulai,
               jamSelesai: kp.jamMengajar.jamSelesai
             });
-            logger.info(`Added jam mengajar from kelas program: ${kp.jamMengajar.jamMulai} - ${kp.jamMengajar.jamSelesai}`);
           }
 
           kelasPrograms.set(kp.id, scheduleEntry);
         }
 
         // Add from JadwalProgramSiswa (additional schedules) - avoid duplicates
-        logger.info(`Found ${programSiswa.JadwalProgramSiswa.length} jadwal program siswa`);
 
         for (const jadwal of programSiswa.JadwalProgramSiswa) {
-          logger.info(`Processing jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
 
           // Find or create kelasProgram entry
           const kelasProgram = await prisma.kelasProgram.findFirst({
@@ -1787,7 +1743,6 @@ class SiswaService {
           });
 
           if (kelasProgram) {
-            logger.info(`Found matching kelas program: ${kelasProgram.kelas?.namaKelas}`);
 
             if (!kelasPrograms.has(kelasProgram.id)) {
               kelasPrograms.set(kelasProgram.id, {
@@ -1814,18 +1769,14 @@ class SiswaService {
                 jamMulai: jadwal.jamMengajar.jamMulai,
                 jamSelesai: jadwal.jamMengajar.jamSelesai
               });
-              logger.info(`Added unique jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
             } else {
-              logger.info(`Skipped duplicate jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
             }
           } else {
-            logger.warn(`No matching kelas program found for jadwal: ${jadwal.hari} at ${jadwal.jamMengajar.jamMulai} - ${jadwal.jamMengajar.jamSelesai}`);
           }
         }
 
         // If no schedules found from either source, create a basic entry
         if (kelasPrograms.size === 0) {
-          logger.warn(`No schedules found for program ${programSiswa.program.namaProgram}, creating basic entry`);
 
           // Try to find any kelas program for this program
           const anyKelasProgram = await prisma.kelasProgram.findFirst({
@@ -1899,10 +1850,8 @@ class SiswaService {
         SPPThisMonth: sppThisMonth
       };
 
-      logger.info(`Retrieved jadwal for siswa with RFID: ${rfid}, found ${schedules.length} schedules`);
       return result;
     } catch (error) {
-      logger.error(`Error getting jadwal siswa with RFID ${rfid}:`, error);
       throw error;
     }
   }
@@ -1913,11 +1862,11 @@ class SiswaService {
 
       // Validate required fields
       if (!programId) {
-        throw new BadRequestError('Program ID wajib diisi');
+        throw ErrorFactory.badRequest('Program ID wajib diisi');
       }
 
       if (!siswa || !Array.isArray(siswa) || siswa.length === 0) {
-        throw new BadRequestError('Data siswa wajib diisi');
+        throw ErrorFactory.badRequest('Data siswa wajib diisi');
       }
 
       // Validate each student's email to prevent duplicate registrations
@@ -1930,7 +1879,7 @@ class SiswaService {
         });
 
         if (existingUser) {
-          throw new ConflictError(`Email ${email} sudah terdaftar sebagai user`);
+          throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai user`);
         }
 
         // Check if email exists in siswa table through pendaftaranTemp
@@ -1946,7 +1895,6 @@ class SiswaService {
 
           // If there's an expired or failed registration, delete it
           if (existingPayment && ['EXPIRED', 'FAILED'].includes(existingPayment.statusPembayaran)) {
-            logger.info(`Found expired/failed registration for email ${email}, cleaning up...`);
             await prisma.$transaction(async (tx) => {
               // Delete the payment record first
               await tx.pembayaran.delete({
@@ -1957,9 +1905,8 @@ class SiswaService {
                 where: { id: existingPendaftaranTemp.id }
               });
             }, { timeout: 15000, maxWait: 5000 });
-            logger.info(`Successfully cleaned up expired/failed registration for email ${email}`);
           } else if (existingPayment && existingPayment.statusPembayaran === 'PENDING') {
-            throw new ConflictError(`Email ${email} sedang dalam proses pendaftaran`);
+            throw ErrorFactory.badRequest(`Email ${email} sedang dalam proses pendaftaran`);
           }
         }
 
@@ -1977,9 +1924,9 @@ class SiswaService {
 
         if (existingSiswa) {
           if (existingSiswa.programSiswa.length > 0) {
-            throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
+            throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai siswa dengan program aktif. Untuk mengubah program, silakan hubungi admin.`);
           }
-          throw new ConflictError(`Email ${email} sudah terdaftar sebagai siswa`);
+          throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai siswa`);
         }
 
         // Check if email exists in siswaPrivateTemp table
@@ -1988,7 +1935,7 @@ class SiswaService {
         });
 
         if (existingSiswaPrivateTemp) {
-          throw new ConflictError(`Email ${email} sedang dalam proses pendaftaran private`);
+          throw ErrorFactory.badRequest(`Email ${email} sedang dalam proses pendaftaran private`);
         }
       }
 
@@ -2003,7 +1950,7 @@ class SiswaService {
       });
 
       if (!program) {
-        throw new NotFoundError('Program tidak ditemukan');
+        throw ErrorFactory.notFound('Program tidak ditemukan');
       }
 
       // Determine program type based on name
@@ -2015,12 +1962,12 @@ class SiswaService {
 
       // Validate kartu keluarga for family programs
       if (isFamily && subType === 'BERSAUDARA' && !kartuKeluargaFile) {
-        throw new BadRequestError('Kartu keluarga wajib diupload untuk program Private Bersaudara (isFamily: true)');
+        throw ErrorFactory.badRequest('Kartu keluarga wajib diupload untuk program Private Bersaudara (isFamily: true)');
       }
 
       // Validate hubungan keluarga for non-family programs
       if (!isFamily && subType === 'BERSAUDARA' && !hubunganKeluarga) {
-        throw new BadRequestError('Hubungan keluarga wajib diisi untuk program Private Bersaudara (isFamily: false)');
+        throw ErrorFactory.badRequest('Hubungan keluarga wajib diisi untuk program Private Bersaudara (isFamily: false)');
       }
 
       // Calculate registration fees for each student
@@ -2030,7 +1977,7 @@ class SiswaService {
       const calculatedTotal = calculatedFees.reduce((sum, fee) => sum + fee.totalBiaya, 0);
 
       if (Math.abs(calculatedTotal - totalBiaya) > 1) {
-        throw new BadRequestError(`Total biaya tidak sesuai. Expected: ${calculatedTotal}, Got: ${totalBiaya}. Program: ${program.namaProgram}, Type: ${programType}, SubType: ${subType}`);
+        throw ErrorFactory.badRequest(`Total biaya tidak sesuai. Expected: ${calculatedTotal}, Got: ${totalBiaya}. Program: ${program.namaProgram}, Type: ${programType}, SubType: ${subType}`);
       }
 
       let voucher = null;
@@ -2039,7 +1986,6 @@ class SiswaService {
       
       if (kodeVoucher) {
         // Log voucher query untuk debugging
-        logger.info('Voucher query:', {
           kodeVoucher: kodeVoucher.toUpperCase(),
           isActive: true
         });
@@ -2056,7 +2002,7 @@ class SiswaService {
         });
 
         if (!voucher) {
-          throw new NotFoundError('Voucher tidak valid atau tidak aktif');
+          throw ErrorFactory.notFound('Voucher tidak valid atau tidak aktif');
         }
 
         // Cek apakah ada multiple voucher dengan kode yang sama
@@ -2070,7 +2016,6 @@ class SiswaService {
         });
 
         if (allVouchersWithSameCode.length > 1) {
-          logger.warn(`Found ${allVouchersWithSameCode.length} vouchers with same code:`, {
             kodeVoucher: kodeVoucher.toUpperCase(),
             vouchers: allVouchersWithSameCode.map(v => ({
               id: v.id,
@@ -2086,7 +2031,6 @@ class SiswaService {
         voucherId = voucher.id;
 
         // Calculate voucher discount on total
-        logger.info('Calculating voucher discount:', {
           voucherTipe: voucher.tipe,
           voucherNominal: voucher.nominal,
           voucherNominalNumber: Number(voucher.nominal),
@@ -2095,13 +2039,11 @@ class SiswaService {
 
         if (voucher.tipe === 'PERSENTASE') {
           totalDiskon = calculatedTotal * (Number(voucher.nominal) / 100);
-          logger.info('PERSENTASE calculation:', {
             percentage: Number(voucher.nominal) / 100,
             totalDiskon
           });
         } else {
           totalDiskon = Math.min(Number(voucher.nominal), calculatedTotal * 0.5);
-          logger.info('NOMINAL calculation:', {
             voucherNominal: Number(voucher.nominal),
             maxDiscount: calculatedTotal * 0.5,
             totalDiskon
@@ -2112,7 +2054,6 @@ class SiswaService {
       const finalTotal = calculatedTotal - totalDiskon;
 
       // Log perhitungan untuk debugging
-      logger.info('Voucher calculation:', {
         calculatedTotal,
         voucherType: voucher?.tipe,
         voucherNominal: voucher?.nominal,
@@ -2143,7 +2084,6 @@ class SiswaService {
         let xenditPaymentData;
         try {
           // Log Xendit request untuk debugging
-          logger.info('Xendit request data:', {
             amount: finalTotal,
             description: `Pendaftaran ${program.namaProgram} - ${siswa.length} siswa`,
             itemsCount: siswa.length,
@@ -2165,7 +2105,6 @@ class SiswaService {
               const discountedPrice = Math.round(originalPrice * (1 - discountRatio));
 
               // Log untuk debugging
-              logger.info(`Item ${index + 1} calculation:`, {
                 studentName: s.namaMurid,
                 originalPrice,
                 discountRatio: (discountRatio * 100).toFixed(2) + '%',
@@ -2198,7 +2137,6 @@ class SiswaService {
                 });
               }, { timeout: 15000, maxWait: 5000 });
             } catch (rollbackError) {
-              logger.error('Error during Xendit rollback:', rollbackError);
             }
           }
           throw xenditError;
@@ -2268,15 +2206,12 @@ class SiswaService {
               });
             }, { timeout: 15000, maxWait: 5000 });
           } catch (rollbackError) {
-            logger.error('Error during rollback:', rollbackError);
           }
           throw dbError;
         }
 
-        logger.info(`Created pendaftaran V2 for ${siswa.length} students in program ${program.namaProgram}`);
 
         // Log payment data untuk debugging
-        logger.info('Payment data returned from payment service:', {
           pembayaranId: xenditPaymentData.pembayaranId,
           xenditInvoiceUrl: xenditPaymentData.xenditInvoiceUrl,
           expireDate: xenditPaymentData.expireDate,
@@ -2294,7 +2229,6 @@ class SiswaService {
         };
       }
     } catch (error) {
-      logger.error('Error creating pendaftaran V2:', error);
       throw error;
     }
   }
@@ -2313,19 +2247,19 @@ class SiswaService {
 
   validateStudentCount(count, programType, subType) {
     if (programType === 'GROUP' && count !== 1) {
-      throw new BadRequestError('Program GROUP hanya untuk 1 siswa');
+      throw ErrorFactory.badRequest('Program GROUP hanya untuk 1 siswa');
     }
 
     if (programType === 'PRIVATE') {
       switch (subType) {
         case 'MANDIRI':
-          if (count !== 1) throw new BadRequestError('Private Mandiri hanya untuk 1 siswa');
+          if (count !== 1) throw ErrorFactory.badRequest('Private Mandiri hanya untuk 1 siswa');
           break;
         case 'SHARING':
-          if (count < 1 || count > 3) throw new BadRequestError('Private Sharing untuk 1-3 siswa');
+          if (count < 1 || count > 3) throw ErrorFactory.badRequest('Private Sharing untuk 1-3 siswa');
           break;
         case 'BERSAUDARA':
-          if (count < 2 || count > 4) throw new BadRequestError('Private Bersaudara untuk 2-4 siswa');
+          if (count < 2 || count > 4) throw ErrorFactory.badRequest('Private Bersaudara untuk 2-4 siswa');
           break;
       }
     }
@@ -2458,12 +2392,12 @@ class SiswaService {
       });
 
       if (!siswa) {
-        throw new NotFoundError(`Siswa dengan ID ${siswaId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Siswa dengan ID ${siswaId} tidak ditemukan`);
       }
 
       // 2. Validasi program aktif
       if (siswa.programSiswa.length === 0) {
-        throw new BadRequestError('Siswa tidak memiliki program aktif');
+        throw ErrorFactory.badRequest('Siswa tidak memiliki program aktif');
       }
 
       const programLama = siswa.programSiswa[0];
@@ -2474,16 +2408,16 @@ class SiswaService {
       });
 
       if (!programBaru) {
-        throw new NotFoundError(`Program dengan ID ${programBaruId} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Program dengan ID ${programBaruId} tidak ditemukan`);
       }
 
       if (programLama.program.tipeProgram !== programBaru.tipeProgram) {
-        throw new BadRequestError('Siswa private tidak bisa pindah ke grup dan sebaliknya');
+        throw ErrorFactory.badRequest('Siswa private tidak bisa pindah ke grup dan sebaliknya');
       }
 
       // 4. Validasi tidak pindah ke program yang sama
       if (programLama.programId === programBaruId) {
-        throw new BadRequestError('Tidak dapat pindah ke program yang sama');
+        throw ErrorFactory.badRequest('Tidak dapat pindah ke program yang sama');
       }
 
       // 5. Proses pindah program dalam transaction
@@ -2515,7 +2449,6 @@ class SiswaService {
             }
           });
 
-          logger.info(`Deleted ${sppBelumDibayar.length} unpaid SPP records from old program`);
         }
 
         // d. Buat program siswa baru
@@ -2540,7 +2473,7 @@ class SiswaService {
         // f. Buat jadwal untuk program baru jika ada
         if (jadwal && jadwal.length > 0) {
           if (jadwal.length > 2) {
-            throw new BadRequestError('Maksimal 2 jadwal per program');
+            throw ErrorFactory.badRequest('Maksimal 2 jadwal per program');
           }
 
           for (let i = 0; i < jadwal.length; i++) {
@@ -2552,7 +2485,7 @@ class SiswaService {
             });
 
             if (!jamMengajar) {
-              throw new NotFoundError(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
+              throw ErrorFactory.notFound(`Jam mengajar dengan ID ${jadwalItem.jamMengajarId} tidak ditemukan`);
             }
 
             await tx.jadwalProgramSiswa.create({
@@ -2574,7 +2507,6 @@ class SiswaService {
           tx
         );
 
-        logger.info(`Generated ${sppBaru.length} SPP records for new program`);
 
         // h. Send email notification
         try {
@@ -2589,9 +2521,7 @@ class SiswaService {
               tanggalPindah: tanggalPindah
             }
           });
-          logger.info(`Program change notification sent to ${siswa.user.email}`);
         } catch (emailError) {
-          logger.error('Failed to send program change notification:', emailError);
           // Don't throw, let the process continue
         }
 
@@ -2633,7 +2563,6 @@ class SiswaService {
         };
       });
     } catch (error) {
-      logger.error(`Error in pindahProgram for siswa ${siswaId}:`, error);
       throw error;
     }
   }

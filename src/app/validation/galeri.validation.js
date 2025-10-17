@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class GaleriValidation {
     static create() {
-        return ValidatorFactory.create({
+        return Joi.object({
             judulFoto: Joi.string().required()
                 .messages({
                     'string.empty': 'Judul foto tidak boleh kosong',
@@ -17,7 +16,7 @@ class GaleriValidation {
     }
 
     static update() {
-        return ValidatorFactory.create({
+        return Joi.object({
             judulFoto: Joi.string().optional()
                 .messages({
                     'string.empty': 'Judul foto tidak boleh kosong'
@@ -27,7 +26,7 @@ class GaleriValidation {
     }
 
     static getGaleriQuery() {
-        return ValidatorFactory.create({
+        return Joi.object({
             judul: Joi.string().min(1).max(191).optional()
                 .messages({
                     'string.min': 'Judul minimal 1 karakter',

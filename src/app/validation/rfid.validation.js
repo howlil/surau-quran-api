@@ -1,9 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class RfidValidation {
     static searchUser() {
-        return ValidatorFactory.create({
+        return Joi.object({
             search: Joi.string().min(1).max(191).optional()
                 .messages({
                     'string.min': 'Search minimal 1 karakter',
@@ -30,7 +29,7 @@ class RfidValidation {
     }
 
     static registerRfid() {
-        return ValidatorFactory.create({
+        return Joi.object({
             userId: Joi.string().guid({ version: 'uuidv4' }).required()
                 .messages({
                     'string.guid': 'User ID harus berupa UUID yang valid',
@@ -46,7 +45,7 @@ class RfidValidation {
     }
 
     static updateRfid() {
-        return ValidatorFactory.create({
+        return Joi.object({
             rfid: Joi.string().min(8).max(50).required()
                 .messages({
                     'string.min': 'RFID minimal 8 karakter',
@@ -57,7 +56,7 @@ class RfidValidation {
     }
 
     static getRfidList() {
-        return ValidatorFactory.create({
+        return Joi.object({
             search: Joi.string().min(1).max(191).optional()
                 .messages({
                     'string.min': 'Search minimal 1 karakter',

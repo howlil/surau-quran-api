@@ -1,8 +1,6 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
-const { Prisma } = require('@prisma/client');
 
 class VoucherService {
   async create(data) {
@@ -12,18 +10,16 @@ class VoucherService {
       });
 
       if (existing) {
-        throw new ConflictError(`Voucher dengan kode ${data.kodeVoucher} sudah ada`);
+        throw ErrorFactory.badRequest(`Voucher dengan kode ${data.kodeVoucher} sudah ada`);
       }
 
       const voucher = await prisma.voucher.create({
         data
       });
 
-      logger.info(`Created voucher with ID: ${voucher.id}`);
       return voucher;
     } catch (error) {
-      logger.error('Error creating voucher:', error);
-      throw error;
+      throw error
     }
   }
 
@@ -34,7 +30,7 @@ class VoucherService {
       });
 
       if (!voucher) {
-        throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Voucher dengan ID ${id} tidak ditemukan`);
       }
 
       if (data.kodeVoucher && data.kodeVoucher !== voucher.kodeVoucher) {
@@ -46,7 +42,7 @@ class VoucherService {
         });
 
         if (existing) {
-          throw new ConflictError(`Voucher dengan kode ${data.kodeVoucher} sudah ada`);
+          throw ErrorFactory.badRequest(`Voucher dengan kode ${data.kodeVoucher} sudah ada`);
         }
       }
 
@@ -55,11 +51,9 @@ class VoucherService {
         data
       });
 
-      logger.info(`Updated voucher with ID: ${id}`);
       return updated;
     } catch (error) {
-      logger.error(`Error updating voucher with ID ${id}:`, error);
-      throw error;
+      throw error
     }
   }
 
@@ -74,22 +68,20 @@ class VoucherService {
       });
 
       if (!voucher) {
-        throw new NotFoundError(`Voucher dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Voucher dengan ID ${id} tidak ditemukan`);
       }
 
       if (voucher.Pendaftaran.length > 0 || voucher.PeriodeSpp.length > 0) {
-        throw new ConflictError('Voucher sedang digunakan dan tidak dapat dihapus');
+        throw ErrorFactory.badRequest('Voucher sedang digunakan dan tidak dapat dihapus');
       }
 
       await prisma.voucher.delete({
         where: { id }
       });
 
-      logger.info(`Deleted voucher with ID: ${id}`);
       return { message: 'Voucher berhasil dihapus' };
     } catch (error) {
-      logger.error(`Error deleting voucher with ID ${id}:`, error);
-      throw error;
+      throw error
     }
   }
 
@@ -97,7 +89,7 @@ class VoucherService {
     const { page = 1, limit = 10, nama } = filters;
     try {
       const where = {};
-      
+
       if (nama) {
         where.OR = [
           { namaVoucher: { contains: nama } },
@@ -124,11 +116,7 @@ class VoucherService {
 
       return voucherList;
     } catch (error) {
-      logger.error('Error getting all vouchers:', error);
-      if (error instanceof Prisma.PrismaClientValidationError) {
-        throw new BadRequestError('Invalid field selection in voucher query');
-      }
-      throw error;
+      throw error
     }
   }
 
@@ -146,17 +134,16 @@ class VoucherService {
       });
 
       if (!voucher) {
-        throw new NotFoundError(`Voucher dengan kode ${kodeVoucher} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Voucher dengan kode ${kodeVoucher} tidak ditemukan`);
       }
 
       return voucher;
     } catch (error) {
-      logger.error(`Error getting voucher by kode ${kodeVoucher}:`, error);
-      throw error;
+      throw error
     }
   }
-  
-  
+
+
 
 }
 

@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const financeService = require('./finance.service');
 const moment = require('moment');
 const axios = require('axios');
@@ -21,7 +20,7 @@ class PayrollService {
     const [bulan, tahun] = monthYear.split('-').map(num => parseInt(num));
 
     if (isNaN(bulan) || isNaN(tahun) || bulan < 1 || bulan > 12) {
-      throw new BadRequestError('Format filter bulan-tahun tidak valid. Gunakan format MM-YYYY');
+      throw ErrorFactory.badRequest('Format filter bulan-tahun tidak valid. Gunakan format MM-YYYY');
     }
 
     return {
@@ -35,7 +34,6 @@ class PayrollService {
       const { page = 1, limit = 10, monthYear } = filters;
       const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
 
-      logger.info(`Payroll filter - monthYear: ${monthYear}, parsed bulan: ${bulan}, tahun: ${tahun}`);
 
       // Get all active gurus first
       const gurus = await prisma.guru.findMany({
@@ -49,7 +47,6 @@ class PayrollService {
         orderBy: { nama: 'asc' }
       });
 
-      logger.info(`Found ${gurus.length} active gurus`);
 
       // Get payroll data for all gurus in the specified month
       // Hanya gunakan format bulan MM (misal: "08")
@@ -92,11 +89,9 @@ class PayrollService {
         }
       });
 
-      logger.info(`Found ${payrollData.length} payroll records for ${bulan}-${tahun}`);
 
       // Debug: Log payroll data yang ditemukan
       payrollData.forEach(payroll => {
-        logger.info(`Payroll found for guru ${payroll.guruId}: status ${payroll.status}`);
       });
 
       // Create a map of guru payroll data for quick lookup
@@ -174,16 +169,9 @@ class PayrollService {
           }
         }
 
-        // Payroll data exists - use linked absensi data
-        logger.info(`Linked absensi data for guru ${guru.nama} (${guru.id}):`, {
-          count: payroll.absensiGuru.length,
-          absensiIds: payroll.absensiGuru.map(a => a.id),
-          statusList: payroll.absensiGuru.map(a => ({ id: a.id, status: a.statusKehadiran, sks: a.sks }))
-        });
 
         const absensiStats = this.calculateDetailedAbsensiStats(payroll.absensiGuru);
 
-        logger.info(`Calculated absensi stats for guru ${guru.nama}:`, absensiStats);
 
         // Use saved values if available, otherwise calculate from absensi
         let totalMengajar, totalInsentif, totalPotongan;
@@ -277,7 +265,6 @@ class PayrollService {
         }
       };
     } catch (error) {
-      logger.error('Error getting all payrolls for admin:', error);
       throw error;
     }
   }
@@ -308,13 +295,6 @@ class PayrollService {
       const potonganTanpaSuratIzin = Number(absensi.potonganTanpaSuratIzin) || 0;
       const insentifKehadiran = Number(absensi.insentifKehadiran) || 0;
 
-      logger.info(`Processing absensi ${index + 1}:`, {
-        id: absensi.id,
-        tanggal: absensi.tanggal,
-        status: absensi.statusKehadiran,
-        sks: sks,
-        originalSks: absensi.sks
-      });
 
       switch (absensi.statusKehadiran) {
         case 'HADIR':
@@ -370,7 +350,6 @@ class PayrollService {
 
         default:
           // Handle status yang tidak dikenal
-          logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
           break;
       }
     });
@@ -397,11 +376,11 @@ class PayrollService {
       });
 
       if (!payroll) {
-        throw new NotFoundError(`Payroll dengan ID ${id} tidak ditemukan`);
+        throw ErrorFactory.notFound(`Payroll dengan ID ${id} tidak ditemukan`);
       }
 
       if (payroll.status === 'SELESAI') {
-        throw new BadRequestError('Payroll yang sudah selesai tidak dapat diubah');
+        throw ErrorFactory.badRequest('Payroll yang sudah selesai tidak dapat diubah');
       }
 
       const { tanggalKalkulasi, bulan, detail, catatan } = data;
@@ -440,7 +419,6 @@ class PayrollService {
 
       const absensiStats = this.calculateDetailedAbsensiStats(absensiData);
 
-      logger.info(`Absensi stats for validation:`, {
         totalSKS: absensiStats.totalSKS,
         totalKehadiran: absensiStats.totalKehadiran,
         jumlahTelat: absensiStats.jumlahTelat,
@@ -461,27 +439,27 @@ class PayrollService {
 
         // Validasi SKS tidak boleh melebihi total SKS dari absensi
         if (inputSKS > absensiStats.totalSKS) {
-          throw new BadRequestError(`Jumlah SKS mengajar (${inputSKS}) tidak boleh melebihi total SKS dari absensi (${absensiStats.totalSKS})`);
+          throw ErrorFactory.badRequest(`Jumlah SKS mengajar (${inputSKS}) tidak boleh melebihi total SKS dari absensi (${absensiStats.totalSKS})`);
         }
 
         // Validasi insentif tidak boleh melebihi total kehadiran
         if (inputInsentif > absensiStats.totalKehadiran) {
-          throw new BadRequestError(`Jumlah hari insentif (${inputInsentif}) tidak boleh melebihi total kehadiran dari absensi (${absensiStats.totalKehadiran})`);
+          throw ErrorFactory.badRequest(`Jumlah hari insentif (${inputInsentif}) tidak boleh melebihi total kehadiran dari absensi (${absensiStats.totalKehadiran})`);
         }
 
         // Validasi potongan terlambat tidak boleh melebihi data absensi
         if (inputTelat > absensiStats.jumlahTelat) {
-          throw new BadRequestError(`Jumlah potongan terlambat (${inputTelat}) tidak boleh melebihi data terlambat dari absensi (${absensiStats.jumlahTelat})`);
+          throw ErrorFactory.badRequest(`Jumlah potongan terlambat (${inputTelat}) tidak boleh melebihi data terlambat dari absensi (${absensiStats.jumlahTelat})`);
         }
 
         // Validasi potongan izin tidak boleh melebihi data absensi
         if (inputIzin > absensiStats.jumlahIzin) {
-          throw new BadRequestError(`Jumlah potongan izin (${inputIzin}) tidak boleh melebihi data izin dari absensi (${absensiStats.jumlahIzin})`);
+          throw ErrorFactory.badRequest(`Jumlah potongan izin (${inputIzin}) tidak boleh melebihi data izin dari absensi (${absensiStats.jumlahIzin})`);
         }
 
         // Validasi potongan lainnya tidak boleh melebihi data absensi
         if (inputDLL > absensiStats.jumlahTidakHadir) {
-          throw new BadRequestError(`Jumlah potongan lainnya (${inputDLL}) tidak boleh melebihi data tidak hadir dari absensi (${absensiStats.jumlahTidakHadir})`);
+          throw ErrorFactory.badRequest(`Jumlah potongan lainnya (${inputDLL}) tidak boleh melebihi data tidak hadir dari absensi (${absensiStats.jumlahTidakHadir})`);
         }
 
         jumlahSKS = inputSKS;
@@ -509,22 +487,6 @@ class PayrollService {
       const totalGaji = totalMengajar + totalInsentif - totalPotongan;
 
       // Log the raw values for debugging
-      logger.info('Raw calculation values:', {
-        jumlahSKS,
-        rateSKS,
-        totalMengajar,
-        jumlahInsentif,
-        rateInsentif,
-        totalInsentif,
-        jumlahTelat,
-        rateTelat,
-        jumlahIzin,
-        rateIzin,
-        jumlahDLL,
-        rateDLL,
-        totalPotongan,
-        totalGaji
-      });
 
       // Ensure values stay within DECIMAL(10,2) range (max 99999999.99)
       const MAX_VALUE = 99999999.99;
@@ -534,17 +496,10 @@ class PayrollService {
       const safePotongan = Math.min(Math.max(Number(totalPotongan.toFixed(2)), 0), MAX_VALUE);
       const safeTotalGaji = Math.min(Math.max(Number(totalGaji.toFixed(2)), 0), MAX_VALUE);
 
-      // Log the safe values
-      logger.info('Safe values for database:', {
-        safeGajiPokok,
-        safeInsentif,
-        safePotongan,
-        safeTotalGaji
-      });
 
       // Validate if potongan exceeds total earnings
       if (safePotongan > (safeGajiPokok + safeInsentif)) {
-        throw new BadRequestError('Total potongan tidak boleh melebihi total pendapatan (gaji pokok + insentif)');
+        throw ErrorFactory.badRequest('Total potongan tidak boleh melebihi total pendapatan (gaji pokok + insentif)');
       }
 
       updateData.gajiPokok = safeGajiPokok;
@@ -612,10 +567,8 @@ class PayrollService {
         };
       });
 
-      logger.info(`Updated payroll with ID: ${id}`);
       return updated;
     } catch (error) {
-      logger.error(`Error updating payroll with ID ${id}:`, error);
       throw error;
     }
   }
@@ -722,7 +675,7 @@ class PayrollService {
       });
 
       if (!guru) {
-        throw new NotFoundError('Guru tidak ditemukan');
+        throw ErrorFactory.notFound('Guru tidak ditemukan');
       }
 
       // Get payroll data for this guru
@@ -912,14 +865,13 @@ class PayrollService {
         }
       };
     } catch (error) {
-      logger.error('Error getting payrolls for guru:', error);
       throw error;
     }
   }
 
   async batchPayrollDisbursement(payrollIds) {
     if (!Array.isArray(payrollIds) || payrollIds.length === 0) {
-      throw new BadRequestError('payrollIds harus berupa array dan tidak boleh kosong');
+      throw ErrorFactory.badRequest('payrollIds harus berupa array dan tidak boleh kosong');
     }
 
     const payrolls = await prisma.payroll.findMany({
@@ -929,7 +881,7 @@ class PayrollService {
       }
     });
 
-    if (payrolls.length === 0) throw new NotFoundError('Payroll tidak ditemukan');
+    if (payrolls.length === 0) throw ErrorFactory.notFound('Payroll tidak ditemukan');
 
     // Build disbursement items
     const disbursements = payrolls.map((payroll, idx) => ({
@@ -974,7 +926,6 @@ class PayrollService {
         data: { status: 'DIPROSES' }
       });
 
-      logger.info('Batch payroll disbursement sukses:', response.data);
 
       return {
         status: 'SUCCESS',
@@ -982,14 +933,12 @@ class PayrollService {
         batchDisbursementId: batchDisbursement.id
       };
     } catch (err) {
-      logger.error('Gagal batch payroll disbursement:', err.response?.data || err.message);
-      throw new BadRequestError('Gagal batch payroll disbursement: ' + (err.response?.data?.message || err.message));
+      throw ErrorFactory.badRequest('Gagal batch payroll disbursement: ' + (err.response?.data?.message || err.message));
     }
   }
 
   async handleDisbursementCallback(callbackData) {
     try {
-      logger.info('Received disbursement callback:', callbackData);
 
       const { id, status, disbursements } = callbackData;
 
@@ -998,8 +947,7 @@ class PayrollService {
       });
 
       if (!batchDisbursement) {
-        logger.error(`Batch disbursement not found for ID: ${id}`);
-        throw new NotFoundError(`Batch disbursement not found for ID: ${id}`);
+        throw ErrorFactory.notFound(`Batch disbursement not found for ID: ${id}`);
       }
 
       await prisma.payrollBatchDisbursement.update({
@@ -1063,19 +1011,13 @@ class PayrollService {
               guru: updatedPayroll.guru
             });
           } catch (financeError) {
-            // Log error but don't fail the main disbursement processing
-            logger.error('Failed to auto-sync payroll to finance:', {
-              payrollId: updatedPayroll.id,
-              error: financeError.message
-            });
+         
           }
         }
       }
 
-      logger.info(`Successfully processed disbursement callback for batch ID: ${id}`);
       return { success: true };
     } catch (error) {
-      logger.error('Error handling disbursement callback:', error);
       throw error;
     }
   }

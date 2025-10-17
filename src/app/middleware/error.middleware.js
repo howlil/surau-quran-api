@@ -1,31 +1,57 @@
-const multer = require('multer');
-const Http = require('../../lib/http');
-const { BadRequestError } = require('../../lib/http/errors.http');
+const PrismaErrorMiddleware = require('./prisma-error.middleware');
+const ErrorHttp = require('../../lib/http/error.http');
 
 class ErrorMiddleware {
-    static handleMulterError(err, req, res, next) {
-        if (err instanceof multer.MulterError) {
-            switch (err.code) {
-                case 'LIMIT_FILE_SIZE':
-                    return Http.Response.badRequest(res, 'File terlalu besar', {
-                        [err.field]: 'Ukuran file melebihi batas maksimum'
-                    });
-                case 'LIMIT_UNEXPECTED_FILE':
-                    return Http.Response.badRequest(res, 'File tidak sesuai', {
-                        [err.field]: 'Field ini bukan field upload file'
-                    });
-                default:
-                    return Http.Response.badRequest(res, 'Error saat upload file', {
-                        [err.field || 'file']: err.message
-                    });
+
+    constructor() {
+        this.createErrorResponse = ErrorMiddleware.createErrorResponse;
+        this.expressErrorHandler = this.expressErrorHandler.bind(this);
+    }
+
+    expressErrorHandler(err, req, res, next) {
+        try {
+            if (err instanceof ErrorHttp) {
+                return this.createErrorResponse(res, err.statusCode, err.message, err.error);
             }
-        } else if (err instanceof BadRequestError) {
-            return Http.Response.badRequest(res, err.message, {
-                file: err.message
-            });
+
+            if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+                return this.createErrorResponse(res, 400, "Invalid JSON", {
+                    message: "Request body contains invalid JSON",
+                    details: err.message,
+                    position: err.message.match(/position (\d+)/)?.[1] || 'unknown'
+                });
+            }
+
+            const prismaError = PrismaErrorMiddleware.handlePrismaError(err);
+            if (prismaError) {
+                return this.createErrorResponse(res, prismaError.statusCode, prismaError.message, prismaError.error);
+            }
+
+            return this.createErrorResponse(res, 500, "Internal Server Error", this.cleanErrorMessage(err.message));
+
+        } catch (error) {
+            return this.createErrorResponse(res, 500, "Internal Server Error", error.message);
         }
-        next(err);
+    }
+
+    cleanErrorMessage(message) {
+        if (typeof message !== 'string') return message;
+
+        return message
+            .replace(/\u001b\[[0-9;]*m/g, '')
+            .replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
+            .replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
+            .trim();
+    }
+
+
+    static createErrorResponse(res, statusCode, message, error) {
+        return res.status(statusCode).json({
+            success: false,
+            message,
+            error
+        });
     }
 }
 
-module.exports = ErrorMiddleware; 
+module.exports = new ErrorMiddleware();

@@ -1,40 +1,59 @@
 const voucherService = require('../service/voucher.service');
-const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
+const ErrorFactory = require('../../lib/factories/error.factory');
 
 class VoucherController {
-  create = ErrorHandler.asyncHandler(async (req, res) => {
-    const data = HttpRequest.getBodyParams(req);
-    const result = await voucherService.create(data);
-    return Http.Response.created(res, result, 'Voucher berhasil dibuat');
-  });
+  create = async (req, res, next) => {
+    try {
+      const data = req.extract.getBody();
+      const result = await voucherService.create(data);
+      return ResponseFactory.created(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
-  update = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    const data = HttpRequest.getBodyParams(req);
-    const result = await voucherService.update(id, data);
-    return Http.Response.success(res, result, 'Voucher berhasil diperbarui');
-  });
+  update = async (req, res, next) => {
+    try {
+      const { id } = req.extract.getParams(['id']);
+      const data = req.extract.getBody();
+      const result = await voucherService.update(id, data);
+      return ResponseFactory.updated(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
-  delete = ErrorHandler.asyncHandler(async (req, res) => {
-    const { id } = HttpRequest.getUrlParams(req);
-    await voucherService.delete(id);
-    return Http.Response.success(res, { id }, 'Voucher berhasil dihapus');
-  });
+  delete = async (req, res, next) => {
+    try {
+      const { id } = req.extract.getParams(['id']);
+      await voucherService.delete(id);
+      return ResponseFactory.deleted().send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
 
-  getAll = ErrorHandler.asyncHandler(async (req, res) => {
-    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'nama']);
-    const result = await voucherService.getAll(filters);
-    return Http.Response.success(res, result);
-  });
+  getAll = async (req, res, next) => {
+    try {
+      const filters = req.extract.getQuery(['page', 'limit', 'nama']);
+      const result = await voucherService.getAll(filters);
+      return ResponseFactory.getAll(result.data, result.meta).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
-  getVoucherByKode = ErrorHandler.asyncHandler(async (req, res) => {
-    const { kodeVoucher } = HttpRequest.getUrlParams(req);
-    const result = await voucherService.getVoucherByKode(kodeVoucher);
-    return Http.Response.success(res, result);
-  });
+  getVoucherByKode = async (req, res, next) => {
+    try {
+      const { kodeVoucher } = req.extract.getParams(['kodeVoucher']);
+      const result = await voucherService.getVoucherByKode(kodeVoucher);
+      return ResponseFactory.get(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
 }
 module.exports = new VoucherController();

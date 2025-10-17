@@ -1,10 +1,8 @@
 const Joi = require('joi');
-const ValidatorFactory = require('./factory.validation');
 
 class JamMengajarValidation {
   static create() {
-    return ValidatorFactory.create(
-      Joi.object({
+    return Joi.object({
         jamMulai: Joi.string()
           .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
           .required()
@@ -35,14 +33,12 @@ class JamMengajarValidation {
         return value;
       }).messages({
         'any.invalid': '{{#message}}'
-      })
-    );
+      });
   }
 
 
   static update() {
-    return ValidatorFactory.create(
-      Joi.object({
+    return Joi.object({
         jamMulai: Joi.string()
           .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
           .optional()
@@ -73,8 +69,7 @@ class JamMengajarValidation {
         return value;
       }).messages({
         'any.invalid': '{{#message}}'
-      })
-    );
+      });
   }
 
 }

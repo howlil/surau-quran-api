@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { UnauthorizedError, ConflictError, NotFoundError, ForbiddenError, BadRequestError, handlePrismaError } = require('../../lib/http/error.handler.http');
-const { logger } = require('../../lib/config/logger.config');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const EmailUtils = require('../../lib/utils/email.utils');
@@ -29,43 +28,27 @@ class AuthService {
 
             return token;
         } catch (error) {
-            logger.error('Error generating reset token:', error);
-            throw handlePrismaError(error);
-        }
-    }
-
-    async #sendPasswordResetEmail(email, token) {
-        try {
-            const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-            await EmailUtils.sendPasswordResetEmail({ email, resetLink });
-        } catch (error) {
-            logger.error('Error sending reset email:', error);
-            throw new Error('Gagal mengirim email reset password');
+            throw error;
         }
     }
 
     async requestPasswordReset(email) {
         try {
-            logger.info(`Starting password reset request for email: ${email}`);
 
             const user = await prisma.user.findUnique({
                 where: { email }
             });
 
             if (!user) {
-                logger.warn(`Password reset requested for non-existent email: ${email}`);
-                throw new NotFoundError('User not found');
+                throw ErrorFactory.notFound('User not found');
             }
 
-            logger.info(`Found user with ID: ${user.id} for password reset request`);
 
             const resetToken = await this.#generateResetToken(user.id);
             const resetTokenExpiry = moment().add(24, 'hours').toDate(); // 24 hours
 
-            logger.info(`Generated reset token for user ID: ${user.id}, token expires at: ${resetTokenExpiry}`);
 
             const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-            logger.info(`Generated reset link for user ID: ${user.id}`);
 
             let emailSent = true;
             try {
@@ -73,15 +56,8 @@ class AuthService {
                     email: user.email,
                     resetLink
                 });
-                logger.info(`Successfully sent password reset email to: ${user.email}`);
             } catch (emailError) {
                 emailSent = false;
-                logger.error('Failed to send password reset email:', {
-                    error: emailError.message,
-                    stack: emailError.stack,
-                    userId: user.id,
-                    email: user.email
-                });
             }
 
             return {
@@ -91,18 +67,12 @@ class AuthService {
                 token: !emailSent ? resetToken : undefined
             };
         } catch (error) {
-            logger.error('Error in requestPasswordReset:', {
-                error: error.message,
-                stack: error.stack,
-                email
-            });
             throw error;
         }
     }
 
     async resetPassword(token, newPassword) {
         try {
-            logger.info(`Starting password reset process for token: ${token}`);
 
             const resetToken = await prisma.passwordResetToken.findFirst({
                 where: {
@@ -117,15 +87,12 @@ class AuthService {
             });
 
             if (!resetToken) {
-                logger.warn(`Invalid or expired reset token used: ${token}`);
-                throw new NotFoundError('Invalid or expired reset token');
+                throw ErrorFactory.notFound('Invalid or expired reset token');
             }
 
             const user = resetToken.user;
-            logger.info(`Found valid reset token for user ID: ${user.id}`);
 
             const hashedPassword = await PasswordUtils.hash(newPassword);
-            logger.info(`Generated hashed password for user ID: ${user.id}`);
 
             await prisma.$transaction([
                 prisma.user.update({
@@ -139,36 +106,25 @@ class AuthService {
                 })
             ]);
 
-            logger.info(`Successfully updated password for user ID: ${user.id}`);
 
             try {
                 await EmailUtils.sendPasswordChangedEmail({
                     email: user.email
                 });
-                logger.info(`Successfully sent password changed notification to: ${user.email}`);
             } catch (emailError) {
-                logger.warn('Failed to send password changed notification:', {
-                    error: emailError.message,
-                    userId: user.id,
-                    email: user.email
-                });
+      
                 // Don't throw error here as password was already changed
             }
 
             return { message: 'Password reset successfully' };
         } catch (error) {
-            logger.error('Error in resetPassword:', {
-                error: error.message,
-                stack: error.stack,
-                token
-            });
+     
             throw error;
         }
     }
 
     async changePassword(userId, oldPassword, newPassword) {
         try {
-            logger.info(`Starting password change process for user ID: ${userId}`);
 
             // Ambil data user
             const user = await prisma.user.findUnique({
@@ -176,21 +132,18 @@ class AuthService {
             });
 
             if (!user) {
-                logger.warn(`Password change requested for non-existent user ID: ${userId}`);
-                throw new NotFoundError('User tidak ditemukan');
+                throw ErrorFactory.notFound('User tidak ditemukan');
             }
 
             // Verifikasi password lama
             const isValidOldPassword = await PasswordUtils.verify(oldPassword, user.password);
 
             if (!isValidOldPassword) {
-                logger.warn(`Invalid old password provided for user ID: ${userId}`);
-                throw new UnauthorizedError('Password lama tidak valid');
+                throw ErrorFactory.unauthorized('Password lama tidak valid');
             }
 
             // Hash password baru
             const hashedNewPassword = await PasswordUtils.hash(newPassword);
-            logger.info(`Generated hashed new password for user ID: ${userId}`);
 
             // Update password
             await prisma.user.update({
@@ -200,37 +153,27 @@ class AuthService {
                 }
             });
 
-            logger.info(`Successfully changed password for user ID: ${userId}`);
 
             // Kirim notifikasi email (optional, tidak akan throw error jika gagal)
             try {
                 await EmailUtils.sendPasswordChangedEmail({
                     email: user.email
                 });
-                logger.info(`Successfully sent password changed notification to: ${user.email}`);
             } catch (emailError) {
-                logger.warn('Failed to send password changed notification:', {
-                    error: emailError.message,
-                    userId: user.id,
-                    email: user.email
-                });
+    
                 // Don't throw error here as password was already changed
             }
 
             return { message: 'Password berhasil diubah' };
         } catch (error) {
-            logger.error('Error in changePassword:', {
-                error: error.message,
-                stack: error.stack,
-                userId
-            });
+
             throw error;
         }
     }
 
     async login(email, password) {
         if (!email || !password) {
-            throw new BadRequestError('Email dan password harus diisi');
+            throw ErrorFactory.badRequest('Email dan password harus diisi');
         }
 
         try {
@@ -244,13 +187,13 @@ class AuthService {
             });
 
             if (!user) {
-                throw new UnauthorizedError('Email atau password salah');
+                throw ErrorFactory.unauthorized('Email atau password salah');
             }
 
             const isValidPassword = await PasswordUtils.verify(password, user.password);
 
             if (!isValidPassword) {
-                throw new UnauthorizedError('Email atau password salah');
+                throw ErrorFactory.unauthorized('Email atau password salah');
             }
 
             // Get nama based on user role
@@ -280,7 +223,7 @@ class AuthService {
                 }
             };
         } catch (error) {
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -288,7 +231,6 @@ class AuthService {
         try {
             return await TokenUtils.revokeToken(token);
         } catch (error) {
-            logger.error('Logout error:', error);
             throw error;
         }
     }
@@ -301,14 +243,14 @@ class AuthService {
             });
 
             if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
-                throw new ForbiddenError('Hanya admin yang dapat membuat akun admin');
+                throw ErrorFactory.forbidden('Hanya admin yang dapat membuat akun admin');
             }
             const existingUser = await prisma.user.findUnique({
                 where: { email: userData.email }
             });
 
             if (existingUser) {
-                throw new ConflictError('Email sudah terdaftar');
+                throw ErrorFactory.badRequest('Email sudah terdaftar');
             }
 
             const hashedPassword = await PasswordUtils.hash(userData.password);
@@ -342,8 +284,7 @@ class AuthService {
                 role: result.user.role
             };
         } catch (error) {
-            logger.error('Create admin error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -352,8 +293,7 @@ class AuthService {
             // Hanya return role ADMIN untuk create admin
             return ['ADMIN'];
         } catch (error) {
-            logger.error('Get available roles error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -367,7 +307,7 @@ class AuthService {
             });
 
             if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
-                throw new ForbiddenError('Hanya admin yang dapat melihat daftar admin');
+                throw ErrorFactory.forbidden('Hanya admin yang dapat melihat daftar admin');
             }
 
             const where = {};
@@ -394,8 +334,7 @@ class AuthService {
                 orderBy: { createdAt: 'desc' }
             });
         } catch (error) {
-            logger.error('Get admins error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -407,7 +346,7 @@ class AuthService {
             });
 
             if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
-                throw new ForbiddenError('Hanya admin yang dapat mengubah data admin');
+                throw ErrorFactory.forbidden('Hanya admin yang dapat mengubah data admin');
             }
 
             const admin = await prisma.admin.findUnique({
@@ -416,7 +355,7 @@ class AuthService {
             });
 
             if (!admin) {
-                throw new NotFoundError('Admin tidak ditemukan');
+                throw ErrorFactory.notFound('Admin tidak ditemukan');
             }
 
             const updateUserData = {};
@@ -429,7 +368,7 @@ class AuthService {
                     });
 
                     if (existingUserWithEmail) {
-                        throw new ConflictError('Email sudah terdaftar');
+                        throw ErrorFactory.badRequest('Email sudah terdaftar');
                     }
 
                     updateUserData.email = updateData.email;
@@ -472,8 +411,7 @@ class AuthService {
                 updatedAt: result.admin.updatedAt
             };
         } catch (error) {
-            logger.error('Update admin error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -485,7 +423,7 @@ class AuthService {
             });
 
             if (!requestUser || (requestUser.role !== 'SUPER_ADMIN' && requestUser.role !== 'ADMIN_SURAU')) {
-                throw new ForbiddenError('Hanya admin yang dapat menghapus akun admin');
+                throw ErrorFactory.forbidden('Hanya admin yang dapat menghapus akun admin');
             }
 
             const admin = await prisma.admin.findUnique({
@@ -494,12 +432,12 @@ class AuthService {
             });
 
             if (!admin) {
-                throw new NotFoundError('Admin tidak ditemukan');
+                throw ErrorFactory.notFound('Admin tidak ditemukan');
             }
 
             // Prevent self-deletion
             if (admin.userId === requestUserId) {
-                throw new ForbiddenError('Tidak dapat menghapus akun admin sendiri');
+                throw ErrorFactory.forbidden('Tidak dapat menghapus akun admin sendiri');
             }
 
             await prisma.$transaction(async (tx) => {
@@ -510,8 +448,7 @@ class AuthService {
 
             return true;
         } catch (error) {
-            logger.error('Delete admin error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 
@@ -525,15 +462,14 @@ class AuthService {
             });
 
             if (!user) {
-                throw new NotFoundError('RFID tidak ditemukan');
+                throw ErrorFactory.notFound('RFID tidak ditemukan');
             }
 
             return {
                 role: user.role
             };
         } catch (error) {
-            logger.error('Check role by RFID error:', error);
-            throw handlePrismaError(error);
+            throw error;
         }
     }
 }

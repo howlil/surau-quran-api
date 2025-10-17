@@ -1,47 +1,62 @@
 const statisticsService = require('../service/statistics.service');
-const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
+const ErrorFactory = require('../../lib/factories/error.factory');
 
 class StatisticsController {
     // Get student counts with date filtering
-    getStudentCounts = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['startDate', 'endDate']);
-        const result = await statisticsService.getStudentCounts(filters);
-        return Http.Response.success(res, result, 'Statistik siswa berhasil diambil');
-    });
+    getStudentCounts = async (req, res, next) => {
+        try {
+            const filters = req.extract.getQuery(['startDate', 'endDate']);
+            const result = await statisticsService.getStudentCounts(filters);
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
     // Get financial statistics for graphs with date and grouping options
-    getFinancialStatistics = ErrorHandler.asyncHandler(async (req, res) => {
-        const filters = HttpRequest.getQueryParams(req, ['startDate', 'endDate', 'groupBy']);
-        const result = await statisticsService.getFinancialStatistics(filters);
-        return Http.Response.success(res, result, 'Statistik keuangan berhasil diambil');
-    });
+    getFinancialStatistics = async (req, res, next) => {
+        try {
+            const filters = req.extract.getQuery(['startDate', 'endDate', 'groupBy']);
+            const result = await statisticsService.getFinancialStatistics(filters);
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
     // Get student distribution across classes
-    getStudentDistribution = ErrorHandler.asyncHandler(async (req, res) => {
-        const result = await statisticsService.getStudentDistribution();
-        return Http.Response.success(res, result, 'Distribusi siswa berhasil diambil');
-    });
+    getStudentDistribution = async (req, res, next) => {
+        try {
+            const result = await statisticsService.getStudentDistribution();
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
     // Get today's schedule with student counts
-    getTodaySchedule = ErrorHandler.asyncHandler(async (req, res) => {
-        const result = await statisticsService.getTodaySchedule();
-        
-        // Validasi hari Minggu - tidak ada jadwal
-        if (result.hari === 'MINGGU') {
-            return Http.Response.success(res, {
-                tanggal: result.tanggal,
-                hari: result.hari,
-                message: 'Tidak ada jadwal kelas pada hari Minggu',
-                jumlahSiswa: 0,
-                siswaHadir: 0,
-                schedules: []
-            }, 'Tidak ada jadwal kelas pada hari Minggu');
+    getTodaySchedule = async (req, res, next) => {
+        try {
+            const result = await statisticsService.getTodaySchedule();
+            
+            // Validasi hari Minggu - tidak ada jadwal
+            if (result.hari === 'MINGGU') {
+                return ResponseFactory.get({
+                    tanggal: result.tanggal,
+                    hari: result.hari,
+                    message: 'Tidak ada jadwal kelas pada hari Minggu',
+                    jumlahSiswa: 0,
+                    siswaHadir: 0,
+                    schedules: []
+                }).send(res);
+            }
+            
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
         }
-        
-        return Http.Response.success(res, result, 'Jadwal hari ini berhasil diambil');
-    });
+    };
 }
 
 module.exports = new StatisticsController(); 

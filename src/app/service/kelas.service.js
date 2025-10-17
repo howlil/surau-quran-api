@@ -1,6 +1,5 @@
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, ConflictError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 
 class KelasService {
@@ -15,7 +14,6 @@ class KelasService {
             jamMengajarId
         };
 
-        // Exclude kelas program yang sedang diupdate (untuk patch operation)
         if (excludeKelasProgramId) {
             whereClause.id = { not: excludeKelasProgramId };
         }
@@ -43,7 +41,7 @@ class KelasService {
                 hari: conflictingSchedule.hari
             };
 
-            throw new ConflictError(
+            throw ErrorFactory.badRequest(
                 `Guru sudah memiliki jadwal mengajar pada ${conflictInfo.hari} jam ${conflictInfo.jam} ` +
                 `untuk program ${conflictInfo.program} di kelas ${conflictInfo.kelas}. ` +
                 `Satu guru tidak dapat mengajar di jam yang sama pada hari yang sama.`
@@ -60,17 +58,15 @@ class KelasService {
             });
 
             if (existing) {
-                throw new ConflictError(`Kelas dengan nama ${data.namaKelas} sudah ada`);
+                throw ErrorFactory.badRequest(`Kelas dengan nama ${data.namaKelas} sudah ada`);
             }
 
             const kelas = await prisma.kelas.create({
                 data
             });
 
-            logger.info(`Created kelas with ID: ${kelas.id}`);
             return kelas;
         } catch (error) {
-            logger.error('Error creating kelas:', error);
             throw error;
         }
     }
@@ -82,7 +78,7 @@ class KelasService {
             });
 
             if (!kelas) {
-                throw new NotFoundError(`Kelas dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Kelas dengan ID ${id} tidak ditemukan`);
             }
 
             if (data.namaKelas && data.namaKelas !== kelas.namaKelas) {
@@ -94,7 +90,7 @@ class KelasService {
                 });
 
                 if (existing) {
-                    throw new ConflictError(`Kelas dengan nama ${data.namaKelas} sudah ada`);
+                    throw ErrorFactory.badRequest(`Kelas dengan nama ${data.namaKelas} sudah ada`);
                 }
             }
 
@@ -103,10 +99,8 @@ class KelasService {
                 data
             });
 
-            logger.info(`Updated kelas with ID: ${id}`);
             return updated;
         } catch (error) {
-            logger.error(`Error updating kelas with ID ${id}:`, error);
             throw error;
         }
     }
@@ -118,26 +112,23 @@ class KelasService {
             });
 
             if (!kelas) {
-                throw new NotFoundError(`Kelas dengan ID ${id} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Kelas dengan ID ${id} tidak ditemukan`);
             }
 
-            // Check if kelas is being used in KelasProgram
             const kelasProgram = await prisma.kelasProgram.findFirst({
                 where: { kelasId: id }
             });
 
             if (kelasProgram) {
-                throw new ConflictError('Kelas sedang digunakan dalam program kelas dan tidak dapat dihapus');
+                throw ErrorFactory.badRequest('Kelas sedang digunakan dalam program kelas dan tidak dapat dihapus');
             }
 
             await prisma.kelas.delete({
                 where: { id }
             });
 
-            logger.info(`Deleted kelas with ID: ${id}`);
             return { id };
         } catch (error) {
-            logger.error(`Error deleting kelas with ID ${id}:`, error);
             throw error;
         }
     }
@@ -159,7 +150,6 @@ class KelasService {
 
             return kelasList;
         } catch (error) {
-            logger.error('Error getting all kelas:', error);
             throw error;
         }
     }
@@ -251,7 +241,6 @@ class KelasService {
 
             return result;
         } catch (err) {
-            logger.error('Error getting initial student into class:', err);
             throw err;
         }
     }
@@ -280,7 +269,7 @@ class KelasService {
                 });
 
                 if (!existingKelasProgram) {
-                    throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+                    throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
                 }
 
                 // Update kelas program if there are changes
@@ -319,7 +308,6 @@ class KelasService {
                     (!hapusSiswaIds || hapusSiswaIds.length === 0);
 
                 if (isMetadataOnlyUpdate) {
-                    logger.info('Detected metadata-only update, skipping student management operations');
                 }
 
                 // Handle student removal first - only if not a metadata-only update
@@ -361,7 +349,6 @@ class KelasService {
                             NIS: ps.siswa.nis
                         }));
 
-                        logger.info(`Successfully removed ${siswaDihapus.length} students from class ${kelasProgramId}`);
                     }
                 }
 
@@ -374,7 +361,7 @@ class KelasService {
                     });
 
                     if (!program) {
-                        throw new NotFoundError('Program tidak ditemukan');
+                        throw ErrorFactory.notFound('Program tidak ditemukan');
                     }
 
                     let programSiswaList;
@@ -393,7 +380,7 @@ class KelasService {
                         if (subType === 'MANDIRI') {
                             // Private Mandiri: hanya 1 siswa, tidak ada keluargaId
                             if (tambahSiswaIds.length > 1) {
-                                throw new BadRequestError('Program Private Mandiri hanya bisa menambahkan 1 siswa');
+                                throw ErrorFactory.badRequest('Program Private Mandiri hanya bisa menambahkan 1 siswa');
                             }
 
                             const siswa = await tx.siswa.findUnique({
@@ -402,7 +389,7 @@ class KelasService {
                             });
 
                             if (siswa && siswa.keluargaId) {
-                                throw new BadRequestError('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
+                                throw ErrorFactory.badRequest('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
                             }
 
                             programSiswaList = await tx.programSiswa.findMany({
@@ -420,14 +407,13 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private Mandiri program detected. Found ${programSiswaList.length} students`);
 
                         } else if (subType === 'SHARING' || subType === 'BERSAUDARA') {
                             // Private Sharing/Bersaudara: max 3 untuk sharing, max 4 untuk bersaudara
                             const maxStudents = subType === 'SHARING' ? 3 : 4;
                             
                             if (tambahSiswaIds.length > maxStudents) {
-                                throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
+                                throw ErrorFactory.badRequest(`Program Private ${subType} maksimal ${maxStudents} siswa`);
                             }
 
                             // Ambil ID siswa pertama sebagai ketua keluarga
@@ -452,9 +438,8 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private ${subType} program detected. Found ${programSiswaList.length} students with ketua: ${firstSiswaId}`);
                         } else {
-                            throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
+                            throw ErrorFactory.badRequest('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
                         }
                     } else {
                         // Untuk program group, logic tetap sama seperti sebelumnya
@@ -499,7 +484,7 @@ class KelasService {
                             namaProgram: ps.kelasProgram?.program?.namaProgram
                         }));
 
-                        throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program lain: ${conflictDetails.map(s => s.namaSiswa).join(', ')}`);
+                        throw ErrorFactory.badRequest(`Beberapa siswa sudah terdaftar di kelas program lain: ${conflictDetails.map(s => s.namaSiswa).join(', ')}`);
                     }
 
                     // Check if any students are already in this specific kelas program
@@ -521,7 +506,7 @@ class KelasService {
                             namaSiswa: ps.siswa.namaMurid
                         }));
 
-                        throw new ConflictError(`Beberapa siswa sudah terdaftar di kelas program ini: ${alreadyInClassDetails.map(s => s.namaSiswa).join(', ')}`);
+                        throw ErrorFactory.badRequest(`Beberapa siswa sudah terdaftar di kelas program ini: ${alreadyInClassDetails.map(s => s.namaSiswa).join(', ')}`);
                     }
 
                     // Check if any students don't exist in the program
@@ -534,7 +519,7 @@ class KelasService {
                             select: { id: true, namaMurid: true, nis: true }
                         });
 
-                        throw new NotFoundError(`Beberapa siswa tidak ditemukan dalam program ini: ${notFoundStudents.map(s => s.namaMurid).join(', ')}`);
+                        throw ErrorFactory.notFound(`Beberapa siswa tidak ditemukan dalam program ini: ${notFoundStudents.map(s => s.namaMurid).join(', ')}`);
                     }
 
                     // Batch update programSiswa
@@ -545,7 +530,6 @@ class KelasService {
                             data: { kelasProgramId: kelasProgramId }
                         });
 
-                        logger.info(`Successfully added ${ids.length} students to class ${kelasProgramId}`);
                     }
 
                     siswaDitambah = programSiswaList.map(ps => ({
@@ -598,7 +582,6 @@ class KelasService {
                 };
             });
         } catch (err) {
-            logger.error('Error in initialStudentIntoClass:', err);
             throw err;
         }
     }
@@ -619,7 +602,7 @@ class KelasService {
                 });
 
                 if (existingKelasProgram) {
-                    throw new ConflictError('Kelas program dengan kombinasi ini sudah ada');
+                    throw ErrorFactory.badRequest('Kelas program dengan kombinasi ini sudah ada');
                 }
 
                 // Check for guru schedule conflict
@@ -643,7 +626,7 @@ class KelasService {
                 });
 
                 if (!program) {
-                    throw new NotFoundError('Program tidak ditemukan');
+                    throw ErrorFactory.notFound('Program tidak ditemukan');
                 }
 
                 // Process student assignments
@@ -665,7 +648,7 @@ class KelasService {
                         if (subType === 'MANDIRI') {
                             // Private Mandiri: hanya 1 siswa, tidak ada keluargaId
                             if (siswaIds.length > 1) {
-                                throw new BadRequestError('Program Private Mandiri hanya bisa menambahkan 1 siswa');
+                                throw ErrorFactory.badRequest('Program Private Mandiri hanya bisa menambahkan 1 siswa');
                             }
 
                             const siswa = await tx.siswa.findUnique({
@@ -674,7 +657,7 @@ class KelasService {
                             });
 
                             if (siswa && siswa.keluargaId) {
-                                throw new BadRequestError('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
+                                throw ErrorFactory.badRequest('Siswa untuk program Private Mandiri tidak boleh memiliki keluargaId');
                             }
 
                             eligibleProgramSiswa = await tx.programSiswa.findMany({
@@ -692,14 +675,13 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private Mandiri program detected. Found ${eligibleProgramSiswa.length} students`);
 
                         } else if (subType === 'SHARING' || subType === 'BERSAUDARA') {
                             // Private Sharing/Bersaudara: max 3 untuk sharing, max 4 untuk bersaudara
                             const maxStudents = subType === 'SHARING' ? 3 : 4;
                             
                             if (siswaIds.length > maxStudents) {
-                                throw new BadRequestError(`Program Private ${subType} maksimal ${maxStudents} siswa`);
+                                throw ErrorFactory.badRequest(`Program Private ${subType} maksimal ${maxStudents} siswa`);
                             }
 
                             // Ambil ID siswa pertama sebagai ketua keluarga
@@ -724,9 +706,8 @@ class KelasService {
                                 }
                             });
 
-                            logger.info(`Private ${subType} program detected. Found ${eligibleProgramSiswa.length} students with ketua: ${firstSiswaId}`);
                         } else {
-                            throw new BadRequestError('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
+                            throw ErrorFactory.badRequest('Tipe program private tidak dikenali. Pastikan nama program mengandung "mandiri", "sharing", atau "bersaudara"');
                         }
                     } else {
                         // Untuk program group, logic tetap sama seperti sebelumnya
@@ -743,17 +724,7 @@ class KelasService {
                         });
                     }
 
-                    logger.info('Found eligible students:', {
-                        count: eligibleProgramSiswa.length,
-                        programType: program.tipeProgram,
-                        students: eligibleProgramSiswa.map(ps => ({
-                            siswaId: ps.siswa.id,
-                            namaSiswa: ps.siswa.namaMurid,
-                            keluargaId: ps.siswa.keluargaId
-                        }))
-                    });
-
-                    // Batch update programSiswa
+                   
                     const ids = eligibleProgramSiswa.map(ps => ps.id);
                     if (ids.length > 0) {
                         await tx.programSiswa.updateMany({
@@ -768,7 +739,6 @@ class KelasService {
                     })));
                 }
 
-                logger.info(`Created kelas program with ID: ${kelasProgram.id}`);
 
                 return {
                     id: kelasProgram.id,
@@ -781,7 +751,6 @@ class KelasService {
                 };
             });
         } catch (error) {
-            logger.error('Error creating kelas program:', error);
             throw error;
         }
     }
@@ -798,11 +767,11 @@ class KelasService {
             });
 
             if (!kelasProgram) {
-                throw new NotFoundError(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
+                throw ErrorFactory.notFound(`Kelas program dengan ID ${kelasProgramId} tidak ditemukan`);
             }
 
             if (kelasProgram.programSiswa.length > 0) {
-                throw new ConflictError('Kelas program ini memiliki siswa yang terdaftar dan tidak dapat dihapus');
+                throw ErrorFactory.badRequest('Kelas program ini memiliki siswa yang terdaftar dan tidak dapat dihapus');
             }
 
             // Use transaction to ensure data consistency
@@ -832,10 +801,8 @@ class KelasService {
                 });
             });
 
-            logger.info(`Deleted kelas program with ID: ${kelasProgramId}`);
             return { kelasProgramId };
         } catch (error) {
-            logger.error(`Error deleting kelas program with ID ${kelasProgramId}:`, error);
             throw error;
         }
     }
@@ -848,7 +815,7 @@ class KelasService {
             });
 
             if (!siswa) {
-                throw new NotFoundError('Profil siswa tidak ditemukan');
+                throw ErrorFactory.notFound('Profil siswa tidak ditemukan');
             }
 
             // 2. Cari program siswa yang masih aktif dan ter-enroll di kelas program
@@ -869,7 +836,7 @@ class KelasService {
             });
 
             if (programSiswa.length === 0) {
-                throw new NotFoundError('Siswa tidak terdaftar dalam kelas program apapun');
+                throw ErrorFactory.notFound('Siswa tidak terdaftar dalam kelas program apapun');
             }
 
             const kelasProgramIds = programSiswa.map(ps => ps.kelasProgramId);
@@ -910,7 +877,7 @@ class KelasService {
             });
 
             if (kelasPrograms.length === 0) {
-                throw new NotFoundError('Tidak ada kelas dengan CCTV yang dapat diakses siswa ini');
+                throw ErrorFactory.notFound('Tidak ada kelas dengan CCTV yang dapat diakses siswa ini');
             }
 
             // 4. Format response dengan informasi lengkap
@@ -927,7 +894,6 @@ class KelasService {
                 cctvIP: kp.kelas.ipAddressHikvision
             }));
 
-            logger.info(`CCTV access granted for siswa ID: ${siswa.id}, found ${cctvList.length} accessible CCTV(s)`);
 
             return {
                 siswaId: siswa.id,
@@ -936,7 +902,6 @@ class KelasService {
                 cctvList
             };
         } catch (error) {
-            logger.error(`Error getting CCTV for siswa user ID ${siswaUserId}:`, error);
             throw error;
         }
     }

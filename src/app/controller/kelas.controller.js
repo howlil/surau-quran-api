@@ -1,65 +1,99 @@
 const kelasService = require('../service/kelas.service');
-const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
+const ErrorFactory = require('../../lib/factories/error.factory');
 
 class KelasController {
-    create = ErrorHandler.asyncHandler(async (req, res) => {
-        const data = HttpRequest.getBodyParams(req);
-        const result = await kelasService.create(data);
-        return Http.Response.created(res, result, 'Kelas berhasil dibuat');
-    });
+    create = async (req, res, next) => {
+        try {
+            const data = req.extract.getBody();
+            const result = await kelasService.create(data);
+            return ResponseFactory.created(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    update = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = HttpRequest.getUrlParams(req);
-        const data = HttpRequest.getBodyParams(req);
-        const result = await kelasService.update(id, data);
-        return Http.Response.success(res, result, 'Kelas berhasil diperbarui');
-    });
+    update = async (req, res, next) => {
+        try {
+            const { id } = req.extract.getParams(['id']);
+            const data = req.extract.getBody();
+            const result = await kelasService.update(id, data);
+            return ResponseFactory.updated(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    delete = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = HttpRequest.getUrlParams(req);
-        await kelasService.delete(id);
-        return Http.Response.success(res, { id }, 'Kelas berhasil dihapus');
-    });
+    delete = async (req, res, next) => {
+        try {
+            const { id } = req.extract.getParams(['id']);
+            await kelasService.delete(id);
+            return ResponseFactory.deleted().send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    getAll = ErrorHandler.asyncHandler(async (req, res) => {
-        const result = await kelasService.getAll();
-        return Http.Response.success(res, result);
-    });
+    getAll = async (req, res, next) => {
+        try {
+            const result = await kelasService.getAll();
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
-    getInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
-        const query = HttpRequest.getQueryParams(req);
-        const result = await kelasService.getInitialStudentIntoClass(query);
-        return Http.Response.success(res, result, 'Data siswa awal untuk kelas berhasil diambil');
-    });
+    getInitialStudentIntoClass = async (req, res, next) => {
+        try {
+            const query = req.extract.getQuery();
+            const result = await kelasService.getInitialStudentIntoClass(query);
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
-    createKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
-        const data = HttpRequest.getBodyParams(req);
-        const result = await kelasService.createKelasProgram(data);
-        return Http.Response.created(res, result, 'Kelas program berhasil dibuat');
-    });
+    createKelasProgram = async (req, res, next) => {
+        try {
+            const data = req.extract.getBody();
+            const result = await kelasService.createKelasProgram(data);
+            return ResponseFactory.created(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    patchInitialStudentIntoClass = ErrorHandler.asyncHandler(async (req, res) => {
-        const { kelasProgramId } = HttpRequest.getUrlParams(req);
-        const data = HttpRequest.getBodyParams(req);
+    patchInitialStudentIntoClass = async (req, res, next) => {
+        try {
+            const { kelasProgramId } = req.extract.getParams(['kelasProgramId']);
+            const data = req.extract.getBody();
 
-        const result = await kelasService.patchInitialStudentIntoClass(kelasProgramId, data);
-        return Http.Response.success(res, result, 'Kelas program berhasil diupdate');
-    });
+            const result = await kelasService.patchInitialStudentIntoClass(kelasProgramId, data);
+            return ResponseFactory.updated(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    deleteKelasProgram = ErrorHandler.asyncHandler(async (req, res) => {
-        const { kelasProgramId } = HttpRequest.getUrlParams(req);
-        const result = await kelasService.deleteKelasProgram(kelasProgramId);
-        return Http.Response.success(res, 'Kelas program berhasil dihapus');
-    });
+    deleteKelasProgram = async (req, res, next) => {
+        try {
+            const { kelasProgramId } = req.extract.getParams(['kelasProgramId']);
+            const result = await kelasService.deleteKelasProgram(kelasProgramId);
+            return ResponseFactory.deleted().send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    getCCTV = ErrorHandler.asyncHandler(async (req, res) => {
-        const userId = req.user.id; // User ID siswa dari authentication
-
-        const result = await kelasService.getCCTVByUserId(userId);
-        return Http.Response.success(res, result, 'CCTV IP berhasil diambil');
-    });
+    getCCTV = async (req, res, next) => {
+        try {
+            const userId = req.user.id;
+            const result = await kelasService.getCCTVByUserId(userId);
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
 }
 

@@ -1,78 +1,85 @@
-const jwt = require('jsonwebtoken');
-const { prisma } = require('../config/prisma.config');
-const { UnauthorizedError } = require('../http/errors.http');
-require('dotenv').config();
+require("dotenv").config()
+const jwt = require("jsonwebtoken")
 
+class TokenUtil {
+  static #jwtSecret = process.env.JWT_SECRET
+  static #jwtExpire = '24h'
 
-class TokenUtils {
-  static #jwtSecret = process.env.JWT_SECRET;
-  static #jwtExpires = process.env.JWT_EXPIRES || '24h';
+  static generateToke(userId) {
+    const expireIn = this.#jwtExpire;
 
-  static async generateToken(userId) {
-    const expiresIn = this.#jwtExpires;
+    try {
 
-    const token = jwt.sign({ userId }, this.#jwtSecret, { expiresIn });
+      const token = jwt.sign({ userId }, this.#jwtSecret, { expireIn })
+      return token
+    } catch {
+      throw new Error("Failed to generate Token")
+    }
 
-    await prisma.token.create({
-      data: {
-        userId,
-        token
-      }
-    });
-
-    return token;
   }
 
-  static async verifyToken(token) {
+  static verifyToken(token) {
     try {
-      const decoded = jwt.verify(token, this.#jwtSecret);
 
-      const tokenRecord = await prisma.token.findFirst({
-        where: {
-          token,
-          userId: decoded.userId
-        }
-      });
+      const verify = jwt.verify(token, this.#jwtSecret)
+      return verify
 
-      if (!tokenRecord) {
-        throw new UnauthorizedError('Token tidak valid');
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId }
-      });
-
-      if (!user) {
-        throw new UnauthorizedError('User tidak ditemukan');
-      }
-
-      return user;
     } catch (error) {
-      if (error instanceof jwt.JsonWebTokenError) {
-        throw new UnauthorizedError('Token tidak valid');
-      }
-
       if (error instanceof jwt.TokenExpiredError) {
-        throw new UnauthorizedError('Token kadaluarsa');
+        throw new Error("Token has expired")
+      } else if (error instanceof jwt.JsonWebTokenError) {
+        throw new Error("Invalid Token")
       }
+      throw new Error("Token Verification failed")
+    }
 
-      throw error;
+  }
+
+  static decodeToken(token) {
+    try {
+      const decode = jwt.decode(token)
+      return decode
+
+    } catch (error) {
+      throw new Error("failed to decode token")
     }
   }
 
-  static async revokeToken(token) {
-    await prisma.token.deleteMany({
-      where: { token }
-    });
-    return true;
+  static getTokenFromHeader(authHeader) {
+    try {
+      if (!authHeader) {
+        throw new Error("authorization header is required")
+      }
+      if (!authHeader.startWith('Bearer ')) {
+        throw new Error("invalid authorization header format")
+      }
+
+      return authHeader.substring(7)
+
+
+    } catch (error) {
+      throw new Error("Invalid authorization header format")
+    }
   }
 
-  static async revokeAllUserTokens(userId) {
-    await prisma.token.deleteMany({
-      where: { userId }
-    });
-    return true;
+  static isTokenExpired(token) {
+    try {
+      const decode = this.decodeToken(token)
+
+      if (decode.exp) {
+        return false
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000)
+
+      return decode.exp < currentTime
+
+
+    } catch (error) {
+      return true
+    }
   }
+
 }
 
-module.exports = TokenUtils;
+module.exports = TokenUtil

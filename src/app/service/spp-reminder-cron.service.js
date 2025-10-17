@@ -13,7 +13,6 @@ class SppReminderCronService {
             const currentMonth = currentDate.format('MMMM');
             const currentYear = currentDate.year();
 
-            logger.info(`Starting SPP reminder process for ${currentMonth} ${currentYear}`);
 
             // Get all unpaid SPP for current month
             const unpaidSpp = await prisma.periodeSpp.findMany({
@@ -48,11 +47,9 @@ class SppReminderCronService {
             });
 
             if (unpaidSpp.length === 0) {
-                logger.info('No unpaid SPP found for current month');
                 return { message: 'No unpaid SPP found for current month' };
             }
 
-            logger.info(`Found ${unpaidSpp.length} unpaid SPP records`);
 
             const results = [];
             const errors = [];
@@ -62,7 +59,6 @@ class SppReminderCronService {
                     const result = await this.processSppReminder(spp);
                     results.push(result);
                 } catch (error) {
-                    logger.error(`Error processing SPP reminder for ${spp.id}:`, error);
                     errors.push({
                         sppId: spp.id,
                         siswaId: spp.programSiswa.siswa.id,
@@ -80,7 +76,6 @@ class SppReminderCronService {
             };
 
         } catch (error) {
-            logger.error('Error in SPP reminder cron job:', error);
             throw error;
         }
     }
@@ -217,11 +212,9 @@ class SppReminderCronService {
                 data: { pembayaranId: pembayaran.id }
             });
 
-            logger.info(`Created Xendit invoice for SPP ${spp.id}: ${xenditInvoice.id}`);
             return xenditInvoice;
 
         } catch (error) {
-            logger.error(`Error creating Xendit invoice for SPP ${spp.id}:`, error);
             throw error;
         }
     }
@@ -229,7 +222,6 @@ class SppReminderCronService {
     static async sendEmailReminder(spp, siswa, program, formattedAmount, xenditInvoice) {
         try {
             if (!siswa.user?.email) {
-                logger.warn(`No email found for siswa ${siswa.id}`);
                 return;
             }
 
@@ -250,10 +242,8 @@ class SppReminderCronService {
             };
 
             await EmailUtils.sendEmail(emailData);
-            logger.info(`Email reminder sent to ${siswa.user.email} for SPP ${spp.id}`);
 
         } catch (error) {
-            logger.error(`Error sending email reminder for SPP ${spp.id}:`, error);
             throw error;
         }
     }
@@ -261,13 +251,11 @@ class SppReminderCronService {
     static async sendWhatsAppReminder(spp, siswa, program, formattedAmount, xenditInvoice) {
         try {
             if (!siswa.noWhatsapp) {
-                logger.warn(`No WhatsApp number found for siswa ${siswa.id}`);
                 return;
             }
 
             // Validate phone number
             if (!WhatsAppUtils.validatePhoneNumber(siswa.noWhatsapp)) {
-                logger.warn(`Invalid WhatsApp number format for siswa ${siswa.id}: ${siswa.noWhatsapp}`);
                 return;
             }
 
@@ -285,12 +273,10 @@ class SppReminderCronService {
             const result = await WhatsAppUtils.sendSppReminder(siswa.noWhatsapp, sppData);
 
             if (result.success) {
-                logger.info(`WhatsApp reminder sent successfully to ${siswa.noWhatsapp} for SPP ${spp.id}`, {
                     messageSid: result.messageSid,
                     status: result.status
                 });
             } else {
-                logger.error(`Failed to send WhatsApp reminder to ${siswa.noWhatsapp} for SPP ${spp.id}:`, {
                     error: result.error,
                     code: result.code
                 });
@@ -299,7 +285,6 @@ class SppReminderCronService {
             return result;
 
         } catch (error) {
-            logger.error(`Error sending WhatsApp reminder for SPP ${spp.id}:`, error);
             throw error;
         }
     }

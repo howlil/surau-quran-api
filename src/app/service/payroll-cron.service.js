@@ -30,7 +30,6 @@ class PayrollCronService {
       for (const guru of gurus) {
         try {
           if (guru.payroll.length > 0) {
-            logger.info(`Payroll untuk guru ${guru.nama} periode ${periode} sudah ada`);
             continue;
           }
 
@@ -114,7 +113,6 @@ class PayrollCronService {
                 break;
 
               default:
-                logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
                 break;
             }
           });
@@ -168,18 +166,15 @@ class PayrollCronService {
             totalGaji: payroll.totalGaji
           });
 
-          logger.info(`Created payroll for guru ${guru.nama} with total gaji: ${payroll.totalGaji}`);
         } catch (error) {
           errors.push({
             guruId: guru.id,
             nama: guru.nama,
             error: error.message
           });
-          logger.error(`Error creating payroll for guru ${guru.nama}:`, error);
         }
       }
 
-      logger.info(`Monthly payroll generation completed. Success: ${results.length}, Errors: ${errors.length}`);
 
       return {
         success: results,
@@ -191,13 +186,11 @@ class PayrollCronService {
         }
       };
     } catch (error) {
-      logger.error('Error in monthly payroll generation:', error);
       throw error;
     }
   }
 
   static async runManualPayrollGeneration(bulan, tahun) {
-    logger.info(`Running manual payroll generation for ${bulan} ${tahun}...`);
 
     try {
       // Convert bulan name to MM format if needed
@@ -325,7 +318,6 @@ class PayrollCronService {
                 break;
 
               default:
-                logger.warn(`Unknown attendance status: ${absensi.statusKehadiran} for absensi ID: ${absensi.id}`);
                 break;
             }
           });
@@ -387,7 +379,6 @@ class PayrollCronService {
         }
       }
 
-      logger.info(`Manual payroll generation completed for ${periode}. Success: ${results.length}, Errors: ${errors.length}`);
 
       return {
         success: results,
@@ -399,7 +390,6 @@ class PayrollCronService {
         }
       };
     } catch (error) {
-      logger.error('Error in manual payroll generation:', error);
       throw error;
     }
   }

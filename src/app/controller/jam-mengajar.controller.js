@@ -1,33 +1,47 @@
 const jamMengajarService = require('../service/jam-mengajar.service');
-const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
 
 class JamMengajarController {
-    create = ErrorHandler.asyncHandler(async (req, res) => {
-        const data = HttpRequest.getBodyParams(req);
-        const result = await jamMengajarService.create(data);
-        return Http.Response.created(res, result, 'Jam mengajar berhasil dibuat');
-    });
+    create = async (req, res, next) => {
+        try {
+            const data = req.extract.getBody();
+            const result = await jamMengajarService.create(data);
+            return ResponseFactory.created(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    update = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = HttpRequest.getUrlParams(req);
-        const data = HttpRequest.getBodyParams(req);
-        const result = await jamMengajarService.update(id, data);
-        return Http.Response.success(res, result, 'Jam mengajar berhasil diperbarui');
-    });
+    update = async (req, res, next) => {
+        try {
+            const { id } = req.extract.getParams(['id']);
+            const data = req.extract.getBody();
+            const result = await jamMengajarService.update(id, data);
+            return ResponseFactory.updated(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
-    delete = ErrorHandler.asyncHandler(async (req, res) => {
-        const { id } = HttpRequest.getUrlParams(req);
-        await jamMengajarService.delete(id);
-        return Http.Response.success(res, { id }, 'Jam mengajar berhasil dihapus');
-    });
+    delete = async (req, res, next) => {
+        try {
+            const { id } = req.extract.getParams(['id']);
+            await jamMengajarService.delete(id);
+            return ResponseFactory.deleted().send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 
 
-    getAll = ErrorHandler.asyncHandler(async (req, res) => {
-        const result = await jamMengajarService.getAll();
-        return Http.Response.success(res, result);
-    });
+    getAll = async (req, res, next) => {
+        try {
+            const result = await jamMengajarService.getAll();
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
 }
 
 module.exports = new JamMengajarController();

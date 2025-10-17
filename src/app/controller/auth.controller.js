@@ -1,73 +1,96 @@
 const authService = require('../service/auth.service');
-const Http = require('../../lib/http');
-const HttpRequest = require('../../lib/http/request.http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError } = require('../../lib/http/error.handler.http');
 
 class AuthController {
 
-  login = ErrorHandler.asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
-    const result = await authService.login(email, password);
-    return Http.Response.success(res, result, 'Login berhasil');
-  }
-  );
-
-  logout = ErrorHandler.asyncHandler(async (req, res) => {
-    const token = Http.Request.getAuthToken(req);
-    if (!token) {
-      return Http.Response.unauthorized(res, 'Token tidak ditemukan');
-    }
-    await authService.logout(token);
-    return Http.Response.success(res, 'Logout berhasil');
-  });
-
-  createAdmin = ErrorHandler.asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const result = await authService.createAdmin(req.body, userId);
-    return Http.Response.created(res, result, 'Admin berhasil dibuat');
-  });
-
-  getAllAdmins = ErrorHandler.asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const filters = HttpRequest.getQueryParams(req, ['page', 'limit', 'nama']);
-    const result = await authService.getAllAdmins(userId, filters);
-    
-    const transformedData = {
-      ...result,
-      data: result.data
-        .filter(admin => admin.user.role === 'ADMIN')
-        .map(admin => ({
-          id: admin.id,
-          nama: admin.nama,
-          email: admin.user.email,
-        }))
-    };
-    
-    return Http.Response.success(res, transformedData, 'Daftar admin berhasil diambil');
-  });
-
-  updateAdmin = ErrorHandler.asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const adminId = req.params.id;
-    const result = await authService.updateAdmin(adminId, req.body, userId);
-    return Http.Response.success(res, result, 'Admin berhasil diperbarui');
-  });
-
-  deleteAdmin = ErrorHandler.asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const adminId = req.params.id;
-    await authService.deleteAdmin(adminId, userId);
-    return Http.Response.success(res, 'Admin berhasil dihapus');
-  });
-
-  forgotPassword = ErrorHandler.asyncHandler(async (req, res) => {
+  login = async (req, res, next) => {
     try {
-      const { email } = req.body;
+      const { email, password } = req.extract.getBody(['email', 'password']);
+      const result = await authService.login(email, password);
+      return ResponseFactory.get(result).send(res);
+    } catch (error) {
+      next(ErrorFactory.unauthorized(error.message));
+    }
+  };
+
+  logout = async (req, res, next) => {
+    try {
+      const token = req.extract.getHeaders(['authorization']).authorization?.replace('Bearer ', '');
+      if (!token) {
+        throw ErrorFactory.unauthorized('Token tidak ditemukan');
+      }
+      await authService.logout(token);
+      return ResponseFactory.get({ message: 'Logout berhasil' }).send(res);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createAdmin = async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const data = req.extract.getBody();
+      const result = await authService.createAdmin(data, userId);
+      return ResponseFactory.created(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
+
+  getAllAdmins = async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const filters = req.extract.getQuery(['page', 'limit', 'nama']);
+      const result = await authService.getAllAdmins(userId, filters);
+      
+      const transformedData = {
+        ...result,
+        data: result.data
+          .filter(admin => admin.user.role === 'ADMIN')
+          .map(admin => ({
+            id: admin.id,
+            nama: admin.nama,
+            email: admin.user.email,
+          }))
+      };
+      
+      return ResponseFactory.getAll(transformedData.data, transformedData.meta).send(res);
+    } catch (error) {
+next(error)
+    }
+  };
+
+  updateAdmin = async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const { id: adminId } = req.extract.getParams(['id']);
+      const data = req.extract.getBody();
+      const result = await authService.updateAdmin(adminId, data, userId);
+      return ResponseFactory.updated(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
+
+  deleteAdmin = async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const { id: adminId } = req.extract.getParams(['id']);
+      await authService.deleteAdmin(adminId, userId);
+      return ResponseFactory.deleted().send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
+
+  forgotPassword = async (req, res, next) => {
+    try {
+      const { email } = req.extract.getBody(['email']);
 
       if (!email) {
-        return Http.Response.badRequest(res, 'Email is required');
+        throw ErrorFactory.badRequest('Email is required');
       }
 
       const result = await authService.requestPasswordReset(email);
@@ -76,47 +99,58 @@ class AuthController {
       if (result.token) {
         // In development mode, return the token for testing
         if (process.env.NODE_ENV === 'development') {
-          return Http.Response.success(res, {
+          return ResponseFactory.get({
             message: result.message,
             token: result.token,
             resetLink: `${process.env.FRONTEND_URL}/reset-password?token=${result.token}`
-          }, 'Password reset token generated but email could not be sent');
+          }).send(res);
         }
       }
 
-      return Http.Response.success(res, result, 'Password reset email sent');
+      return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error('Error processing forgot password request:', error);
 
-      // Don't expose whether an email exists or not
-      if (error instanceof NotFoundError) {
-        return Http.Response.success(res, {
+      if (error.name === 'NotFoundError') {
+        return ResponseFactory.get({
           message: 'If the email exists, a password reset email has been sent'
-        });
+        }).send(res);
       }
 
-      return Http.Response.error(res, error.message);
+next(error)
     }
-  });
+  };
 
-  resetPassword = ErrorHandler.asyncHandler(async (req, res) => {
-    const { token, newPassword } = req.body;
-    const result = await authService.resetPassword(token, newPassword);
-    return Http.Response.success(res, result, result.message);
-  });
+  resetPassword = async (req, res, next) => {
+    try {
+      const { token, newPassword } = req.extract.getBody(['token', 'newPassword']);
+      const result = await authService.resetPassword(token, newPassword);
+      return ResponseFactory.get(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
-  changePassword = ErrorHandler.asyncHandler(async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
-    const userId = req.user.id;
-    const result = await authService.changePassword(userId, oldPassword, newPassword);
-    return Http.Response.success(res, null, result.message);
-  });
+  changePassword = async (req, res, next) => {
+    try {
+      const { oldPassword, newPassword } = req.extract.getBody(['oldPassword', 'newPassword']);
+      const userId = req.user.id;
+      const result = await authService.changePassword(userId, oldPassword, newPassword);
+      return ResponseFactory.get({ message: result.message }).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 
-  checkRoleByRfid = ErrorHandler.asyncHandler(async (req, res) => {
-    const { rfid } = req.body;
-    const result = await authService.checkRoleByRfid(rfid);
-    return Http.Response.success(res, result, 'Role berhasil ditemukan');
-  });
+  checkRoleByRfid = async (req, res, next) => {
+    try {
+      const { rfid } = req.extract.getBody(['rfid']);
+      const result = await authService.checkRoleByRfid(rfid);
+      return ResponseFactory.get(result).send(res);
+    } catch (error) {
+      next(error)
+    }
+  };
 }
 
 module.exports = new AuthController();

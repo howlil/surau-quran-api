@@ -1,44 +1,56 @@
 const sppService = require('../service/spp.service');
-const Http = require('../../lib/http');
-const ErrorHandler = require('../../lib/http/error.handler.htttp');
+const ResponseFactory = require('../../lib/factories/response.factory');
+const ErrorFactory = require('../../lib/factories/error.factory');
 
 class SppController {
-    getSppForAdmin = ErrorHandler.asyncHandler(async (req, res) => {
-        const { status, bulan, namaSiswa, page, limit } = req.query;
+    getSppForAdmin = async (req, res, next) => {
+        try {
+            const { status, bulan, namaSiswa, page, limit } = req.extract.getQuery(['status', 'bulan', 'namaSiswa', 'page', 'limit']);
 
-        const filters = {
-            status,
-            bulan,
-            namaSiswa,
-            page,
-            limit
-        };
+            const filters = {
+                status,
+                bulan,
+                namaSiswa,
+                page,
+                limit
+            };
 
-        const result = await sppService.getSppForAdmin(filters);
+            const result = await sppService.getSppForAdmin(filters);
 
-        return Http.Response.success(res, result, 'Data SPP berhasil diambil');
-    });
+            return ResponseFactory.getAll(result.data, result.meta).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
-    getSppForSiswa = ErrorHandler.asyncHandler(async (req, res) => {
-        const {page, limit } = req.query;
-        const userId = req.user.id;
+    getSppForSiswa = async (req, res, next) => {
+        try {
+            const {page, limit } = req.extract.getQuery(['page', 'limit']);
+            const userId = req.user.id;
 
-        const filters = {
-            page,
-            limit
-        };
+            const filters = {
+                page,
+                limit
+            };
 
-        const result = await sppService.getSppForSiswa(userId, filters);
+            const result = await sppService.getSppForSiswa(userId, filters);
 
-        return Http.Response.success(res, result, 'Data SPP siswa berhasil diambil');
-    });
+            return ResponseFactory.getAll(result.data, result.meta).send(res);
+        } catch (error) {
+      next(error)
+        }
+    };
 
-    getSppInvoice = ErrorHandler.asyncHandler(async (req, res) => {
-        const { pembayaranId } = req.params;
-        const result = await sppService.getSppInvoice(pembayaranId);
+    getSppInvoice = async (req, res, next) => {
+        try {
+            const { pembayaranId } = req.extract.getParams(['pembayaranId']);
+            const result = await sppService.getSppInvoice(pembayaranId);
 
-        return Http.Response.success(res, result, 'Invoice SPP berhasil diambil');
-    });
+            return ResponseFactory.get(result).send(res);
+        } catch (error) {
+            next(error)
+        }
+    };
     
 }
 

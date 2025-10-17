@@ -1,7 +1,6 @@
 // src/app/service/spp.service.js
 const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { NotFoundError, BadRequestError } = require('../../lib/http/errors.http');
+const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const { DATE_FORMATS } = require('../../lib/constants');
@@ -140,7 +139,6 @@ class SppService {
                 pagination: result.pagination
             };
         } catch (error) {
-            logger.error('Error getting SPP data for admin:', error);
             throw error;
         }
     }
@@ -154,7 +152,7 @@ class SppService {
             });
 
             if (!siswa) {
-                throw new NotFoundError('Data siswa tidak ditemukan');
+                throw ErrorFactory.notFound('Data siswa tidak ditemukan');
             }
 
             const programSiswaIds = await prisma.programSiswa.findMany({
@@ -237,7 +235,6 @@ class SppService {
                 pagination: result.pagination
             };
         } catch (error) {
-            logger.error('Error getting SPP data for student:', error);
             throw error;
         }
     }
@@ -254,7 +251,7 @@ class SppService {
             });
 
             if (!siswa) {
-                throw new NotFoundError('Data siswa tidak ditemukan');
+                throw ErrorFactory.notFound('Data siswa tidak ditemukan');
             }
 
             const periodeSppList = await prisma.periodeSpp.findMany({
@@ -275,12 +272,12 @@ class SppService {
             });
 
             if (periodeSppList.length !== periodeSppIds.length) {
-                throw new BadRequestError('Beberapa periode SPP tidak valid atau tidak ditemukan');
+                throw ErrorFactory.badRequest('Beberapa periode SPP tidak valid atau tidak ditemukan');
             }
 
             const paidSpp = periodeSppList.filter(spp => spp.pembayaran);
             if (paidSpp.length > 0) {
-                throw new BadRequestError(`${paidSpp.length} periode SPP sudah dibayar`);
+                throw ErrorFactory.badRequest(`${paidSpp.length} periode SPP sudah dibayar`);
             }
 
             let totalAmount = periodeSppList.reduce((sum, spp) => sum + Number(spp.totalTagihan), 0);
@@ -296,7 +293,7 @@ class SppService {
                 });
 
                 if (!voucher) {
-                    throw new NotFoundError('Voucher tidak valid atau tidak aktif');
+                    throw ErrorFactory.notFound('Voucher tidak valid atau tidak aktif');
                 }
 
                 voucherId = voucher.id;
@@ -305,7 +302,7 @@ class SppService {
                     discountAmount = Math.min(Number(voucher.nominal), totalAmount);
                 } else if (voucher.tipe === 'PERSENTASE') {
                     if (Number(voucher.nominal) > 100) {
-                        throw new BadRequestError(`Persentase diskon tidak boleh lebih dari 100%`);
+                        throw ErrorFactory.badRequest(`Persentase diskon tidak boleh lebih dari 100%`);
                     }
 
                     discountAmount = totalAmount * (Number(voucher.nominal) / 100);
@@ -315,7 +312,7 @@ class SppService {
             const finalAmount = totalAmount - discountAmount;
 
             if (finalAmount < 1000) {
-                throw new BadRequestError(`Total biaya setelah diskon minimal Rp 1.000. Saat ini: Rp ${finalAmount.toLocaleString('id-ID')}`);
+                throw ErrorFactory.badRequest(`Total biaya setelah diskon minimal Rp 1.000. Saat ini: Rp ${finalAmount.toLocaleString('id-ID')}`);
             }
 
             const periods = periodeSppList.map(spp => ({
@@ -365,7 +362,6 @@ class SppService {
                 }
             };
         } catch (error) {
-            logger.error('Error creating SPP payment:', error);
             throw error;
         }
     }
@@ -431,13 +427,7 @@ class SppService {
                 metodePembayaran: 'TUNAI'
             });
 
-            logger.info(`Successfully processed tunai SPP payment:`, {
-                pembayaranId: pembayaran.id,
-                siswaId: siswa.id,
-                periodeCount: periodeSppIds.length,
-                amount: finalAmount
-            });
-
+  
             return {
                 success: true,
                 message: 'Pembayaran SPP tunai berhasil',
@@ -461,7 +451,6 @@ class SppService {
                 }
             };
         } catch (error) {
-            logger.error('Error processing tunai SPP payment:', error);
             throw error;
         }
     }
@@ -491,11 +480,11 @@ class SppService {
             }
         });
 
-        if (!pembayaran) throw new NotFoundError('Pembayaran tidak ditemukan');
-        if (pembayaran.statusPembayaran !== 'PAID') throw new BadRequestError('Invoice hanya tersedia untuk transaksi yang sudah dibayar');
+        if (!pembayaran) throw ErrorFactory.notFound('Pembayaran tidak ditemukan');
+        if (pembayaran.statusPembayaran !== 'PAID') throw ErrorFactory.badRequest('Invoice hanya tersedia untuk transaksi yang sudah dibayar');
 
         const periode = pembayaran.periodeSpp;
-        if (!periode) throw new NotFoundError('Data periode SPP tidak ditemukan');
+        if (!periode) throw ErrorFactory.notFound('Data periode SPP tidak ditemukan');
 
         const siswa = periode.programSiswa.siswa;
 
@@ -530,7 +519,6 @@ class SppService {
 
     async generateFiveMonthsAhead(programSiswaId, tanggalDaftar = new Date(), tx = null) {
         try {
-            logger.info(`Generating 5 months SPP for programSiswa: ${programSiswaId}`);
 
             // Use transaction context if provided, otherwise use global prisma
             const db = tx || prisma;
@@ -554,7 +542,6 @@ class SppService {
             });
 
             if (!programSiswa) {
-                logger.error(`ProgramSiswa not found: ${programSiswaId}`);
                 throw new Error('Program siswa tidak ditemukan');
             }
 
@@ -579,7 +566,6 @@ class SppService {
                 });
 
                 if (existingSpp) {
-                    logger.info(`SPP already exists for ${programSiswa.siswa.namaMurid} - ${bulan} ${tahun}`);
                     continue;
                 }
 
@@ -597,14 +583,11 @@ class SppService {
                 });
 
                 createdSppRecords.push(sppRecord);
-                logger.info(`Created SPP for ${programSiswa.siswa.namaMurid} - ${bulan} ${tahun}: Rp ${biayaSpp.toLocaleString('id-ID')}`);
             }
 
-            logger.info(`Successfully generated ${createdSppRecords.length} SPP records for ${programSiswa.siswa.namaMurid}`);
             return createdSppRecords;
 
         } catch (error) {
-            logger.error('Error generating SPP 5 months ahead:', error);
             throw error;
         }
     }
@@ -661,7 +644,6 @@ class SppService {
             });
 
             if (existingSpp) {
-                logger.info(`SPP already exists for ${bulan} ${tahun}`);
                 return existingSpp;
             }
 
@@ -678,11 +660,9 @@ class SppService {
                 }
             });
 
-            logger.info(`Created single SPP for ${bulan} ${tahun}: Rp ${biayaSpp.toLocaleString('id-ID')}`);
             return sppRecord;
 
         } catch (error) {
-            logger.error('Error generating single SPP:', error);
             throw error;
         }
     }
