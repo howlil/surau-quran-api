@@ -158,8 +158,7 @@ class SiswaController {
       data.evidence = evidenceFile;
     }
 
-  
-    const result = await siswaService.createPendaftaranV2(data, kartuKeluargaFile);
+      const result = await siswaService.createPendaftaranV2(data, kartuKeluargaFile);
 
     if (result.success && result.data) {
       const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;

@@ -8,8 +8,6 @@ class SppReminderController {
         return Http.Response.success(res, result, 'SPP reminder process completed');
     });
 
-    
-
 }
 
 module.exports = new SppReminderController(); 
