@@ -20,8 +20,8 @@ class App {
         this.#app.use(express.json({ limit: '20mb', type: 'application/json', verify: (req, res, buf, encoding) => { req.rawBody = buf.toString(); } }));
         this.#app.use(express.urlencoded({ extended: true }))
         this.#app.use((req, res, next) => { req.container = awilixConfig.scope; next() });
-
-        this.#app.use(errorMiddleware.expressErrorHandler);
+        this.#app.use(require("./domain/route"))
+        this.#app.use(errorMiddleware.expressErrorHandler); 
 
     }
 

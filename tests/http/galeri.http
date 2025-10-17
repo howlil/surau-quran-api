@@ -1,0 +1,13 @@
+### Get All Galleries
+GET http://localhost:3000/api/v1/galleries
+Content-Type: application/json
+
+### Create Gallery
+POST http://localhost:3000/api/v1/gallery
+Content-Type: application/json
+
+{
+  "title": "Gallery Test",
+  "coverImage": "https://example.com/image.jpg"
+}
+
