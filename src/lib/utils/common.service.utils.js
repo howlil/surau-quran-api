@@ -20,13 +20,12 @@ class CommonServiceUtils {
         return `${currentYear}${randomNumber}`;
     }
 
-
-    static formatDate(date, format = "DD-MM-YYY") {
+    static formatDate(date, format = "DD-MM-YYYY") {
         return moment(date).format(format);
     }
 
 
-    static getCurrentDate(format = "DD-MM-YYY") {
+    static getCurrentDate(format = "DD-MM-YYYY") {
         return moment().format(format);
     }
 
@@ -158,8 +157,8 @@ class CommonServiceUtils {
         const endOfMonth = moment().endOf('month');
 
         return {
-            startDate: startOfMonth.format("DD-MM-YYY"),
-            endDate: endOfMonth.format("DD-MM-YYY"),
+            startDate: startOfMonth.format("DD-MM-YYYY"),
+            endDate: endOfMonth.format("DD-MM-YYYY"),
             startDateFormatted: startOfMonth.format('YYYY-MM-DD'),
             endDateFormatted: endOfMonth.format('YYYY-MM-DD')
         };
@@ -199,6 +198,7 @@ class CommonServiceUtils {
   
     static generateRandomToken(length = 32) {
         const crypto = require('crypto');
+const logger = require('../../lib/config/logger.config');
         return crypto.randomBytes(length).toString('hex');
     }
 

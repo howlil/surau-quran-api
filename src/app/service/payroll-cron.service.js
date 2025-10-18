@@ -1,8 +1,9 @@
 // File: src/lib/services/payroll-cron.service.js
 const cron = require('node-cron');
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const moment = require('moment');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class PayrollCronService {
 
@@ -184,6 +185,7 @@ class PayrollCronService {
         }
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -388,6 +390,7 @@ class PayrollCronService {
         }
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

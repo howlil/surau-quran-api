@@ -1,6 +1,7 @@
 const galeriService = require('../service/galeri.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
+const logger = require('../../lib/config/logger.config');
 
 class GaleriController {
     create = async (req, res, next) => {
@@ -18,7 +19,8 @@ class GaleriController {
             const result = await galeriService.create({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -28,6 +30,7 @@ class GaleriController {
             const result = await galeriService.getAll({ data: filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -44,7 +47,8 @@ class GaleriController {
             const result = await galeriService.update({ data, where: { id } });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -54,7 +58,8 @@ class GaleriController {
             await galeriService.delete({ where: { id } });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 }

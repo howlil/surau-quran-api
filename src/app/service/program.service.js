@@ -1,7 +1,8 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const FileUtils = require('../../lib/utils/file.utils');
+const logger = require('../../lib/config/logger.config');
 
 class ProgramService {
   async create(options) {
@@ -29,6 +30,7 @@ class ProgramService {
         cover: transformedResult.cover
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -75,6 +77,7 @@ class ProgramService {
         cover: transformedResult.cover
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -116,6 +119,7 @@ class ProgramService {
 
       return { id };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -150,6 +154,7 @@ class ProgramService {
         orderBy: { namaProgram: 'asc' }
       });
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -185,13 +190,14 @@ class ProgramService {
         programId: program.id,
         namaProgram: program.namaProgram,
         deskripsi: program.deskripsi,
-        cover: FileUtils.getImageUrl(program.cover),
+        cover: program.cover ? FileUtils.getImageUrl(program.cover) : null,
         tipeProgram: program.tipeProgram,
         biayaSpp: Number(program.biayaSpp),
         createdAt: program.createdAt,
         updatedAt: program.updatedAt
       }));
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -218,6 +224,7 @@ class ProgramService {
         cover: program.cover
       }));
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -391,6 +398,7 @@ class ProgramService {
       };
 
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

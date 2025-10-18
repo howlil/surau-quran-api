@@ -1,9 +1,10 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const FileUtils = require('../../lib/utils/file.utils');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class FinanceService {
     async create(options) {
@@ -376,7 +377,8 @@ class FinanceService {
 
             return financeRecord;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

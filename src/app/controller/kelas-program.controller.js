@@ -1,7 +1,8 @@
 const kelasProgramService = require('../service/kelas-program.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
+const logger = require('../../lib/config/logger.config');
 
 class KelasProgramController {
     createKelasProgram = async (req, res, next) => {
@@ -10,7 +11,8 @@ class KelasProgramController {
             const result = await kelasProgramService.createKelasProgram(data);
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -22,7 +24,8 @@ class KelasProgramController {
             const result = await kelasProgramService.patchInitialStudentIntoClass(kelasProgramId, data);
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -32,7 +35,8 @@ class KelasProgramController {
             const result = await kelasProgramService.deleteKelasProgram(kelasProgramId);
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -43,7 +47,8 @@ class KelasProgramController {
             const result = await kelasProgramService.getInitialStudentIntoClass(query);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -66,7 +71,8 @@ class KelasProgramController {
             const result = await kelasProgramService.addKelasPengganti(guru.id, data);
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error);
+            logger.error(error);
+      next(error);
         }
     };
 
@@ -87,7 +93,8 @@ class KelasProgramController {
             const result = await kelasProgramService.removeKelasPengganti(guru.id, kelasProgramId);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error);
+            logger.error(error);
+      next(error);
         }
     };
 
@@ -98,7 +105,8 @@ class KelasProgramController {
             const result = await kelasProgramService.getSiswaKelasPengganti(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 }

@@ -1,4 +1,5 @@
-const { prisma } = require('../config/prisma.config');
+const prisma  = require('../config/prisma.config');
+const logger = require('../../lib/config/logger.config');
 
 class PrismaUtils {
   static async paginate(model, options = {}) {
@@ -44,6 +45,7 @@ class PrismaUtils {
         }
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

@@ -202,7 +202,7 @@ model Pendaftaran {
   id               String   @id @default(uuid())
   siswaId          String   @unique
   tanggalDaftar    String
-  biayaPendaftaran Decimal  @db.Decimal(10, 2)
+  biayaPendaftaran Decimal  @db.Decimal(10, 2)  
   pembayaranId     String?  @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -565,6 +565,7 @@ model Chanel {
   id                     String                   @id @default(uuid())
   chanelName             String
   isOther                Boolean?                 @default(false)
+  count                  Int                      @default(0)
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
   PendaftaranPrivateTemp PendaftaranPrivateTemp[]

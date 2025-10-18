@@ -1,7 +1,8 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class KelasProgramService {
 
@@ -646,7 +647,8 @@ class KelasProgramService {
                 };
             });
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -698,7 +700,8 @@ class KelasProgramService {
 
             return { kelasProgramId };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -966,7 +969,8 @@ class KelasProgramService {
                 absensiCreated: true
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -1050,7 +1054,8 @@ class KelasProgramService {
                 }))
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -1128,7 +1133,8 @@ class KelasProgramService {
 
             return transformedData;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

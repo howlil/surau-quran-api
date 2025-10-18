@@ -1,7 +1,8 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class RfidService {
     async searchUser(filters = {}) {
@@ -105,7 +106,8 @@ class RfidService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -159,7 +161,8 @@ class RfidService {
                 registeredAt: new Date()
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -218,7 +221,8 @@ class RfidService {
                 updatedAt: new Date()
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -260,7 +264,8 @@ class RfidService {
                 deletedAt: new Date()
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -395,7 +400,8 @@ class RfidService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 

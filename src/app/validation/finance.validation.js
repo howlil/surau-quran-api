@@ -77,70 +77,69 @@ class FinanceValidation {
     }
 
     static getFinanceQuery() {
-        return ValidatorFactory.create(
-            Joi.object({
-                startDate: Joi.string()
-                    .pattern(/^\d{2}-\d{2}-\d{4}$/)
-                    .optional()
-                    .messages({
-                        'string.pattern.base': 'Format startDate harus DD-MM-YYYY'
-                    }),
-                endDate: Joi.string()
-                    .pattern(/^\d{2}-\d{2}-\d{4}$/)
-                    .optional()
-                    .messages({
-                        'string.pattern.base': 'Format endDate harus DD-MM-YYYY'
-                    }),
-                type: Joi.string().valid('INCOME', 'EXPENSE').optional()
-                    .messages({
-                        'any.only': 'Type harus INCOME atau EXPENSE'
-                    }),
-                page: Joi.number().integer().min(1).default(1)
-                    .messages({
-                        'number.base': 'Page harus berupa angka',
-                        'number.integer': 'Page harus berupa bilangan bulat',
-                        'number.min': 'Page minimal 1'
-                    }),
-                limit: Joi.number().integer().min(1).max(100).default(10)
-                    .messages({
-                        'number.base': 'Limit harus berupa angka',
-                        'number.integer': 'Limit harus berupa bilangan bulat',
-                        'number.min': 'Limit minimal 1',
-                        'number.max': 'Limit maksimal 100'
-                    })
-            }).custom((value, helpers) => {
-                const { startDate, endDate } = value;
+        return Joi.object({
+            startDate: Joi.string()
+                .pattern(/^\d{2}-\d{2}-\d{4}$/)
+                .optional()
+                .messages({
+                    'string.pattern.base': 'Format startDate harus DD-MM-YYYY'
+                }),
+            endDate: Joi.string()
+                .pattern(/^\d{2}-\d{2}-\d{4}$/)
+                .optional()
+                .messages({
+                    'string.pattern.base': 'Format endDate harus DD-MM-YYYY'
+                }),
+            type: Joi.string().valid('INCOME', 'EXPENSE').optional()
+                .messages({
+                    'any.only': 'Type harus INCOME atau EXPENSE'
+                }),
+            page: Joi.number().integer().min(1).default(1)
+                .messages({
+                    'number.base': 'Page harus berupa angka',
+                    'number.integer': 'Page harus berupa bilangan bulat',
+                    'number.min': 'Page minimal 1'
+                }),
+            limit: Joi.number().integer().min(1).max(100).default(10)
+                .messages({
+                    'number.base': 'Limit harus berupa angka',
+                    'number.integer': 'Limit harus berupa bilangan bulat',
+                    'number.min': 'Limit minimal 1',
+                    'number.max': 'Limit maksimal 100'
+                })
+        }).custom((value, helpers) => {
+            const { startDate, endDate } = value;
 
-                // Jika ada endDate, harus ada startDate
-                if (endDate && !startDate) {
+            // Jika ada endDate, harus ada startDate
+            if (endDate && !startDate) {
+                return helpers.error('any.invalid', {
+                    message: 'Jika menggunakan endDate, startDate juga harus diisi'
+                });
+            }
+
+            // Jika ada kedua tanggal, validasi startDate < endDate
+            if (startDate && endDate) {
+                const start = moment(startDate, 'DD-MM-YYYY');
+                const end = moment(endDate, 'DD-MM-YYYY');
+
+                if (!start.isValid() || !end.isValid()) {
                     return helpers.error('any.invalid', {
-                        message: 'Jika menggunakan endDate, startDate juga harus diisi'
+                        message: 'Format tanggal tidak valid'
                     });
                 }
 
-                // Jika ada kedua tanggal, validasi startDate < endDate
-                if (startDate && endDate) {
-                    const start = moment(startDate, 'DD-MM-YYYY');
-                    const end = moment(endDate, 'DD-MM-YYYY');
-
-                    if (!start.isValid() || !end.isValid()) {
-                        return helpers.error('any.invalid', {
-                            message: 'Format tanggal tidak valid'
-                        });
-                    }
-
-                    if (start.isAfter(end)) {
-                        return helpers.error('any.invalid', {
-                            message: 'StartDate harus lebih kecil atau sama dengan endDate'
-                        });
-                    }
+                if (start.isAfter(end)) {
+                    return helpers.error('any.invalid', {
+                        message: 'StartDate harus lebih kecil atau sama dengan endDate'
+                    });
                 }
+            }
 
-                return value;
-            }).messages({
-                'any.invalid': '{{#message}}'
-            })
-        );
+            return value;
+        }).messages({
+            'any.invalid': '{{#message}}'
+        })
+
     }
 }
 

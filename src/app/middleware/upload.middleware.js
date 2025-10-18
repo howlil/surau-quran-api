@@ -1,4 +1,5 @@
 const UploadFactory = require('../../lib/factories/upload.factory');
+const logger = require('../../lib/config/logger.config');
 
 const uploadFactory = new UploadFactory();
 

@@ -1,19 +1,18 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const TokenUtils = require('../../lib/utils/token.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
-const EmailUtils = require('../../lib/utils/email.utils');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
-const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const moment = require('moment');
+const logger = require('../../lib/config/logger.config');
 
 class AuthService {
     async #generateResetToken(userId) {
         return TokenUtils.generatePasswordResetToken(userId);
     }
 
-    async requestPasswordReset(email) {
+    async requestPasswordReset({ data }) {
         try {
+            const { email } = data;
 
             const user = await prisma.user.findUnique({
                 where: { email }
@@ -32,10 +31,10 @@ class AuthService {
 
             let emailSent = true;
             try {
-                await EmailUtils.sendPasswordResetEmail({
-                    email: user.email,
-                    resetLink
-                });
+                // await EmailUtils.sendPasswordResetEmail({
+                //     email: user.email,
+                //     resetLink
+                // });
             } catch (emailError) {
                 emailSent = false;
             }
@@ -47,12 +46,15 @@ class AuthService {
                 token: !emailSent ? resetToken : undefined
             };
         } catch (error) {
+            logger.error(error);
             throw error;
         }
     }
 
-    async resetPassword(token, newPassword) {
+    async resetPassword({ data }) {
         try {
+            const { token, newPassword } = data;
+
             // Verify password reset token
             let decoded;
             try {
@@ -73,7 +75,7 @@ class AuthService {
             }
 
             // Hash new password
-            const hashedPassword = await PasswordUtils.hash(newPassword);
+            const hashedPassword = await PasswordUtils.hashPassword(newPassword);
 
             // Update password
             await prisma.user.update({
@@ -84,21 +86,23 @@ class AuthService {
             });
 
             try {
-                await EmailUtils.sendPasswordChangedEmail({
-                    email: user.email
-                });
+                // await EmailUtils.sendPasswordChangedEmail({
+                //     email: user.email
+                // });
             } catch (emailError) {
                 // Don't throw error here as password was already changed
             }
 
             return { message: 'Password reset successfully' };
         } catch (error) {
+            logger.error(error);
             throw error;
         }
     }
 
-    async changePassword(userId, oldPassword, newPassword) {
+    async changePassword({ data, userId }) {
         try {
+            const { oldPassword, newPassword } = data;
 
             const user = await prisma.user.findUnique({
                 where: { id: userId }
@@ -108,13 +112,13 @@ class AuthService {
                 throw ErrorFactory.notFound('User tidak ditemukan');
             }
 
-            const isValidOldPassword = await PasswordUtils.verify(oldPassword, user.password);
+            const isValidOldPassword = await PasswordUtils.verifyPassword(oldPassword, user.password);
 
             if (!isValidOldPassword) {
                 throw ErrorFactory.unauthorized('Password lama tidak valid');
             }
 
-            const hashedNewPassword = await PasswordUtils.hash(newPassword);
+            const hashedNewPassword = await PasswordUtils.hashPassword(newPassword);
 
             await prisma.user.update({
                 where: { id: userId },
@@ -125,9 +129,9 @@ class AuthService {
 
 
             try {
-                await EmailUtils.sendPasswordChangedEmail({
-                    email: user.email
-                });
+                // await EmailUtils.sendPasswordChangedEmail({
+                //     email: user.email
+                // });
             } catch (emailError) {
 
             }
@@ -139,7 +143,9 @@ class AuthService {
         }
     }
 
-    async login(email, password) {
+    async login({ data }) {
+        const { email, password } = data;
+
         if (!email || !password) {
             throw ErrorFactory.badRequest('Email dan password harus diisi');
         }
@@ -158,7 +164,7 @@ class AuthService {
                 throw ErrorFactory.unauthorized('Email atau password salah');
             }
 
-            const isValidPassword = await PasswordUtils.verify(password, user.password);
+            const isValidPassword = await PasswordUtils.verifyPassword(password, user.password);
 
             if (!isValidPassword) {
                 throw ErrorFactory.unauthorized('Email atau password salah');
@@ -180,7 +186,6 @@ class AuthService {
             const token = await TokenUtils.generateToken(user.id);
 
             return {
-                success: true,
                 token,
                 user: {
                     id: user.id,
@@ -190,21 +195,16 @@ class AuthService {
                 }
             };
         } catch (error) {
-            throw error;
-        }
-    }
-
-    async logout(token) {
-        try {
-            return await TokenUtils.revokeToken(token);
-        } catch (error) {
+            logger.error(error);
             throw error;
         }
     }
 
 
-    async checkRoleByRfid(rfid) {
+    async checkRoleByRfid({ data }) {
         try {
+            const { rfid } = data;
+
             const user = await prisma.user.findUnique({
                 where: { rfid },
                 select: {
@@ -220,6 +220,7 @@ class AuthService {
                 role: user.role
             };
         } catch (error) {
+            logger.error(error);
             throw error;
         }
     }

@@ -1,5 +1,7 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
+const moment = require('moment');
 
 class StatisticsService {
     async getStudentCounts(filters = {}) {
@@ -79,7 +81,8 @@ class StatisticsService {
                 newStudents
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -126,11 +129,11 @@ class StatisticsService {
             const pendaftaranPayments = await prisma.pembayaran.findMany({
                 where: {
                     tipePembayaran: 'PENDAFTARAN',
-                    statusPembayaran: 'PAID',
+                    statusPembayaran: 'SETTLEMENT',
                     ...dateFilter
                 },
                 select: {
-                    jumlahTagihan: true,
+                    totalTagihan: true,
                     tanggalPembayaran: true
                 }
             });
@@ -138,11 +141,11 @@ class StatisticsService {
             const sppPayments = await prisma.pembayaran.findMany({
                 where: {
                     tipePembayaran: 'SPP',
-                    statusPembayaran: 'PAID',
+                    statusPembayaran: 'SETTLEMENT',
                     ...dateFilter
                 },
                 select: {
-                    jumlahTagihan: true,
+                    totalTagihan: true,
                     tanggalPembayaran: true
                 }
             });
@@ -259,7 +262,7 @@ class StatisticsService {
             // Get payroll data
             const payrollData = await prisma.payroll.findMany({
                 where: {
-                    status: 'SELESAI',
+                    status: 'COMPLETED',
                     ...payrollFilter
                 },
                 select: {
@@ -292,7 +295,8 @@ class StatisticsService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -417,7 +421,8 @@ class StatisticsService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -452,7 +457,7 @@ class StatisticsService {
                 };
             }
 
-            result[period].value += Number(item.jumlahTagihan || item.totalGaji || 0);
+            result[period].value += Number(item.totalTagihan || item.totalGaji || 0);
             result[period].count += 1;
         });
 
@@ -575,7 +580,8 @@ class StatisticsService {
             return result;
 
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

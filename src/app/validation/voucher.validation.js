@@ -19,9 +19,19 @@ class VoucherValidation {
           'any.required': 'Tipe voucher wajib diisi'
         }),
       nominal: Joi.number().precision(2).positive().required()
+        .custom((value, helpers) => {
+          const tipe = helpers.state.ancestors[0].tipe;
+          if (tipe === 'PERSENTASE') {
+            if (value < 0 || value > 100) {
+              return helpers.error('number.range', { min: 0, max: 100 });
+            }
+          }
+          return value;
+        })
         .messages({
           'number.base': 'Nominal harus berupa angka',
           'number.positive': 'Nominal harus lebih dari 0',
+          'number.range': 'Persentase harus antara 0-100%',
           'any.required': 'Nominal wajib diisi'
         }),
       isActive: Joi.boolean().default(true)
@@ -46,9 +56,19 @@ class VoucherValidation {
           'any.only': 'Tipe voucher harus PERSENTASE atau NOMINAL'
         }),
       nominal: Joi.number().precision(2).positive().optional()
+        .custom((value, helpers) => {
+          const tipe = helpers.state.ancestors[0].tipe;
+          if (tipe === 'PERSENTASE' && value !== undefined) {
+            if (value < 0 || value > 100) {
+              return helpers.error('number.range', { min: 0, max: 100 });
+            }
+          }
+          return value;
+        })
         .messages({
           'number.base': 'Nominal harus berupa angka',
-          'number.positive': 'Nominal harus lebih dari 0'
+          'number.positive': 'Nominal harus lebih dari 0',
+          'number.range': 'Persentase harus antara 0-100%'
         }),
       isActive: Joi.boolean().optional()
         .messages({

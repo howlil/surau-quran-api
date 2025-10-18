@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "gen:domain": "node ./tools/generate-domain.js"
+    "gen:domain": "node ./tools/generate-domain.js",
+    "db:seed": "node src/database/cli.js seed",
+    "db:reset": "node src/database/cli.js reset",
+    "db:fresh": "node src/database/cli.js fresh"
   },
   "keywords": [
     "school",

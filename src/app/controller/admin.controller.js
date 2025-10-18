@@ -1,5 +1,6 @@
 const adminService = require('../service/admin.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 class AdminController {
 
   createAdmin = async (req, res, next) => {
@@ -9,6 +10,7 @@ class AdminController {
       const result = await adminService.createAdmin(data, userId);
       return ResponseFactory.created(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -20,6 +22,7 @@ class AdminController {
       const result = await adminService.getAllAdmins(userId, filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -32,6 +35,7 @@ class AdminController {
       const result = await adminService.updateAdmin(adminId, data, userId);
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -43,6 +47,7 @@ class AdminController {
       await adminService.deleteAdmin(adminId, userId);
       return ResponseFactory.deleted().send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };

@@ -1,16 +1,18 @@
 const rfidService = require('../service/rfid.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
+const logger = require('../../lib/config/logger.config');
 
 class RfidController {
-    // Search users (guru dan siswa) untuk pendaftaran RFID
+
     searchUser = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['search', 'role', 'page', 'limit']);
             const result = await rfidService.searchUser(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -20,7 +22,8 @@ class RfidController {
             const result = await rfidService.registerRfid(userId, rfid);
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -31,7 +34,8 @@ class RfidController {
             const result = await rfidService.updateRfid(id, rfid);
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -41,7 +45,8 @@ class RfidController {
             const result = await rfidService.deleteRfid(id);
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -51,7 +56,8 @@ class RfidController {
             const result = await rfidService.getRfidList(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 

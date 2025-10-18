@@ -1,5 +1,6 @@
 const kelasService = require('../service/kelas.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 
 class KelasController {
     create = async (req, res, next) => {
@@ -8,7 +9,8 @@ class KelasController {
             const result = await kelasService.create({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -19,7 +21,8 @@ class KelasController {
             const result = await kelasService.update({ data, where: { id } });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -29,7 +32,8 @@ class KelasController {
             await kelasService.delete({ where: { id } });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -38,7 +42,8 @@ class KelasController {
             const result = await kelasService.getAll();
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -50,7 +55,8 @@ class KelasController {
             const result = await kelasService.getCCTVByUserId(userId);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 

@@ -1,8 +1,9 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const financeService = require('./finance.service');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class SppService {
     async getSppForAdmin(filters = {}) {
@@ -81,7 +82,7 @@ class SppService {
                         select: {
                             id: true,
                             tanggalPembayaran: true,
-                            jumlahTagihan: true,
+                            totalTagihan: true,
                             statusPembayaran: true,
                             metodePembayaran: true
                         }
@@ -121,7 +122,7 @@ class SppService {
                 pembayaran: spp.pembayaran ? {
                     id: spp.pembayaran.id,
                     tanggal: spp.pembayaran.tanggalPembayaran,
-                    jumlah: Number(spp.pembayaran.jumlahTagihan),
+                    jumlah: Number(spp.pembayaran.totalTagihan),
                     status: spp.pembayaran.statusPembayaran,
                     metode: spp.pembayaran.metodePembayaran
                 } : null,
@@ -137,7 +138,8 @@ class SppService {
                 pagination: result.pagination
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -194,7 +196,7 @@ class SppService {
                         select: {
                             id: true,
                             tanggalPembayaran: true,
-                            jumlahTagihan: true,
+                            totalTagihan: true,
                             statusPembayaran: true
                         }
                     }
@@ -217,7 +219,7 @@ class SppService {
                 totalTagihan: Number(spp.totalTagihan),
                 idPembayaran: spp.pembayaran?.id,
                 statusPembayaran: spp.pembayaran?.statusPembayaran,
-                isPaid: !!spp.pembayaran?.statusPembayaran && ['PAID', 'SETTLED'].includes(spp.pembayaran.statusPembayaran)
+                isPaid: !!spp.pembayaran?.statusPembayaran && ['SETTLEMENT'].includes(spp.pembayaran.statusPembayaran)
             })).sort((a, b) => {
                 // Sort by year first, then by month number
                 if (a.tahun !== b.tahun) {
@@ -233,7 +235,8 @@ class SppService {
                 pagination: result.pagination
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -299,8 +302,8 @@ class SppService {
                 if (voucher.tipe === 'NOMINAL') {
                     discountAmount = Math.min(Number(voucher.nominal), totalAmount);
                 } else if (voucher.tipe === 'PERSENTASE') {
-                    if (Number(voucher.nominal) > 100) {
-                        throw ErrorFactory.badRequest(`Persentase diskon tidak boleh lebih dari 100%`);
+                    if (Number(voucher.nominal) < 0 || Number(voucher.nominal) > 100) {
+                        throw ErrorFactory.badRequest(`Persentase diskon harus antara 0-100%. Saat ini: ${voucher.nominal}%`);
                     }
 
                     discountAmount = totalAmount * (Number(voucher.nominal) / 100);
@@ -360,7 +363,8 @@ class SppService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -386,7 +390,7 @@ class SppService {
                     tipePembayaran: 'SPP',
                     metodePembayaran: 'TUNAI',
                     jumlahTagihan: finalAmount,
-                    statusPembayaran: 'PAID',
+                    statusPembayaran: 'SETTLEMENT',
                     tanggalPembayaran: new Date().toISOString().split('T')[0],
                     evidence: evidence
                 }
@@ -449,7 +453,8 @@ class SppService {
                 }
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -479,7 +484,7 @@ class SppService {
         });
 
         if (!pembayaran) throw ErrorFactory.notFound('Pembayaran tidak ditemukan');
-        if (pembayaran.statusPembayaran !== 'PAID') throw ErrorFactory.badRequest('Invoice hanya tersedia untuk transaksi yang sudah dibayar');
+        if (pembayaran.statusPembayaran !== 'SETTLEMENT') throw ErrorFactory.badRequest('Invoice hanya tersedia untuk transaksi yang sudah dibayar');
 
         const periode = pembayaran.periodeSpp;
         if (!periode) throw ErrorFactory.notFound('Data periode SPP tidak ditemukan');
@@ -586,7 +591,8 @@ class SppService {
             return createdSppRecords;
 
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -661,7 +667,8 @@ class SppService {
             return sppRecord;
 
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

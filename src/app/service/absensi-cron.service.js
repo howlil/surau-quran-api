@@ -1,6 +1,7 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const moment = require('moment');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class AbsensiCronService {
     static async createDailyAbsensiGuru() {

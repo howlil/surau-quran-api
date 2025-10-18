@@ -1,7 +1,8 @@
 const guruService = require('../service/guru.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
+const logger = require('../../lib/config/logger.config');
 
 class GuruController {
   create = async (req, res, next) => {
@@ -20,6 +21,7 @@ class GuruController {
       const result = await guruService.create({ data });
       return ResponseFactory.created(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -41,6 +43,7 @@ class GuruController {
       const result = await guruService.update({ data, where: { id } });
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -51,6 +54,7 @@ class GuruController {
       await guruService.delete({ where: { id } });
       return ResponseFactory.deleted().send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -63,6 +67,7 @@ class GuruController {
       const result = await guruService.getAll({ data: filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -74,6 +79,7 @@ class GuruController {
       const result = await guruService.getAllGuruWithSchedules(filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -93,6 +99,7 @@ class GuruController {
       const result = await guruService.getKelasProgramWithStudents(guru.id);
       return ResponseFactory.get(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error);
     }
   };
@@ -117,6 +124,7 @@ class GuruController {
       const fileStream = require('fs').createReadStream(filePath);
       fileStream.pipe(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };

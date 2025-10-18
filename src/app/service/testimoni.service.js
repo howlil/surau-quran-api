@@ -1,7 +1,8 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const FileUtils = require('../../lib/utils/file.utils');
+const logger = require('../../lib/config/logger.config');
 
 class TestimoniService {
     async create(options) {

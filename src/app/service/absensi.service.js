@@ -1,9 +1,10 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const FileUtils = require('../../lib/utils/file.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const moment = require('moment');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 class AbsensiService {
 
     async getAbsensiSiswaForAdmin(filters = {}) {
@@ -108,7 +109,8 @@ class AbsensiService {
             };
             return transformedResult;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -339,7 +341,8 @@ class AbsensiService {
                 pagination: result.pagination
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -496,7 +499,8 @@ class AbsensiService {
 
             return result;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -630,7 +634,8 @@ class AbsensiService {
                 isTemporary: false
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -835,7 +840,8 @@ class AbsensiService {
             }
 
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -957,7 +963,8 @@ class AbsensiService {
 
             return result;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -1146,7 +1153,8 @@ class AbsensiService {
 
             return result;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -1518,7 +1526,8 @@ class AbsensiService {
             };
 
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -1745,7 +1754,8 @@ class AbsensiService {
                 data: transformedData
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

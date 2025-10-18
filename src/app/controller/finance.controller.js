@@ -1,5 +1,6 @@
 const financeService = require('../service/finance.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 
 class FinanceController {
     create = async (req, res, next) => {
@@ -13,7 +14,8 @@ class FinanceController {
             const result = await financeService.create({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -31,6 +33,7 @@ class FinanceController {
 
             return ResponseFactory.get(responseData).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -51,7 +54,8 @@ class FinanceController {
             const result = await financeService.update({ data, where: { id } });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -61,7 +65,8 @@ class FinanceController {
             await financeService.delete({ where: { id } });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 }

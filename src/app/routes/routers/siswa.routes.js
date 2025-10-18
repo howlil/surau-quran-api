@@ -38,29 +38,6 @@ router.patch(
   siswaController.updateStatusSiswa
 );
 
-router.post(
-  '/v1/pendaftaran',
-  uploadEvidencePendaftaranMiddleware,
-  validationMiddleware.validateBody(siswaValidation.pendaftaranSiswa()),
-  siswaController.pendaftaranSiswa
-);
-
-// Pendaftaran V2 dengan support private program (multipart/form-data)
-router.post(
-  '/v2/pendaftaran',
-  uploadKartuKeluargaMiddleware,
-  validationMiddleware.validateBody(siswaValidation.pendaftaranSiswaV2()),
-  siswaController.pendaftaranSiswaV2
-);
-
-
-router.get(
-  '/v1/pendaftaran/invoice',
-  authMiddleware.authenticate,
-  authMiddleware.authorize(['SUPER_ADMIN', 'ADMIN_SURAU', 'ADMIN']),
-  validationMiddleware.validateQuery(siswaValidation.getPendaftaranInvoiceQuery()),
-  siswaController.getPendaftaranInvoice
-)
 
 router.get(
   '/v1/jadwal/siswa',

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `chanel` ADD COLUMN `count` INTEGER NOT NULL DEFAULT 0;

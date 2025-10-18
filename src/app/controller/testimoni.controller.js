@@ -1,5 +1,6 @@
 const testimoniService = require('../service/testimoni.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 
 class TestimoniController {
     create = async (req, res, next) => {
@@ -13,7 +14,8 @@ class TestimoniController {
             const result = await testimoniService.create({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -23,7 +25,8 @@ class TestimoniController {
             const result = await testimoniService.getAll({ data: filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -42,7 +45,8 @@ class TestimoniController {
             const result = await testimoniService.update({ data, where: { id } });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -52,7 +56,8 @@ class TestimoniController {
             await testimoniService.delete({ where: { id } });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 }

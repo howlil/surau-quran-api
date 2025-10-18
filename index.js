@@ -1,3 +1,7 @@
 const app = require('./src/app');
 
-module.exports = app;
+try {
+    app.startUp()
+} catch (error) {
+    throw error
+}

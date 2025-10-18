@@ -1,5 +1,6 @@
 const sppService = require('../service/spp.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 
 class SppController {
     getSppForAdmin = async (req, res, next) => {
@@ -18,6 +19,7 @@ class SppController {
 
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -36,6 +38,7 @@ class SppController {
 
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -47,7 +50,8 @@ class SppController {
 
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
     

@@ -1,8 +1,9 @@
 const absensiService = require('../service/absensi.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const FileUtils = require('../../lib/utils/file.utils');
+const logger = require('../../lib/config/logger.config');
 
 class AbsensiController {
     getAbsensiSiswaForAdmin = async (req, res, next) => {
@@ -12,7 +13,8 @@ class AbsensiController {
             const result = await absensiService.getAbsensiSiswaForAdmin({ kelasId, tanggal });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -22,7 +24,8 @@ class AbsensiController {
             const result = await absensiService.getAbsensiGuruByDate(filters);
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -41,8 +44,10 @@ class AbsensiController {
             }
 
             return ResponseFactory.updated(result).send(res);
+
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -62,7 +67,8 @@ class AbsensiController {
             const result = await absensiService.updateAbsensiSiswa(kelasProgramId, siswaId, guru.id, statusKehadiran);
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
-            next(error);
+            logger.error(error);
+      next(error);
         }
     };
 
@@ -84,7 +90,8 @@ class AbsensiController {
             const result = await absensiService.getAbsensiSiswaByKelasProgram(kelasProgramId, guru.id, tanggal);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error);
+            logger.error(error);
+      next(error);
         }
     };
 
@@ -93,9 +100,10 @@ class AbsensiController {
             const { kelasProgramId, tanggal } = req.extract.getBody(['kelasProgramId', 'tanggal']);
 
             const result = await absensiService.createAbsensiSiswa(kelasProgramId, tanggal);
-            return ResponseFactory.created({ message: 'Absensi siswa berhasil dibuat' }).send(res);
+            return ResponseFactory.created(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -105,13 +113,10 @@ class AbsensiController {
 
             const result = await absensiService.updateAbsensiGuruWithRfid(rfid, tanggal, jam);
 
-            const message = result.isUpdate
-                ? 'Absensi guru berhasil diperbarui dengan RFID'
-                : 'Absensi guru berhasil dibuat dengan RFID';
-
-            return ResponseFactory.get({ ...result, message }).send(res);
+            return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 
@@ -120,7 +125,8 @@ class AbsensiController {
             const result = await absensiService.getAbsensiGuruTodayPublic();
             return ResponseFactory.get(result).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 

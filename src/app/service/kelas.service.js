@@ -1,6 +1,7 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const logger = require('../../lib/config/logger.config');
 
 class KelasService {
 
@@ -23,7 +24,8 @@ class KelasService {
 
             return kelas;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -60,7 +62,8 @@ class KelasService {
 
             return updated;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -91,7 +94,8 @@ class KelasService {
 
             return { id };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -112,7 +116,8 @@ class KelasService {
 
             return kelasList;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -212,7 +217,8 @@ class KelasService {
                 cctvList
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

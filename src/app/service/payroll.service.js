@@ -1,10 +1,10 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const financeService = require('./finance.service');
 const moment = require('moment');
 const axios = require('axios');
-const FormatUtils = require('../../lib/utils/format.utils');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class PayrollService {
 
@@ -245,6 +245,7 @@ class PayrollService {
         }
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -366,9 +367,9 @@ class PayrollService {
       const { tanggalKalkulasi, bulan, detail, catatan } = data;
       const updateData = {};
 
-      if (tanggalKalkulasi !== undefined) {
-        updateData.tanggalKalkulasi = FormatUtils.parseDate(tanggalKalkulasi);
-      }
+      // if (tanggalKalkulasi !== undefined) {
+      //   updateData.tanggalKalkulasi = FormatUtils.parseDate(tanggalKalkulasi);
+      // }
       // Jangan update bulan untuk menghindari inconsistency format
       // if (bulan !== undefined) {
       //   updateData.bulan = bulan;
@@ -544,6 +545,7 @@ class PayrollService {
 
       return updated;
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -840,6 +842,7 @@ class PayrollService {
         }
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -991,6 +994,7 @@ class PayrollService {
 
       return { success: true };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

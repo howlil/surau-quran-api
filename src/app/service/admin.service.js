@@ -1,7 +1,8 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PasswordUtils = require('../../lib/utils/password.utils');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
+const logger = require('../../lib/config/logger.config');
 
 class AdminService {
     async createAdmin(userData, requestUserId) {
@@ -22,7 +23,7 @@ class AdminService {
                 throw ErrorFactory.badRequest('Email sudah terdaftar');
             }
 
-            const hashedPassword = await PasswordUtils.hash(userData.password);
+            const hashedPassword = await PasswordUtils.hashPassword(userData.password);
 
             const role = 'ADMIN';
 
@@ -52,7 +53,8 @@ class AdminService {
                 role: result.user.role
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -106,7 +108,8 @@ class AdminService {
 
             return transformedData;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -148,7 +151,7 @@ class AdminService {
             }
 
             if (updateData.password) {
-                updateUserData.password = await PasswordUtils.hash(updateData.password);
+                updateUserData.password = await PasswordUtils.hashPassword(updateData.password);
             }
 
             if (updateData.nama) {
@@ -183,7 +186,8 @@ class AdminService {
                 updatedAt: result.admin.updatedAt
             };
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 
@@ -218,7 +222,8 @@ class AdminService {
 
             return true;
         } catch (error) {
-            throw error;
+            logger.error(error);
+      throw error;
         }
     }
 }

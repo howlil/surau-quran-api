@@ -1,15 +1,11 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const XenditUtils = require('../../lib/utils/xendit.utils');
-const PrismaUtils = require('../../lib/utils/prisma.utils');
+const midtransUtil = require('../../lib/utils/midtrans.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
-const DataGeneratorUtils = require('../../lib/utils/data-generator.utils');
-const EmailUtils = require('../../lib/utils/email.utils');
-const WhatsAppUtils = require('../../lib/utils/whatsapp.utils');
 const SppService = require('./spp.service');
-const financeService = require('./finance.service');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const moment = require('moment');
+const logger = require('../../lib/config/logger.config');
 
 class PaymentService {
 
@@ -26,127 +22,140 @@ class PaymentService {
     }
   }
 
-  async createPendaftaranInvoice(options) {
+  async createPendaftaranPayment(options) {
     try {
-      const { data } = options;
+      const data = options.data || options;
       const { email, namaMurid, totalBiaya, noWhatsapp, alamat } = data;
 
-      const externalId = XenditUtils.generateExternalId('DAFTAR');
+      // Validate required fields
+      if (!email) {
+        throw ErrorFactory.badRequest('Email tidak boleh kosong');
+      }
+      if (!namaMurid) {
+        throw ErrorFactory.badRequest('Nama murid tidak boleh kosong');
+      }
+      if (!totalBiaya || totalBiaya <= 0) {
+        throw ErrorFactory.badRequest('Total biaya tidak valid');
+      }
+
+      const externalId = CommonServiceUtils.generateExternalId('DAFTAR', Date.now());
 
       const invoiceData = {
-        externalId,
-        amount: Number(totalBiaya),
-        payerEmail: email,
-        description: `Pembayaran Pendaftaran - ${namaMurid}`,
-        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
-        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
-        items: [{
+        transaction_details: {
+          order_id: externalId,
+          gross_amount: Number(totalBiaya)
+        },
+        item_details: [{
           name: 'Biaya Pendaftaran',
           quantity: 1,
           price: Number(totalBiaya)
         }],
-        customer: {
-          givenNames: namaMurid || 'Calon Siswa',
+        customer_details: {
+          first_name: namaMurid,
+          last_name: namaMurid,
           email: email,
-          phoneNumber: noWhatsapp || '',
-          address: alamat && alamat.trim() !== '' ? alamat.trim() : ''
+          phone: noWhatsapp || '',
+          billing_address: {
+            first_name: namaMurid,
+            last_name: namaMurid,
+            email: email,
+            phone: noWhatsapp || '',
+            address: alamat && alamat.trim() !== '' ? alamat.trim() : ''
+          }
+        },
+        callbacks: {
+          finish: process.env.FRONTEND_URL + process.env.MIDTRANS_FINISH_REDIRECT_URL,
+          error: process.env.FRONTEND_URL + process.env.MIDTRANS_ERROR_REDIRECT_URL
         }
       };
 
-
-
-      const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
+      const response = await midtransUtil.createPayment(invoiceData);
 
       const pembayaran = await prisma.pembayaran.create({
         data: {
           tipePembayaran: 'PENDAFTARAN',
-          metodePembayaran: 'VIRTUAL_ACCOUNT',
-          jumlahTagihan: xenditInvoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          orderId: externalId,
+          totalTagihan: Number(totalBiaya),
+          metodePembayaran: 'PAYMENT_GATEWAY',
           statusPembayaran: 'PENDING',
           tanggalPembayaran: CommonServiceUtils.getCurrentDate()
         }
       });
 
-      await prisma.xenditPayment.create({
-        data: {
-          pembayaranId: pembayaran.id,
-          xenditInvoiceId: xenditInvoice.id,
-          xenditExternalId: xenditInvoice.externalId,
-          xenditPaymentUrl: xenditInvoice.invoiceUrl,
-          xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-          xenditExpireDate: CommonServiceUtils.formatDate(xenditInvoice.expiryDate),
-          xenditStatus: xenditInvoice.status
-        }
-      });
-
       return {
         pembayaranId: pembayaran.id,
-        xenditInvoiceUrl: xenditInvoice.invoiceUrl,
-        expireDate: xenditInvoice.expiryDate,
+        orderId: externalId,
+        redirectUrl: response.redirect_url,
+        token: response.token,
         amount: Number(totalBiaya),
-        xenditInvoiceId: xenditInvoice.id
+        expireDate: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour from now
       };
+
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
 
-  async createPendaftaranInvoiceV2(options) {
+  async createPendaftaranPaymentV2(options) {
     try {
       const { data } = options;
-      const {
-        externalId,
-        amount,
-        description,
-        payerEmail,
-        customer,
-        items
-      } = data;
+      const { email, namaMurid, totalBiaya, noWhatsapp, alamat, description, items } = data;
+
+      const externalId = CommonServiceUtils.generateExternalId('DAFTAR', Date.now());
 
       const invoiceData = {
-        externalId,
-        amount: Number(amount),
-        payerEmail,
-        description,
-        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
-        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
-        items: items.map(item => ({
+        transaction_details: {
+          order_id: externalId,
+          gross_amount: Number(totalBiaya)
+        },
+        item_details: items.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: Number(item.price)
         })),
-        customer: {
-          givenNames: customer.givenNames || 'Calon Siswa',
-          email: customer.email,
-          phoneNumber: customer.phoneNumber || '',
-          address: customer.address || ''
+        customer_details: {
+          first_name: namaMurid,
+          email: email,
+          phone: noWhatsapp || '',
+          billing_address: {
+            first_name: namaMurid,
+            email: email,
+            phone: noWhatsapp || '',
+            address: alamat && alamat.trim() !== '' ? alamat.trim() : ''
+          }
+        },
+        callbacks: {
+          finish: process.env.FRONTEND_URL + process.env.MIDTRANS_FINISH_REDIRECT_URL,
+          unfinish: process.env.FRONTEND_URL + process.env.MIDTRANS_UNFINISH_REDIRECT_URL,
+          error: process.env.FRONTEND_URL + process.env.MIDTRANS_ERROR_REDIRECT_URL
         }
       };
 
-
-      const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
-
-
+      const response = await midtransUtil.createPayment(invoiceData);
 
       const pembayaran = await prisma.pembayaran.create({
         data: {
           tipePembayaran: 'PENDAFTARAN',
-          metodePembayaran: 'VIRTUAL_ACCOUNT',
-          jumlahTagihan: Number(amount),
+          orderId: externalId,
+          totalTagihan: Number(totalBiaya),
+          metodePembayaran: 'PAYMENT_GATEWAY',
           statusPembayaran: 'PENDING',
           tanggalPembayaran: CommonServiceUtils.getCurrentDate()
         }
       });
 
-
       return {
         pembayaranId: pembayaran.id,
-        xenditInvoiceUrl: xenditInvoice.invoice_url || xenditInvoice.invoiceUrl || '',
-        expireDate: xenditInvoice.expiry_date || xenditInvoice.expiryDate,
-        amount: Number(amount),
-        xenditInvoiceId: xenditInvoice.id
+        orderId: externalId,
+        redirectUrl: response.redirect_url,
+        token: response.token,
+        amount: Number(totalBiaya),
+        expireDate: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour from now
       };
+
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -156,235 +165,236 @@ class PaymentService {
       const { data } = options;
       const { periodeSppIds, siswa, payment, voucherId } = data;
 
-      const externalId = XenditUtils.generateExternalId('SPP');
+      // const externalId = XenditUtils.generateExternalId('SPP');
 
-      let description = `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`;
-      if (payment.discountAmount > 0) {
-        description += ` (Diskon: Rp ${payment.discountAmount.toLocaleString('id-ID')})`;
-      }
+      // let description = `Pembayaran SPP - ${siswa.nama} - ${payment.periods}`;
+      // if (payment.discountAmount > 0) {
+      //   description += ` (Diskon: Rp ${payment.discountAmount.toLocaleString('id-ID')})`;
+      // }
 
-      const invoiceData = {
-        externalId,
-        amount: Number(payment.finalAmount),
-        payerEmail: siswa.email,
-        description: description,
-        successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
-        failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
-        items: [{
-          name: `SPP ${payment.periods}`,
-          quantity: 1,
-          price: Number(payment.finalAmount)
-        }],
-        customer: {
-          givenNames: siswa.nama || 'Siswa',
-          email: siswa.email,
-          phoneNumber: siswa.noWhatsapp || '08123456789',
-          address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : 'Alamat tidak tersedia' // Default address
-        }
-      };
+      // const invoiceData = {
+      //   externalId,
+      //   amount: Number(payment.finalAmount),
+      //   payerEmail: siswa.email,
+      //   description: description,
+      //   successRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_SUCCESS_REDIRECT_URL,
+      //   failureRedirectUrl: process.env.FRONTEND_URL + process.env.XENDIT_FAILURE_REDIRECT_URL,
+      //   items: [{
+      //     name: `SPP ${payment.periods}`,
+      //     quantity: 1,
+      //     price: Number(payment.finalAmount)
+      //   }],
+      //   customer: {
+      //     givenNames: siswa.nama || 'Siswa',
+      //     email: siswa.email,
+      //     phoneNumber: siswa.noWhatsapp || '08123456789',
+      //     address: siswa.alamat && siswa.alamat.trim() !== '' ? siswa.alamat.trim() : 'Alamat tidak tersedia' // Default address
+      //   }
+      // };
 
-      const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
+      // const xenditInvoice = await XenditUtils.createInvoice(invoiceData);
 
-      return await prisma.$transaction(async (tx) => {
-        const pembayaran = await tx.pembayaran.create({
-          data: {
-            tipePembayaran: 'SPP',
-            metodePembayaran: 'VIRTUAL_ACCOUNT',
-            jumlahTagihan: Number(payment.finalAmount),
-            statusPembayaran: 'PENDING',
-            tanggalPembayaran: CommonServiceUtils.getCurrentDate()
-          }
-        });
+      // return await prisma.$transaction(async (tx) => {
+      //   const pembayaran = await tx.pembayaran.create({
+      //     data: {
+      //       tipePembayaran: 'SPP',
+      //       metodePembayaran: 'VIRTUAL_ACCOUNT',
+      //       jumlahTagihan: Number(payment.finalAmount),
+      //       statusPembayaran: 'PENDING',
+      //       tanggalPembayaran: CommonServiceUtils.getCurrentDate()
+      //     }
+      //   });
 
-        await tx.xenditPayment.create({
-          data: {
-            pembayaranId: pembayaran.id,
-            xenditInvoiceId: xenditInvoice.id,
-            xenditExternalId: xenditInvoice.externalId,
-            xenditPaymentUrl: xenditInvoice.invoiceUrl,
-            xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
-            xenditExpireDate: CommonServiceUtils.formatDate(xenditInvoice.expiryDate),
-            xenditStatus: xenditInvoice.status
-          }
-        });
+      //   await tx.xenditPayment.create({
+      //     data: {
+      //       pembayaranId: pembayaran.id,
+      //       xenditInvoiceId: xenditInvoice.id,
+      //       xenditExternalId: xenditInvoice.externalId,
+      //       xenditPaymentUrl: xenditInvoice.invoiceUrl,
+      //       xenditPaymentChannel: 'VIRTUAL_ACCOUNT',
+      //       xenditExpireDate: CommonServiceUtils.formatDate(xenditInvoice.expiryDate),
+      //       xenditStatus: xenditInvoice.status
+      //     }
+      //   });
 
-        for (const periodeSppId of periodeSppIds) {
-          await tx.periodeSpp.update({
-            where: { id: periodeSppId },
-            data: {
-              pembayaranId: pembayaran.id,
-              ...(voucherId && {
-                voucher_id: voucherId,
-                diskon: payment.discountAmount / periodeSppIds.length
-              })
-            }
-          });
-        }
+      //   for (const periodeSppId of periodeSppIds) {
+      //     await tx.periodeSpp.update({
+      //       where: { id: periodeSppId },
+      //       data: {
+      //         pembayaranId: pembayaran.id,
+      //         ...(voucherId && {
+      //           voucher_id: voucherId,
+      //           diskon: payment.discountAmount / periodeSppIds.length
+      //         })
+      //       }
+      //     });
+      //   }
 
-        return {
-          pembayaranId: pembayaran.id,
-          xenditInvoiceUrl: xenditInvoice.invoiceUrl,
-          expireDate: xenditInvoice.expiryDate,
-          amount: Number(payment.finalAmount),
-          xenditInvoiceId: xenditInvoice.id
-        };
-      });
+      //   return {
+      //     pembayaranId: pembayaran.id,
+      //     xenditInvoiceUrl: xenditInvoice.invoiceUrl,
+      //     expireDate: xenditInvoice.expiryDate,
+      //     amount: Number(payment.finalAmount),
+      //     xenditInvoiceId: xenditInvoice.id
+      //   };
+      // });
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
 
   async handleXenditCallback(callbackData) {
     try {
-      const processedData = XenditUtils.processInvoiceCallback(callbackData);
+      // const processedData = XenditUtils.processInvoiceCallback(callbackData);
 
-      const xenditPayment = await prisma.xenditPayment.findUnique({
-        where: { xenditInvoiceId: processedData.xenditInvoiceId },
-        include: {
-          pembayaran: true
-        }
-      });
+      // const xenditPayment = await prisma.xenditPayment.findUnique({
+      //   where: { xenditInvoiceId: processedData.xenditInvoiceId },
+      //   include: {
+      //     pembayaran: true
+      //   }
+      // });
 
-      // Check if payment is expired first (before checking if it exists in database)
-      if (processedData.status === 'EXPIRED') {
-        return { message: 'Payment expired' };
-      }
+      // // Check if payment is expired first (before checking if it exists in database)
+      // if (processedData.status === 'EXPIRED') {
+      //   return { message: 'Payment expired' };
+      // }
 
-      if (!xenditPayment) {
-        throw ErrorFactory.notFound(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
-      }
+      // if (!xenditPayment) {
+      //   throw ErrorFactory.notFound(`Payment not found for invoice ID: ${processedData.xenditInvoiceId}`);
+      // }
 
-      // Check if payment is already processed
-      if (xenditPayment.xenditStatus === 'PAID' && processedData.status === 'PAID') {
-        return { message: 'Payment already processed' };
-      }
-
-
-      return await prisma.$transaction(async (tx) => {
-        await tx.xenditPayment.update({
-          where: { id: xenditPayment.id },
-          data: {
-            xenditPaymentChannel: processedData.paymentMethod,
-            xenditStatus: processedData.status,
-            xenditPaidAt: processedData.paidAt,
-            updatedAt: new Date()
-          }
-        });
-
-        await tx.pembayaran.update({
-          where: { id: xenditPayment.pembayaranId },
-          data: {
-            metodePembayaran: processedData.paymentMethod,
-            statusPembayaran: processedData.status === 'PAID' ? 'PAID' : 'PENDING',
-            tanggalPembayaran: processedData.paidAt ?
-              CommonServiceUtils.formatDate(processedData.paidAt) :
-              CommonServiceUtils.getCurrentDate(),
-            updatedAt: new Date()
-          }
-        });
-
-        // If this is a pendaftaran payment, process the pendaftaran
-        if (xenditPayment && xenditPayment.pembayaran.tipePembayaran === 'PENDAFTARAN') {
-          try {
-            // Check if it's a V2 private registration by checking program type
-            // Get payer email from Xendit callback data
-            const payerEmail = callbackData.payer_email;
+      // // Check if payment is already processed
+      // if (xenditPayment.xenditStatus === 'PAID' && processedData.status === 'PAID') {
+      //   return { message: 'Payment already processed' };
+      // }
 
 
-            if (!payerEmail) {
-              throw ErrorFactory.badRequest('Email pembayar tidak ditemukan');
-            }
+      // return await prisma.$transaction(async (tx) => {
+      //   await tx.xenditPayment.update({
+      //     where: { id: xenditPayment.id },
+      //     data: {
+      //       xenditPaymentChannel: processedData.paymentMethod,
+      //       xenditStatus: processedData.status,
+      //       xenditPaidAt: processedData.paidAt,
+      //       updatedAt: new Date()
+      //     }
+      //   });
 
-            // Find SiswaPrivateTemp by email
-            const siswaPrivateTemp = await tx.siswaPrivateTemp.findFirst({
-              where: { email: payerEmail }
-            });
+      //   await tx.pembayaran.update({
+      //     where: { id: xenditPayment.pembayaranId },
+      //     data: {
+      //       metodePembayaran: processedData.paymentMethod,
+      //       statusPembayaran: processedData.status === 'PAID' ? 'PAID' : 'PENDING',
+      //       tanggalPembayaran: processedData.paidAt ?
+      //         CommonServiceUtils.formatDate(processedData.paidAt) :
+      //         CommonServiceUtils.getCurrentDate(),
+      //       updatedAt: new Date()
+      //     }
+      //   });
 
-            if (siswaPrivateTemp) {
-              // This is V2 private registration
-              await this.processV2PrivateRegistration(xenditPayment, siswaPrivateTemp, tx);
-            } else {
-              // This is V1 regular registration
-              await this.processV1RegularRegistration(xenditPayment, tx);
-            }
-          } catch (error) {
-            throw error;
-          }
-        }
-
-        // Get updated payment data
-        const updatedPayment = await tx.pembayaran.findUnique({
-          where: { id: xenditPayment.pembayaranId }
-        });
-
-        // Auto-sync to Finance when payment is successful
-        if (processedData.status === 'PAID') {
-          await financeService.createFromPayment({
-            paymentId: updatedPayment.id,
-            type: updatedPayment.tipePembayaran,
-            amount: updatedPayment.jumlahTagihan
-          });
-        }
-
-        try {
-          let financeRecord = null;
-          if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
-            financeRecord = await financeService.createFromEnrollmentPayment({
-              id: updatedPayment.id,
-              jumlahTagihan: updatedPayment.jumlahTagihan,
-              tanggalPembayaran: updatedPayment.tanggalPembayaran,
-              metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
-            });
-
-            await prisma.pembayaranFinance.create({
-              data: {
-                paymentId: updatedPayment.id,
-                financeRecordId: financeRecord.id,
-                amount: financeRecord.total
-              }
-            });
-          } else if (updatedPayment.tipePembayaran === 'SPP') {
-            financeRecord = await financeService.createFromSppPayment({
-              id: updatedPayment.id,
-              jumlahTagihan: updatedPayment.jumlahTagihan,
-              tanggalPembayaran: updatedPayment.tanggalPembayaran,
-              metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
-            });
-
-            await prisma.pembayaranFinance.create({
-              data: {
-                paymentId: updatedPayment.id,
-                financeRecordId: financeRecord.id,
-                amount: financeRecord.total
-              }
-            });
-          }
-        } catch (financeError) {
-          // Finance sync error - continue without failing the main process
-        }
-
-        // Send WhatsApp notification for successful payment
-        if (processedData.status === 'PAID') {
-          try {
-            await this.sendPaymentSuccessNotification(updatedPayment, processedData, tx);
-          } catch (notificationError) {
-
-          }
-        }
+      //   // If this is a pendaftaran payment, process the pendaftaran
+      //   if (xenditPayment && xenditPayment.pembayaran.tipePembayaran === 'PENDAFTARAN') {
+      //     try {
+      //       // Check if it's a V2 private registration by checking program type
+      //       // Get payer email from Xendit callback data
+      //       const payerEmail = callbackData.payer_email;
 
 
-        // Return payment data for controller
-        const result = {
-          id: updatedPayment.id,
-          statusPembayaran: updatedPayment.statusPembayaran,
-          tipePembayaran: updatedPayment.tipePembayaran,
-          jumlahTagihan: updatedPayment.jumlahTagihan,
-          tanggalPembayaran: updatedPayment.tanggalPembayaran,
-          metodePembayaran: updatedPayment.metodePembayaran
-        };
+      //       if (!payerEmail) {
+      //         throw ErrorFactory.badRequest('Email pembayar tidak ditemukan');
+      //       }
 
-        return result;
-      });
+      //       // Find SiswaPrivateTemp by email
+      //       const siswaPrivateTemp = await tx.siswaPrivateTemp.findFirst({
+      //         where: { email: payerEmail }
+      //       });
+
+      //       if (siswaPrivateTemp) {
+      //         // This is V2 private registration
+      //         await this.processV2PrivateRegistration(xenditPayment, siswaPrivateTemp, tx);
+      //       } else {
+      //         // This is V1 regular registration
+      //         await this.processV1RegularRegistration(xenditPayment, tx);
+      //       }
+      //     } catch (error) {
+      //       throw error;
+      //     }
+      //   }
+
+      //   // Get updated payment data
+      //   const updatedPayment = await tx.pembayaran.findUnique({
+      //     where: { id: xenditPayment.pembayaranId }
+      //   });
+
+      //   // Auto-sync to Finance when payment is successful
+      //   if (processedData.status === 'PAID') {
+      //     await financeService.createFromPayment({
+      //       paymentId: updatedPayment.id,
+      //       type: updatedPayment.tipePembayaran,
+      //       amount: updatedPayment.jumlahTagihan
+      //     });
+      //   }
+
+      //   try {
+      //     let financeRecord = null;
+      //     if (updatedPayment.tipePembayaran === 'PENDAFTARAN') {
+      //       financeRecord = await financeService.createFromEnrollmentPayment({
+      //         id: updatedPayment.id,
+      //         jumlahTagihan: updatedPayment.jumlahTagihan,
+      //         tanggalPembayaran: updatedPayment.tanggalPembayaran,
+      //         metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
+      //       });
+
+      //       await prisma.pembayaranFinance.create({
+      //         data: {
+      //           paymentId: updatedPayment.id,
+      //           financeRecordId: financeRecord.id,
+      //           amount: financeRecord.total
+      //         }
+      //       });
+      //     } else if (updatedPayment.tipePembayaran === 'SPP') {
+      //       financeRecord = await financeService.createFromSppPayment({
+      //         id: updatedPayment.id,
+      //         jumlahTagihan: updatedPayment.jumlahTagihan,
+      //         tanggalPembayaran: updatedPayment.tanggalPembayaran,
+      //         metodePembayaran: updatedPayment.metodePembayaran || 'PAYMENT_GATEWAY'
+      //       });
+
+      //       await prisma.pembayaranFinance.create({
+      //         data: {
+      //           paymentId: updatedPayment.id,
+      //           financeRecordId: financeRecord.id,
+      //           amount: financeRecord.total
+      //         }
+      //       });
+      //     }
+      //   } catch (financeError) {
+      //     // Finance sync error - continue without failing the main process
+      //   }
+
+      //   // Send WhatsApp notification for successful payment
+      //   if (processedData.status === 'PAID') {
+      //     try {
+      //       await this.sendPaymentSuccessNotification(updatedPayment, processedData, tx);
+      //     } catch (notificationError) {
+
+      //     }
+      //   }
+
+
+      //   // Return payment data for controller
+      //   const result = {
+      //     id: updatedPayment.id,
+      //     statusPembayaran: updatedPayment.statusPembayaran,
+      //     tipePembayaran: updatedPayment.tipePembayaran,
+      //     jumlahTagihan: updatedPayment.jumlahTagihan,
+      //     tanggalPembayaran: updatedPayment.tanggalPembayaran,
+      //     metodePembayaran: updatedPayment.metodePembayaran
+      //   };
+
+      //   return result;
+      // });
     } catch (error) {
 
       throw error;
@@ -417,6 +427,7 @@ class PaymentService {
         totalPeriods: periodeSppList.length
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -490,7 +501,7 @@ class PaymentService {
           namaPanggilan,
           siswaPrivate.tanggalLahir
         );
-        const hashedPassword = await PasswordUtils.hash(generatedPassword);
+        const hashedPassword = await PasswordUtils.hashPassword(generatedPassword);
 
         // Create user
         const user = await tx.user.create({
@@ -638,11 +649,11 @@ class PaymentService {
       // Send welcome emails for V2 private registration (in parallel, don't block transaction)
       const emailPromises = createdUsers.map(async (createdUser) => {
         try {
-          await EmailUtils.sendWelcomeEmail({
-            email: createdUser.email,
-            name: createdUser.nama,
-            password: createdUser.password
-          });
+          // await EmailUtils.sendWelcomeEmail({
+          //   email: createdUser.email,
+          //   name: createdUser.nama,
+          //   password: createdUser.password
+          // });
         } catch (emailError) {
           // Email sending error - continue without failing the main process
         }
@@ -651,6 +662,7 @@ class PaymentService {
 
 
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -766,6 +778,7 @@ class PaymentService {
 
       return siswa;
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -882,18 +895,19 @@ class PaymentService {
       // Send email notification as fallback
       if (siswa.user?.email) {
         try {
-          await EmailUtils.sendPaymentSuccess({
-            email: siswa.user.email,
-            name: siswa.namaMurid,
-            amount: payment.jumlahTagihan,
-            paymentDate: payment.tanggalPembayaran
-          });
+          // await EmailUtils.sendPaymentSuccess({
+          //   email: siswa.user.email,
+          //   name: siswa.namaMurid,
+          //   amount: payment.jumlahTagihan,
+          //   paymentDate: payment.tanggalPembayaran
+          // });
         } catch (emailError) {
           // Email notification error - continue without failing the main process
         }
       }
 
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

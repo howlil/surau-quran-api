@@ -1,5 +1,6 @@
 
 const ErrorFactory = require("../../lib/factories/error.factory")
+const logger = require("../../lib/config/logger.config")
 
 class ValidationMiddleware {
 
@@ -32,6 +33,7 @@ class ValidationMiddleware {
                 next()
 
             } catch (error) {
+                logger.error(error);
                 next(error)
             }
         }

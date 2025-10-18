@@ -20,22 +20,21 @@ class App {
         this.#app.use(express.json({ limit: '20mb', type: 'application/json', verify: (req, res, buf, encoding) => { req.rawBody = buf.toString(); } }));
         this.#app.use(express.urlencoded({ extended: true }));
         this.#app.use('/uploads', express.static(path.resolve('uploads')));
-        this.#app.use(require("./app/routes"));
+        this.#app.use("/api", require("./app/routes"));
         this.#app.use(errorMiddleware.expressErrorHandler);
     }
 
     async startUp() {
         try {
-            await this.connectDatabase();
             this.setupCronJobs();
-
-            const PORT = process.env.PORT || 5000;
+            const PORT = process.env.PORT;
             this.#app.listen(PORT, () => {
                 logger.info(`Server running on port ${PORT}`);
                 logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
             });
 
         } catch (error) {
+            logger.error('Startup failed:', error);
             process.exit(1);
         }
     }

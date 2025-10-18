@@ -1,5 +1,6 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
+const logger = require('../../lib/config/logger.config');
 
 class JamMengajarService {
   async create(options) {

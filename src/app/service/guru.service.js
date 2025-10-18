@@ -1,10 +1,10 @@
-const { prisma } = require('../../lib/config/prisma.config');
+const prisma  = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const PasswordUtils = require('../../lib/utils/password.utils');
-const EmailUtils = require('../../lib/utils/email.utils');
 const FileUtils = require('../../lib/utils/file.utils');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
+const logger = require('../../lib/config/logger.config');
 
 class GuruService {
 
@@ -35,7 +35,7 @@ class GuruService {
 
         const NIP = CommonServiceUtils.generateRandomNumber(6);
         const plainPassword = "@Test123";
-        const hashedPassword = await PasswordUtils.hash(plainPassword);
+        const hashedPassword = await PasswordUtils.hashPassword(plainPassword);
 
         const user = await tx.user.create({
           data: {
@@ -65,16 +65,17 @@ class GuruService {
         });
 
         // Kirim email ke guru
-        await EmailUtils.sendWelcomeEmail({
-          email,
-          name: guru.nama,
-          password: plainPassword
-        });
+        // await EmailUtils.sendWelcomeEmail({
+        //   email,
+        //   name: guru.nama,
+        //   password: plainPassword
+        // });
 
         const transformedResult = FileUtils.transformGuruFiles(guru);
         return transformedResult;
       });
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -118,7 +119,7 @@ class GuruService {
         }
 
         if (password) {
-          const hashedPassword = await PasswordUtils.hash(password);
+          const hashedPassword = await PasswordUtils.hashPassword(password);
           await tx.user.update({
             where: { id: guru.userId },
             data: { password: hashedPassword }
@@ -174,6 +175,7 @@ class GuruService {
         return transformedResult;
       });
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -216,6 +218,7 @@ class GuruService {
 
       return { id };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -268,6 +271,7 @@ class GuruService {
 
       return transformedData;
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -324,6 +328,7 @@ class GuruService {
         }))
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -426,6 +431,7 @@ class GuruService {
         };
       });
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }
@@ -454,6 +460,7 @@ class GuruService {
         fileName: `Surat_Kontrak_${guru.nama.replace(/\s+/g, '_')}.pdf`
       };
     } catch (error) {
+      logger.error(error);
       throw error;
     }
   }

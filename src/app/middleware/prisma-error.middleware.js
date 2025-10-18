@@ -3,23 +3,37 @@ const { PrismaClientKnownRequestError, PrismaClientValidationError, PrismaClient
 class PrismaErrorMiddleware {
 
     static handlePrismaError(err) {
-        if (err instanceof PrismaClientKnownRequestError) {
-            return this.handleKnownRequestError(err);
-        }
+        // Check if Prisma error classes are available and err is an instance
+        try {
+            if (PrismaClientKnownRequestError && err instanceof PrismaClientKnownRequestError) {
+                return this.handleKnownRequestError(err);
+            }
 
-        if (err instanceof PrismaClientValidationError) {
-            return this.handleValidationError(err);
-        }
+            if (PrismaClientValidationError && err instanceof PrismaClientValidationError) {
+                return this.handleValidationError(err);
+            }
 
-        if (err instanceof PrismaClientInitializationError) {
-            return this.handleInitializationError(err);
-        }
+            if (PrismaClientInitializationError && err instanceof PrismaClientInitializationError) {
+                return this.handleInitializationError(err);
+            }
 
-        if (err instanceof PrismaClientRustPanicError) {
-            return this.handleRustPanicError(err);
-        }
+            if (PrismaClientRustPanicError && err instanceof PrismaClientRustPanicError) {
+                return this.handleRustPanicError(err);
+            }
 
-        return null;
+            // Check for Prisma errors by error code pattern
+            if (err.code && typeof err.code === 'string' && err.code.startsWith('P')) {
+                return this.handleKnownRequestError(err);
+            }
+
+            return null;
+        } catch (instanceofError) {
+            // If instanceof check fails, check by error properties
+            if (err.code && typeof err.code === 'string' && err.code.startsWith('P')) {
+                return this.handleKnownRequestError(err);
+            }
+            return null;
+        }
     }
 
     static handleKnownRequestError(err) {
@@ -138,10 +152,11 @@ class PrismaErrorMiddleware {
     }
 
     static handleValidationError(err) {
+        const parsedError = this.parsePrismaValidationError(err.message);
         return {
             statusCode: 422,
-            message: "Validation Error",
-            error: this.parsePrismaValidationError(err.message)
+            message: parsedError.message,
+            error: parsedError
         };
     }
 
@@ -212,6 +227,55 @@ class PrismaErrorMiddleware {
     static parsePrismaValidationError(message) {
         const cleanMessage = this.cleanErrorMessage(message);
 
+        if (cleanMessage.includes('Unknown field')) {
+            const fieldMatch = cleanMessage.match(/Unknown field `([^`]+)` for select statement on model `([^`]+)`/);
+            if (fieldMatch) {
+                const [, fieldName, modelName] = fieldMatch;
+                return {
+                    message: `Field '${fieldName}' does not exist on model '${modelName}'. Please check the field name and try again.`,
+                    type: 'field_not_found',
+                    field: fieldName,
+                    model: modelName,
+                    suggestion: 'Check the Prisma schema for available fields'
+                };
+            }
+        }
+
+        if (cleanMessage.includes('Expected')) {
+            const expectedMatch = cleanMessage.match(/Expected (\w+)/);
+            if (expectedMatch) {
+                return {
+                    message: `Invalid data type. Expected: ${expectedMatch[1]}`,
+                    type: 'type_mismatch',
+                    expected: expectedMatch[1]
+                };
+            }
+        }
+
+        if (cleanMessage.includes('Invalid value')) {
+            const valueMatch = cleanMessage.match(/Invalid value for argument `([^`]+)`\. Expected (\w+)\./);
+            if (valueMatch) {
+                const [, fieldName, expectedType] = valueMatch;
+                return {
+                    message: `Invalid value for field '${fieldName}'. Expected: ${expectedType}`,
+                    type: 'invalid_value',
+                    field: fieldName,
+                    expected: expectedType
+                };
+            }
+            
+            // Fallback for other invalid value errors
+            const simpleValueMatch = cleanMessage.match(/Invalid value for argument `([^`]+)`/);
+            if (simpleValueMatch) {
+                return {
+                    message: `Invalid value for field '${simpleValueMatch[1]}'. Please check the value and try again.`,
+                    type: 'invalid_value',
+                    field: simpleValueMatch[1]
+                };
+            }
+        }
+
+        // Fallback to original logic
         const errorStart = cleanMessage.indexOf('Unknown field') !== -1 ?
             cleanMessage.indexOf('Unknown field') :
             cleanMessage.indexOf('Expected') !== -1 ?

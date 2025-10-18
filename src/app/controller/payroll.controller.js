@@ -1,9 +1,8 @@
 const payrollService = require('../service/payroll.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const { prisma } = require('../../lib/config/prisma.config');
-const { logger } = require('../../lib/config/logger.config');
-const { xenditConfig } = require('../../lib/config/xendit.config');
+const prisma  = require('../../lib/config/prisma.config');
+const logger = require('../../lib/config/logger.config');
 
 class PayrollController {
 
@@ -15,6 +14,7 @@ class PayrollController {
       const result = await payrollService.updatePayroll(id, data);
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -27,6 +27,7 @@ class PayrollController {
       const result = await payrollService.getAllPayrollsForAdmin(filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
@@ -49,6 +50,7 @@ class PayrollController {
       const result = await payrollService.getAllPayrollsForGuru(guru.id, filters);
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
+      logger.error(error);
       next(error);
     }
   };
@@ -59,27 +61,28 @@ class PayrollController {
       const result = await payrollService.batchPayrollDisbursement(payrollIds);
       return ResponseFactory.get(result).send(res);
     } catch (error) {
+      logger.error(error);
       next(error)
     }
   };
 
   handleDisbursementCallback = async (req, res, next) => {
-    try {
-      const callbackToken = req.extract.getHeaders(['x-callback-token'])['x-callback-token'];
-      const rawBody = req.body;
+    // try {
+    //   const callbackToken = req.extract.getHeaders(['x-callback-token'])['x-callback-token'];
+    //   const rawBody = req.body;
 
-      const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
-      if (!isValidToken) {
-        logger.warn('Invalid Xendit callback token received');
-        throw ErrorFactory.unauthorized('Invalid callback token');
-      }
+    //   const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
+    //   if (!isValidToken) {
+    //     logger.warn('Invalid Xendit callback token received');
+    //     throw ErrorFactory.unauthorized('Invalid callback token');
+    //   }
 
-      const result = await payrollService.handleDisbursementCallback(rawBody);
-      return ResponseFactory.get(result).send(res);
-    } catch (error) {
-      logger.error('Error handling disbursement callback:', error);
-      next(error)
-    }
+    //   const result = await payrollService.handleDisbursementCallback(rawBody);
+    //   return ResponseFactory.get(result).send(res);
+    // } catch (error) {
+    //   logger.error('Error handling disbursement callback:', error);
+    //   next(error)
+    // }
   };
 }
 

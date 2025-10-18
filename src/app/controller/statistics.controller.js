@@ -1,5 +1,6 @@
 const statisticsService = require('../service/statistics.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
+const logger = require('../../lib/config/logger.config');
 
 class StatisticsController {
     // Get student counts with date filtering
@@ -9,6 +10,7 @@ class StatisticsController {
             const result = await statisticsService.getStudentCounts(filters);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -20,6 +22,7 @@ class StatisticsController {
             const result = await statisticsService.getFinancialStatistics(filters);
             return ResponseFactory.get(result).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -30,6 +33,7 @@ class StatisticsController {
             const result = await statisticsService.getStudentDistribution();
             return ResponseFactory.get(result).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };
@@ -40,6 +44,7 @@ class StatisticsController {
             const result = await statisticsService.getTodaySchedule();
             return ResponseFactory.get(result).send(res);
         } catch (error) {
+      logger.error(error);
       next(error)
         }
     };

@@ -1,6 +1,5 @@
 const midtrans = require("../config/midtrans.config")
 const { logger } = require('../config/logger.config');
-const crypto = require('crypto');
 
 
 class MidtransUtils {
@@ -28,26 +27,26 @@ class MidtransUtils {
         }
     }
 
-
-    async verifyMidtransWebhook(req) {
-        const body = req.body;
-        const signatureKey = body.signature_key;
-
-        if (!signatureKey) {
-            return false;
+    async createBatchPayout(data = {}) {
+        try {
+            return this.#iris.createPayouts(data)
+        } catch (error) {
+            logger.error(error)
+            throw error
         }
+    }
 
-        const orderId = body.order_id;
-        const statusCode = body.status_code;
-        const grossAmount = body.gross_amount;
-        const serverKey = process.env.MIDTRANS_SERVER_KEY;
+    async handleCallback(data = {}) {
+        try {
+            return this.#snap.transaction.notification(data)
 
-        const stringToSign = orderId + statusCode + grossAmount + serverKey;
-        const signature = crypto.createHash('sha512').update(stringToSign).digest('hex');
+        } catch (error) {
+            logger.error(error)
+            throw error
 
-        return signature === signatureKey;
+        }
     }
 
 }
 
-module.exports = new MidtransUtils()
+module.exports = new MidtransUtils();

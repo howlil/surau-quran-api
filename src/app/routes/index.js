@@ -9,6 +9,7 @@ const jamMengajarRoutes = require('./routers/jam-mengajar.routes');
 const guruRoutes = require('./routers/guru.routes');
 const voucherRoutes = require('./routers/voucher.routes');
 const siswaRoutes = require('./routers/siswa.routes');
+const pendaftaranRoutes = require('./routers/pendaftaran.routes');
 const absensiRoutes = require('./routers/absensi.routes');
 const statisticsRoutes = require('./routers/statistics.routes');
 const sppRoutes = require('./routers/spp.routes');
@@ -17,7 +18,6 @@ const payrollRoutes = require('./routers/payroll.routes');
 const testimoniRoutes = require('./routers/testimoni.routes');
 const galeriRoutes = require('./routers/galeri.routes');
 const financeRoutes = require('./routers/finance.routes');
-const sppReminderRoutes = require('./routers/spp-reminder.routes');
 const rfidRoutes = require('./routers/rfid.routes');
 
 // API Routes
@@ -30,6 +30,7 @@ router.use(jamMengajarRoutes);
 router.use(guruRoutes);
 router.use(voucherRoutes);
 router.use(siswaRoutes);
+router.use(pendaftaranRoutes);
 router.use(absensiRoutes);
 router.use(statisticsRoutes);
 router.use(sppRoutes);
@@ -38,7 +39,8 @@ router.use(payrollRoutes);
 router.use(testimoniRoutes);
 router.use(galeriRoutes);
 router.use(financeRoutes);
-router.use(sppReminderRoutes);
 router.use(rfidRoutes);
+
+
 
 module.exports = router;

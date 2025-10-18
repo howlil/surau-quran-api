@@ -1,4 +1,5 @@
 const cors = require('cors');
+const logger = require('../../lib/config/logger.config');
 require('dotenv').config();
 
 class SecurityMiddleware {

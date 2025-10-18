@@ -1,55 +1,48 @@
-const { logger } = require('../../lib/config/logger.config');
 const paymentService = require('../service/payment.service');
 const siswaService = require('../service/siswa.service');
 const sppService = require('../service/spp.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const { xenditConfig } = require('../../lib/config/xendit.config');
 const FileUtils = require('../../lib/utils/file.utils');
+const logger = require('../../lib/config/logger.config');
 
 class PaymentController {
 
     handleXenditCallback = async (req, res, next) => {
-        try {
-            const callbackToken = req.extract.getHeaders(['x-callback-token'])['x-callback-token'];
-            const rawBody = req.body;
+        // try {
+        //     const callbackToken = req.extract.getHeaders(['x-callback-token'])['x-callback-token'];
+        //     const rawBody = req.body;
 
-            const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
-            if (!isValidToken) {
-                throw ErrorFactory.unauthorized('Invalid callback token');
-            }
+        //     const isValidToken = xenditConfig.validateCallbackToken(callbackToken);
+        //     if (!isValidToken) {
+        //         throw ErrorFactory.unauthorized('Invalid callback token');
+        //     }
 
-            const result = await paymentService.handleXenditCallback(rawBody);
+        //     const result = await paymentService.handleXenditCallback(rawBody);
 
-            if (!result) {
-                throw ErrorFactory.internalServerError('Callback processing failed - no result returned');
-            }
+        //     if (!result) {
+        //         throw ErrorFactory.internalServerError('Callback processing failed - no result returned');
+        //     }
 
 
-            if (result.statusPembayaran === 'PAID') {
-                if (result.tipePembayaran === 'PENDAFTARAN') {
-                } else if (result.tipePembayaran === 'SPP') {
-                    try {
-                        const sppResult = await paymentService.processPaidSpp(result.id);
-                    } catch (error) {
-                        logger.error(`Failed to process SPP for payment ID: ${result.id}`, error);
-                        return ResponseFactory.get({
-                            success: false,
-                            message: 'Payment processed but SPP update failed',
-                            error: error.message
-                        }).send(res);
-                    }
-                }
-            }
+        //     if (result.statusPembayaran === 'PAID') {
+        //         if (result.tipePembayaran === 'PENDAFTARAN') {
+        //         } else if (result.tipePembayaran === 'SPP') {
+        //             try {
+        //                 const sppResult = await paymentService.processPaidSpp(result.id);
+        //             } catch (error) {
+        //                 logger.error(`Failed to process SPP for payment ID: ${result.id}`, error);
+        //                 return ResponseFactory.get({
+        //                     error: error.message
+        //                 }).send(res);
+        //             }
+        //         }
+        //     }
 
-            return ResponseFactory.get({
-                success: true,
-                message: 'Callback received and processed successfully',
-                payment: result
-            }).send(res);
-        } catch (error) {
-            next(error)
-        }
+        //     return ResponseFactory.get(result).send(res);
+        // } catch (error) {
+        //     next(error)
+        // }
     };
 
     createSppPayment = async (req, res, next) => {
@@ -77,13 +70,9 @@ class PaymentController {
                 const transformedResult = FileUtils.transformPembayaranFiles(paymentData.pembayaran);
 
                 return ResponseFactory.get({
-                    success: true,
-                    message: 'Pembayaran SPP tunai berhasil',
-                    data: {
-                        pembayaran: transformedResult,
-                        periodeSppIds,
-                        description: `SPP ${paymentData.payment.periods} - ${paymentData.payment.programs}`
-                    }
+                    pembayaran: transformedResult,
+                    periodeSppIds,
+                    description: `SPP ${paymentData.payment.periods} - ${paymentData.payment.programs}`
                 }).send(res);
             }
 
@@ -93,8 +82,9 @@ class PaymentController {
                     periodeSppIds,
                     siswa: paymentData.siswa,
                     payment: paymentData.payment,
-                voucherId: paymentData.payment.voucherId
-            });
+                    voucherId: paymentData.payment.voucherId
+                }
+            })
 
             return ResponseFactory.get({
                 pembayaranId: invoiceData.pembayaranId,
@@ -105,7 +95,8 @@ class PaymentController {
                 description: `SPP ${paymentData.payment.periods} - ${paymentData.payment.programs}`
             }).send(res);
         } catch (error) {
-            next(error)
+            logger.error(error);
+      next(error)
         }
     };
 

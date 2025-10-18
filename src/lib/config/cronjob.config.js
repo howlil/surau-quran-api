@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { logger } = require('./logger.config');
+const logger  = require('./logger.config');
 const PayrollCronService = require('../../app/service/payroll-cron.service');
 const SppReminderCronService = require('../../app/service/spp-reminder-cron.service');
 
@@ -17,7 +17,7 @@ class CronJobs {
         await PayrollCronService.generateMonthlyPayroll();
         logger.info('Payroll generation completed');
       } catch (error) {
-        logger.error('Payroll generation failed:', error.message);
+        logger.error('Payroll generation failed:', error?.message || error);
       }
     }, {
       timezone: 'Asia/Jakarta'
@@ -32,7 +32,7 @@ class CronJobs {
         await SppReminderCronService.sendSppReminders();
         logger.info('SPP reminder sent');
       } catch (error) {
-        logger.error('SPP reminder failed:', error.message);
+        logger.error('SPP reminder failed:', error?.message || error);
       }
     }, {
       timezone: 'Asia/Jakarta'
