@@ -5,8 +5,12 @@ const PrismaUtils = require('../../lib/utils/prisma.utils');
 const logger = require('../../lib/config/logger.config');
 
 class AdminService {
-    async createAdmin(userData, requestUserId) {
+    async createAdmin(options) {
         try {
+            const { data, where } = options;
+            const { requestUserId } = where;
+            const userData = data;
+            
             const requestUser = await prisma.user.findUnique({
                 where: { id: requestUserId },
                 include: { admin: true }
@@ -58,8 +62,10 @@ class AdminService {
         }
     }
 
-    async getAllAdmins(requestUserId, filters = {}) {
+    async getAllAdmins(options = {}) {
         try {
+            const { data, filters = {} } = options;
+            const { requestUserId } = data;
             const { page = 1, limit = 10, nama } = filters;
 
             const requestUser = await prisma.user.findUnique({
@@ -113,8 +119,12 @@ class AdminService {
         }
     }
 
-    async updateAdmin(adminId, updateData, requestUserId) {
+    async updateAdmin(options) {
         try {
+            const { data, where } = options;
+            const { adminId, requestUserId } = where;
+            const updateData = data;
+            
             const requestUser = await prisma.user.findUnique({
                 where: { id: requestUserId },
                 include: { admin: true }
@@ -191,8 +201,11 @@ class AdminService {
         }
     }
 
-    async deleteAdmin(adminId, requestUserId) {
+    async deleteAdmin(options) {
         try {
+            const { where } = options;
+            const { adminId, requestUserId } = where;
+            
             const requestUser = await prisma.user.findUnique({
                 where: { id: requestUserId },
                 include: { admin: true }

@@ -59,11 +59,14 @@ class PaymentController {
                 evidence = req.file.filename;
             }
 
-            const paymentData = await sppService.createSppPayment(userId, {
-                periodeSppIds,
-                kodeVoucher,
-                metodePembayaran,
-                evidence
+            const paymentData = await sppService.createSppPayment({
+                data: {
+                    userId,
+                    periodeSppIds,
+                    kodeVoucher,
+                    metodePembayaran,
+                    evidence
+                }
             });
 
             if (metodePembayaran === 'TUNAI') {

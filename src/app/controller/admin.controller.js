@@ -7,7 +7,10 @@ class AdminController {
     try {
       const userId = req.user.id;
       const data = req.extract.getBody();
-      const result = await adminService.createAdmin(data, userId);
+      const result = await adminService.createAdmin({
+        data,
+        where: { requestUserId: userId }
+      });
       return ResponseFactory.created(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -19,7 +22,10 @@ class AdminController {
     try {
       const userId = req.user.id;
       const filters = req.extract.getQuery(['page', 'limit', 'nama']);
-      const result = await adminService.getAllAdmins(userId, filters);
+      const result = await adminService.getAllAdmins({
+        data: { requestUserId: userId },
+        filters
+      });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -32,7 +38,10 @@ class AdminController {
       const userId = req.user.id;
       const { id: adminId } = req.extract.getParams(['id']);
       const data = req.extract.getBody();
-      const result = await adminService.updateAdmin(adminId, data, userId);
+      const result = await adminService.updateAdmin({
+        data,
+        where: { adminId, requestUserId: userId }
+      });
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -44,7 +53,9 @@ class AdminController {
     try {
       const userId = req.user.id;
       const { id: adminId } = req.extract.getParams(['id']);
-      await adminService.deleteAdmin(adminId, userId);
+      await adminService.deleteAdmin({
+        where: { adminId, requestUserId: userId }
+      });
       return ResponseFactory.deleted().send(res);
     } catch (error) {
       logger.error(error);

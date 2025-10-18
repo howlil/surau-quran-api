@@ -7,7 +7,7 @@ class PrismaUtils {
       page: pageParam = 1,
       limit: limitParam = 10,
       where = {},
-      orderBy = {},
+      orderBy = null,
       select = {},
       include = {}
     } = options;
@@ -29,7 +29,7 @@ class PrismaUtils {
           skip,
           take: limit,
           where,
-          orderBy: Object.keys(orderBy).length ? orderBy : undefined,
+          orderBy: orderBy || undefined,
           select: Object.keys(filteredSelect).length ? filteredSelect : undefined,
           include: Object.keys(include).length ? include : undefined
         })

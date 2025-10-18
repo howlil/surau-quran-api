@@ -8,7 +8,7 @@ class KelasProgramController {
     createKelasProgram = async (req, res, next) => {
         try {
             const data = req.extract.getBody();
-            const result = await kelasProgramService.createKelasProgram(data);
+            const result = await kelasProgramService.createKelasProgram({ data });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -21,7 +21,10 @@ class KelasProgramController {
             const { kelasProgramId } = req.extract.getParams(['kelasProgramId']);
             const data = req.extract.getBody();
 
-            const result = await kelasProgramService.patchInitialStudentIntoClass(kelasProgramId, data);
+            const result = await kelasProgramService.patchInitialStudentIntoClass({ 
+                data, 
+                where: { kelasProgramId } 
+            });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -32,7 +35,9 @@ class KelasProgramController {
     deleteKelasProgram = async (req, res, next) => {
         try {
             const { kelasProgramId } = req.extract.getParams(['kelasProgramId']);
-            const result = await kelasProgramService.deleteKelasProgram(kelasProgramId);
+            const result = await kelasProgramService.deleteKelasProgram({ 
+                where: { kelasProgramId } 
+            });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
             logger.error(error);
@@ -44,7 +49,9 @@ class KelasProgramController {
     getInitialStudentIntoClass = async (req, res, next) => {
         try {
             const query = req.extract.getQuery();
-            const result = await kelasProgramService.getInitialStudentIntoClass(query);
+            const result = await kelasProgramService.getInitialStudentIntoClass({ 
+                filters: query 
+            });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -68,7 +75,10 @@ class KelasProgramController {
             }
 
             const data = req.extract.getBody();
-            const result = await kelasProgramService.addKelasPengganti(guru.id, data);
+            const result = await kelasProgramService.addKelasPengganti({ 
+                data, 
+                where: { guruId: guru.id } 
+            });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -90,7 +100,9 @@ class KelasProgramController {
             }
 
             const { kelasProgramId } = req.extract.getParams(['kelasProgramId']);
-            const result = await kelasProgramService.removeKelasPengganti(guru.id, kelasProgramId);
+            const result = await kelasProgramService.removeKelasPengganti({ 
+                where: { guruId: guru.id, kelasProgramId } 
+            });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -102,7 +114,7 @@ class KelasProgramController {
         try {
             const filters = req.extract.getQuery(['search', 'page', 'limit']);
 
-            const result = await kelasProgramService.getSiswaKelasPengganti(filters);
+            const result = await kelasProgramService.getSiswaKelasPengganti({ filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
             logger.error(error);

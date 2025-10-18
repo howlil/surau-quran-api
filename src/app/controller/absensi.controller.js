@@ -1,7 +1,7 @@
 const absensiService = require('../service/absensi.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
 const ErrorFactory = require('../../lib/factories/error.factory');
-const prisma  = require('../../lib/config/prisma.config');
+const prisma = require('../../lib/config/prisma.config');
 const FileUtils = require('../../lib/utils/file.utils');
 const logger = require('../../lib/config/logger.config');
 
@@ -10,22 +10,26 @@ class AbsensiController {
         try {
             const { kelasId } = req.extract.getParams(['kelasId']);
             const { tanggal } = req.extract.getQuery(['tanggal']);
-            const result = await absensiService.getAbsensiSiswaForAdmin({ kelasId, tanggal });
+            const result = await absensiService.getAbsensiSiswaForAdmin({
+                filters: { kelasId, tanggal }
+            });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 
     getAbsensiGuruByDate = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['tanggal', 'page', 'limit']);
-            const result = await absensiService.getAbsensiGuruByDate(filters);
+            const result = await absensiService.getAbsensiGuruByDate({
+                filters
+            });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 
@@ -37,7 +41,10 @@ class AbsensiController {
                 data.suratIzin = req.file.filename;
             }
 
-            const result = await absensiService.updateAbsensiGuru(id, data);
+            const result = await absensiService.updateAbsensiGuru({
+                data,
+                where: { id }
+            });
 
             if (result.suratIzin) {
                 result.suratIzin = FileUtils.getSuratIzinUrl(result.suratIzin);
@@ -47,7 +54,7 @@ class AbsensiController {
 
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 
@@ -64,11 +71,18 @@ class AbsensiController {
                 throw ErrorFactory.notFound('Profil guru tidak ditemukan');
             }
 
-            const result = await absensiService.updateAbsensiSiswa(kelasProgramId, siswaId, guru.id, statusKehadiran);
+            const result = await absensiService.updateAbsensiSiswa({
+                data: {
+                    kelasProgramId,
+                    siswaId,
+                    guruId: guru.id,
+                    statusKehadiran
+                }
+            });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error);
+            next(error);
         }
     };
 
@@ -87,11 +101,19 @@ class AbsensiController {
                 throw ErrorFactory.notFound('Profil guru tidak ditemukan');
             }
 
-            const result = await absensiService.getAbsensiSiswaByKelasProgram(kelasProgramId, guru.id, tanggal);
+            const result = await absensiService.getAbsensiSiswaByKelasProgram({
+                data: {
+                    kelasProgramId,
+                    guruId: guru.id
+                },
+                filters: {
+                    tanggal
+                }
+            });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error);
+            next(error);
         }
     };
 
@@ -99,11 +121,16 @@ class AbsensiController {
         try {
             const { kelasProgramId, tanggal } = req.extract.getBody(['kelasProgramId', 'tanggal']);
 
-            const result = await absensiService.createAbsensiSiswa(kelasProgramId, tanggal);
+            const result = await absensiService.createAbsensiSiswa({
+                data: {
+                    kelasProgramId,
+                    tanggal
+                }
+            });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 
@@ -111,12 +138,18 @@ class AbsensiController {
         try {
             const { rfid, tanggal, jam } = req.extract.getBody(['rfid', 'tanggal', 'jam']);
 
-            const result = await absensiService.updateAbsensiGuruWithRfid(rfid, tanggal, jam);
+            const result = await absensiService.updateAbsensiGuruWithRfid({
+                data: {
+                    rfid,
+                    tanggal,
+                    jam
+                }
+            });
 
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 
@@ -126,7 +159,7 @@ class AbsensiController {
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
 

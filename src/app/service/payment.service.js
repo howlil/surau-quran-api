@@ -24,7 +24,7 @@ class PaymentService {
 
   async createPendaftaranPayment(options) {
     try {
-      const data = options.data || options;
+      const { data } = options;
       const { email, namaMurid, totalBiaya, noWhatsapp, alamat } = data;
 
       // Validate required fields

@@ -22,7 +22,7 @@ class TestimoniController {
     getAll = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['page', 'limit', 'nama']);
-            const result = await testimoniService.getAll({ data: filters });
+            const result = await testimoniService.getAll({ filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
             logger.error(error);

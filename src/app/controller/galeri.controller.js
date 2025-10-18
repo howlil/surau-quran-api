@@ -27,7 +27,7 @@ class GaleriController {
     getAll = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['page', 'limit', 'judul']);
-            const result = await galeriService.getAll({ data: filters });
+            const result = await galeriService.getAll({ filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
       logger.error(error);

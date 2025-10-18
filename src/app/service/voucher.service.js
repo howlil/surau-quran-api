@@ -95,7 +95,7 @@ class VoucherService {
   }
 
   async getAll(options = {}) {
-    const { data: filters = {}, where: additionalWhere = {} } = options;
+    const { filters = {}, where: additionalWhere = {} } = options;
     const { page = 1, limit = 10, nama } = filters;
     try {
       const where = { ...additionalWhere };
@@ -131,8 +131,11 @@ class VoucherService {
   }
 
 
-  async getVoucherByKode(kodeVoucher) {
+  async getVoucherByKode(options) {
     try {
+      const { data } = options;
+      const { kodeVoucher } = data;
+      
       const voucher = await prisma.voucher.findUnique({
         where: { kodeVoucher },
         select: {

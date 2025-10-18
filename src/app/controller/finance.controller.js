@@ -22,7 +22,7 @@ class FinanceController {
     getAll = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['startDate', 'endDate', 'type', 'page', 'limit']);
-            const result = await financeService.getAll({ data: filters });
+            const result = await financeService.getAll({ filters });
 
             const responseData = {
                 income: result.income,

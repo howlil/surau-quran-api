@@ -255,6 +255,12 @@ class PendaftaranValidation {
             'any.unknown': 'Bukti pembayaran hanya diperlukan untuk metode TUNAI'
           })
         }),
+
+      kartuKeluarga: Joi.string().optional()
+        .messages({
+          'string.base': 'Kartu keluarga harus berupa string'
+        }),
+
       chanel: Joi.array().items(
         Joi.object({
           chanelName: Joi.string().min(1).max(191).required()

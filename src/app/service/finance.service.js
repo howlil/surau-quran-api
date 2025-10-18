@@ -40,10 +40,10 @@ class FinanceService {
 
     async getAll(options = {}) {
         try {
-            const { data: filters = {}, where: additionalWhere = {} } = options;
+            const { filters = {} } = options;
             const { startDate, endDate, type, page = 1, limit = 10 } = filters;
 
-            const where = { ...additionalWhere };
+            const where = {};
 
             if (type) {
                 where.type = type;
@@ -83,7 +83,7 @@ class FinanceService {
                     });
 
                     filteredData = result.data;
-                    totalRecords = result.pagination.total;
+                    totalRecords = result.meta.total;
                 }
             } else {
                 const result = await PrismaUtils.paginate(prisma.finance, {
@@ -94,7 +94,7 @@ class FinanceService {
                 });
 
                 filteredData = result.data;
-                totalRecords = result.pagination.total;
+                totalRecords = result.meta.total;
             }
 
             const totals = await this.calculateTotals(startDate, endDate);
@@ -119,7 +119,7 @@ class FinanceService {
                 expense: totals.expense,
                 revenue: totals.revenue,
                 dataTable,
-                pagination: {
+                meta: {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     total: totalRecords,

@@ -8,7 +8,7 @@ class RfidController {
     searchUser = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['search', 'role', 'page', 'limit']);
-            const result = await rfidService.searchUser(filters);
+            const result = await rfidService.searchUser({ filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
             logger.error(error);
@@ -19,7 +19,9 @@ class RfidController {
     registerRfid = async (req, res, next) => {
         try {
             const { userId, rfid } = req.extract.getBody(['userId', 'rfid']);
-            const result = await rfidService.registerRfid(userId, rfid);
+            const result = await rfidService.registerRfid({ 
+                data: { userId, rfid } 
+            });
             return ResponseFactory.created(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -31,7 +33,10 @@ class RfidController {
         try {
             const { id } = req.extract.getParams(['id']);
             const { rfid } = req.extract.getBody(['rfid']);
-            const result = await rfidService.updateRfid(id, rfid);
+            const result = await rfidService.updateRfid({ 
+                data: { rfid }, 
+                where: { id } 
+            });
             return ResponseFactory.updated(result).send(res);
         } catch (error) {
             logger.error(error);
@@ -42,7 +47,9 @@ class RfidController {
     deleteRfid = async (req, res, next) => {
         try {
             const { id } = req.extract.getParams(['id']);
-            const result = await rfidService.deleteRfid(id);
+            const result = await rfidService.deleteRfid({ 
+                where: { id } 
+            });
             return ResponseFactory.deleted().send(res);
         } catch (error) {
             logger.error(error);
@@ -53,7 +60,7 @@ class RfidController {
     getRfidList = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['search', 'role', 'hasRfid', 'page', 'limit']);
-            const result = await rfidService.getRfidList(filters);
+            const result = await rfidService.getRfidList({ filters });
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
             logger.error(error);

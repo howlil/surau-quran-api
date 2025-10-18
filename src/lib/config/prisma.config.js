@@ -18,11 +18,16 @@ class PrismaConfig {
         { emit: 'event', level: 'warn' },
         { emit: 'event', level: 'error' }
       ],
-      errorFormat: process.env.NODE_ENV = "development" ? 'pretty' : 'colorless',
-
+      errorFormat: process.env.NODE_ENV === "development" ? 'pretty' : 'colorless',
       datasources: {
         db: {
           url: process.env.DATABASE_URL
+        }
+      },
+      __internal: {
+        engine: {
+          connectTimeout: 60000,
+          queryTimeout: 60000,
         }
       }
     });

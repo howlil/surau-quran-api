@@ -15,18 +15,18 @@ class SppController {
                 limit
             };
 
-            const result = await sppService.getSppForAdmin(filters);
+            const result = await sppService.getSppForAdmin({ filters });
 
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-      logger.error(error);
-      next(error)
+            logger.error(error);
+            next(error)
         }
     };
 
     getSppForSiswa = async (req, res, next) => {
         try {
-            const {page, limit } = req.extract.getQuery(['page', 'limit']);
+            const { page, limit } = req.extract.getQuery(['page', 'limit']);
             const userId = req.user.id;
 
             const filters = {
@@ -34,27 +34,32 @@ class SppController {
                 limit
             };
 
-            const result = await sppService.getSppForSiswa(userId, filters);
+            const result = await sppService.getSppForSiswa({ 
+                data: { userId }, 
+                filters 
+            });
 
             return ResponseFactory.getAll(result.data, result.meta).send(res);
         } catch (error) {
-      logger.error(error);
-      next(error)
+            logger.error(error);
+            next(error)
         }
     };
 
     getSppInvoice = async (req, res, next) => {
         try {
             const { pembayaranId } = req.extract.getParams(['pembayaranId']);
-            const result = await sppService.getSppInvoice(pembayaranId);
+            const result = await sppService.getSppInvoice({ 
+                data: { pembayaranId } 
+            });
 
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);
-      next(error)
+            next(error)
         }
     };
-    
+
 }
 
 module.exports = new SppController();

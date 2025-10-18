@@ -161,9 +161,9 @@ class ProgramService {
 
   async getAllNoPagination(options = {}) {
     try {
-      const { data: filters = {}, where: additionalWhere = {} } = options;
+      const { filters = {} } = options;
       const { namaProgram } = filters;
-      const where = { ...additionalWhere };
+      const where = {};
       
       if (namaProgram) {
         where.namaProgram = {
@@ -202,7 +202,7 @@ class ProgramService {
     }
   }
 
-  async getAllPublic() {
+  async getAllPublic(options = {}) {
     try {
       const programList = await prisma.program.findMany({
         select: {
@@ -229,8 +229,10 @@ class ProgramService {
     }
   }
 
-  async getProgramStudents(programId, filters = {}) {
+  async getProgramStudents(options) {
     try {
+      const { data, filters = {} } = options;
+      const { programId } = data;
       const { page = 1, limit = 10 } = filters;
 
       // Ambil informasi program untuk menentukan tipe dan nama
@@ -316,7 +318,7 @@ class ProgramService {
 
           return {
             data: paginatedResult,
-            pagination: {
+            meta: {
               total,
               limit,
               page,
@@ -352,7 +354,7 @@ class ProgramService {
 
           return {
             data: result,
-            pagination: {
+            meta: {
               total,
               limit,
               page,

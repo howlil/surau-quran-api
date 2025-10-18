@@ -1,13 +1,15 @@
-const prisma  = require('../../lib/config/prisma.config');
+const prisma = require('../../lib/config/prisma.config');
 const ErrorFactory = require('../../lib/factories/error.factory');
 const PrismaUtils = require('../../lib/utils/prisma.utils');
 const financeService = require('./finance.service');
 const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const logger = require('../../lib/config/logger.config');
+const moment = require("moment")
 
 class SppService {
-    async getSppForAdmin(filters = {}) {
+    async getSppForAdmin(options = {}) {
         try {
+            const { filters = {} } = options;
             const {
                 status,
                 bulan,
@@ -25,7 +27,6 @@ class SppService {
             }
 
             if (bulan) {
-                // Parse format MM-YYYY menjadi bulan nama dan tahun
                 const [monthNumber, year] = bulan.split('-');
                 const monthName = this.getMonthName(parseInt(monthNumber));
 
@@ -127,24 +128,23 @@ class SppService {
                     metode: spp.pembayaran.metodePembayaran
                 } : null,
                 tagihan: {
-                    jumlah: Number(spp.jumlahTagihan),
-                    diskon: Number(spp.diskon),
-                    total: Number(spp.totalTagihan)
+                    total: Number(spp.jumlahTagihan)
                 }
             }));
 
             return {
                 data: formattedData,
-                pagination: result.pagination
+                meta: result.pagination
             };
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 
-    async getSppForSiswa(userId, filters = {}) {
+    async getSppForSiswa(userId, options = {}) {
         try {
+            const { filters = {} } = options;
             const { page = 1, limit = 10 } = filters;
 
             const siswa = await prisma.siswa.findUnique({
@@ -163,7 +163,7 @@ class SppService {
             if (programSiswaIds.length === 0) {
                 return {
                     data: [],
-                    pagination: {
+                    meta: {
                         total: 0,
                         limit,
                         page,
@@ -215,13 +215,12 @@ class SppService {
                 tanggalTagihan: spp.tanggalTagihan,
                 tanggalPembayaran: spp.pembayaran?.tanggalPembayaran || null,
                 jumlahTagihan: Number(spp.jumlahTagihan),
-                diskon: Number(spp.diskon),
-                totalTagihan: Number(spp.totalTagihan),
+                diskon: 0, // Diskon tidak tersimpan di PeriodeSpp
+                totalTagihan: Number(spp.jumlahTagihan), // Total sama dengan jumlah tagihan
                 idPembayaran: spp.pembayaran?.id,
                 statusPembayaran: spp.pembayaran?.statusPembayaran,
                 isPaid: !!spp.pembayaran?.statusPembayaran && ['SETTLEMENT'].includes(spp.pembayaran.statusPembayaran)
             })).sort((a, b) => {
-                // Sort by year first, then by month number
                 if (a.tahun !== b.tahun) {
                     return a.tahun - b.tahun;
                 }
@@ -232,11 +231,11 @@ class SppService {
 
             return {
                 data,
-                pagination: result.pagination
+                meta: result.pagination
             };
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 
@@ -281,7 +280,7 @@ class SppService {
                 throw ErrorFactory.badRequest(`${paidSpp.length} periode SPP sudah dibayar`);
             }
 
-            let totalAmount = periodeSppList.reduce((sum, spp) => sum + Number(spp.totalTagihan), 0);
+            let totalAmount = periodeSppList.reduce((sum, spp) => sum + Number(spp.jumlahTagihan), 0);
             let discountAmount = 0;
             let voucherId = null;
 
@@ -364,7 +363,7 @@ class SppService {
             };
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 
@@ -389,7 +388,7 @@ class SppService {
                 data: {
                     tipePembayaran: 'SPP',
                     metodePembayaran: 'TUNAI',
-                    jumlahTagihan: finalAmount,
+                    totalTagihan: finalAmount,
                     statusPembayaran: 'SETTLEMENT',
                     tanggalPembayaran: new Date().toISOString().split('T')[0],
                     evidence: evidence
@@ -424,12 +423,12 @@ class SppService {
 
             await financeService.createFromSppPayment({
                 id: pembayaran.id,
-                jumlahTagihan: finalAmount,
+                totalTagihan: finalAmount,
                 tanggalPembayaran: tanggalPembayaran,
                 metodePembayaran: 'TUNAI'
             });
 
-  
+
             return {
                 success: true,
                 message: 'Pembayaran SPP tunai berhasil',
@@ -454,7 +453,7 @@ class SppService {
             };
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 
@@ -492,9 +491,9 @@ class SppService {
         const siswa = periode.programSiswa.siswa;
 
         // Gunakan nominal dari pembayaran (sudah final amount setelah voucher)
-        const finalAmount = CommonServiceUtils.safeNumber(pembayaran.jumlahTagihan);
+        const finalAmount = CommonServiceUtils.safeNumber(pembayaran.totalTagihan);
         const originalAmount = CommonServiceUtils.safeNumber(periode.jumlahTagihan);
-        const discount = CommonServiceUtils.safeNumber(periode.diskon);
+        const discount = CommonServiceUtils.safeNumber(pembayaran.discount || 0);
 
         return {
             invoiceNumber: pembayaran.id,
@@ -523,7 +522,6 @@ class SppService {
     async generateFiveMonthsAhead(programSiswaId, tanggalDaftar = new Date(), tx = null) {
         try {
 
-            // Use transaction context if provided, otherwise use global prisma
             const db = tx || prisma;
 
             // Get program siswa details including program info
@@ -579,9 +577,7 @@ class SppService {
                         bulan,
                         tahun,
                         tanggalTagihan,
-                        jumlahTagihan: biayaSpp,
-                        diskon: 0,
-                        totalTagihan: biayaSpp
+                        jumlahTagihan: biayaSpp
                     }
                 });
 
@@ -592,7 +588,7 @@ class SppService {
 
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 
@@ -614,7 +610,6 @@ class SppService {
 
     async generateSingleSpp(programSiswaId, monthOffset = 1, tx = null) {
         try {
-            // Use transaction context if provided, otherwise use global prisma
             const db = tx || prisma;
 
             const programSiswa = await db.programSiswa.findUnique({
@@ -658,9 +653,7 @@ class SppService {
                     bulan,
                     tahun,
                     tanggalTagihan,
-                    jumlahTagihan: biayaSpp,
-                    diskon: 0,
-                    totalTagihan: biayaSpp
+                    jumlahTagihan: biayaSpp
                 }
             });
 
@@ -668,7 +661,7 @@ class SppService {
 
         } catch (error) {
             logger.error(error);
-      throw error;
+            throw error;
         }
     }
 }

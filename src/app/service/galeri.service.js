@@ -30,10 +30,10 @@ class GaleriService {
 
     async getAll(options = {}) {
         try {
-            const { data: filters = {}, where: additionalWhere = {} } = options;
+            const { filters = {} } = options;
             const { page = 1, limit = 10, judul } = filters;
 
-            const where = { ...additionalWhere };
+            const where = {};
             
             if (judul) {
                 where.judulFoto = {

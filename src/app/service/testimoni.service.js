@@ -34,10 +34,10 @@ class TestimoniService {
 
     async getAll(options = {}) {
         try {
-            const { data: filters = {}, where: additionalWhere = {} } = options;
+            const { filters = {} } = options;
             const { page = 1, limit = 10, nama } = filters;
 
-            const where = { ...additionalWhere };
+            const where = {};
 
             if (nama) {
                 where.OR = [

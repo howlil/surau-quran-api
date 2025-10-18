@@ -64,7 +64,7 @@ class GuruController {
       const filters = req.extract.getQuery([
         'page', 'limit', 'nama'
       ]);
-      const result = await guruService.getAll({ data: filters });
+      const result = await guruService.getAll({ filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -76,7 +76,7 @@ class GuruController {
   getAllWithSchedules = async (req, res, next) => {
     try {
       const filters = req.extract.getQuery(['page', 'limit', 'nama']);
-      const result = await guruService.getAllGuruWithSchedules(filters);
+      const result = await guruService.getAllGuruWithSchedules({ filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -96,7 +96,9 @@ class GuruController {
         throw ErrorFactory.notFound('Profil guru tidak ditemukan');
       }
 
-      const result = await guruService.getKelasProgramWithStudents(guru.id);
+      const result = await guruService.getKelasProgramWithStudents({ 
+        data: { guruId: guru.id } 
+      });
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -116,7 +118,9 @@ class GuruController {
         throw ErrorFactory.notFound('Profil guru tidak ditemukan');
       }
 
-      const { filePath, fileName } = await guruService.getContractFile(guru.id);
+      const { filePath, fileName } = await guruService.getContractFile({ 
+        data: { guruId: guru.id } 
+      });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);

@@ -9,7 +9,7 @@ class SiswaController {
       const filters = req.extract.getQuery([
         'nama', 'programId', 'page', 'limit'
       ]);
-      const result = await siswaService.getAll({ data: filters });
+      const result = await siswaService.getAll({ filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -21,7 +21,10 @@ class SiswaController {
     try {
       const { id: userId } = req.user;
       const filters = req.extract.getQuery(['bulan', 'page', 'limit']);
-      const result = await siswaService.getProfile(userId, filters);
+      const result = await siswaService.getProfile({ 
+        data: { userId }, 
+        filters 
+      });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -33,7 +36,10 @@ class SiswaController {
     try {
       const { id } = req.extract.getParams(['id']);
       const data = req.extract.getBody();
-      await siswaService.adminUpdateSiswa(id, data);
+      await siswaService.adminUpdateSiswa({ 
+        data, 
+        where: { id } 
+      });
       return ResponseFactory.updated().send(res);
     } catch (error) {
       logger.error(error);
@@ -58,7 +64,9 @@ class SiswaController {
   getJadwalSiswa = async (req, res, next) => {
     try {
       const { rfid } = req.extract.getQuery(['rfid']);
-      const result = await siswaService.getJadwalSiswa(rfid);
+      const result = await siswaService.getJadwalSiswa({ 
+        data: { rfid } 
+      });
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -70,7 +78,10 @@ class SiswaController {
     try {
       const { id } = req.extract.getParams(['id']);
       const data = req.extract.getBody();
-      const result = await siswaService.pindahProgram(id, data);
+      const result = await siswaService.pindahProgram({ 
+        data, 
+        where: { id } 
+      });
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
       logger.error(error);

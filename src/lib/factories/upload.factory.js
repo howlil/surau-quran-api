@@ -125,6 +125,56 @@ class UploadFactory {
     handleEvidencePendaftaranUpload(req) {
         if (req.file && req.file.fieldname === 'evidence') {
             req.body.evidence = req.file.filename;
+        } else if (req.files) {
+            if (Array.isArray(req.files)) {
+                const evidenceFile = req.files.find(file => file.fieldname === 'evidence');
+                if (evidenceFile) {
+                    req.body.evidence = evidenceFile.filename;
+                }
+            } else if (req.files.evidence) {
+                req.body.evidence = req.files.evidence.filename;
+            }
+        }
+
+        // Transform form-data untuk memproses array chanel
+        if (req.body) {
+            const transformedBody = {};
+            const chanelArray = [];
+            
+            // Preserve evidence first
+            if (req.body.evidence) {
+                transformedBody.evidence = req.body.evidence;
+            }
+            
+            Object.keys(req.body).forEach(key => {
+                if (key.startsWith('chanel[')) {
+                    const match = key.match(/chanel\[(\d+)\]\.(.+)/);
+                    if (match) {
+                        const index = parseInt(match[1]);
+                        const property = match[2];
+                        
+                        if (!chanelArray[index]) {
+                            chanelArray[index] = {};
+                        }
+                        chanelArray[index][property] = req.body[key];
+                    }
+                } else if (key !== 'evidence') {
+                    // Handle special data types
+                    if (['jumlahPembayaran', 'biayaPendaftaran', 'totalBiaya'].includes(key)) {
+                        transformedBody[key] = parseFloat(req.body[key]);
+                    } else if (key === 'isOther') {
+                        transformedBody[key] = req.body[key] === 'true';
+                    } else {
+                        transformedBody[key] = req.body[key];
+                    }
+                }
+            });
+            
+            if (chanelArray.length > 0) {
+                transformedBody.chanel = chanelArray.filter(item => item && Object.keys(item).length > 0);
+            }
+            
+            req.body = transformedBody;
         }
     }
 
@@ -150,6 +200,7 @@ class UploadFactory {
         if (req.files) {
             if (req.files.kartuKeluarga?.[0]) {
                 req.file = req.files.kartuKeluarga[0];
+                req.body.kartuKeluarga = req.files.kartuKeluarga[0].filename;
             } else if (req.files.evidence?.[0]) {
                 req.file = req.files.evidence[0];
             }
@@ -163,6 +214,15 @@ class UploadFactory {
         if (req.body) {
             const transformedBody = {};
             const siswaArray = [];
+            const chanelArray = [];
+            
+            // Preserve kartuKeluarga and evidence first
+            if (req.body.kartuKeluarga) {
+                transformedBody.kartuKeluarga = req.body.kartuKeluarga;
+            }
+            if (req.body.evidence) {
+                transformedBody.evidence = req.body.evidence;
+            }
             
             Object.keys(req.body).forEach(key => {
                 if (key.startsWith('siswa[')) {
@@ -176,11 +236,22 @@ class UploadFactory {
                         }
                         siswaArray[index][property] = req.body[key];
                     }
-                } else {
+                } else if (key.startsWith('chanel[')) {
+                    const match = key.match(/chanel\[(\d+)\]\.(.+)/);
+                    if (match) {
+                        const index = parseInt(match[1]);
+                        const property = match[2];
+                        
+                        if (!chanelArray[index]) {
+                            chanelArray[index] = {};
+                        }
+                        chanelArray[index][property] = req.body[key];
+                    }
+                } else if (!['kartuKeluarga', 'evidence'].includes(key)) {
                     // Handle special data types
-                    if (['biayaPendaftaran', 'totalBiaya'].includes(key)) {
+                    if (['biayaPendaftaran', 'totalBiaya', 'jumlahPembayaran'].includes(key)) {
                         transformedBody[key] = parseFloat(req.body[key]);
-                    } else if (key === 'isFamily') {
+                    } else if (key === 'isFamily' || key === 'isOther') {
                         transformedBody[key] = req.body[key] === 'true';
                     } else {
                         transformedBody[key] = req.body[key];
@@ -190,6 +261,10 @@ class UploadFactory {
             
             if (siswaArray.length > 0) {
                 transformedBody.siswa = siswaArray.filter(item => item && Object.keys(item).length > 0);
+            }
+            
+            if (chanelArray.length > 0) {
+                transformedBody.chanel = chanelArray.filter(item => item && Object.keys(item).length > 0);
             }
             
             req.body = transformedBody;

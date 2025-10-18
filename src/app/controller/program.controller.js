@@ -53,7 +53,7 @@ class ProgramController {
   getAll = async (req, res, next) => {
     try {
       const filters = req.extract.getQuery(['namaProgram']);
-      const result = await programService.getAllNoPagination({ data: filters });
+      const result = await programService.getAllNoPagination({ filters });
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -63,7 +63,7 @@ class ProgramController {
 
   getAllPublic = async (req, res, next) => {
     try {
-      const result = await programService.getAllPublic();
+      const result = await programService.getAllPublic({});
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -75,7 +75,10 @@ class ProgramController {
     try {
       const { programId } = req.extract.getParams(['programId']);
       const filters = req.extract.getQuery(['page', 'limit']);
-      const result = await programService.getProgramStudents(programId, filters);
+      const result = await programService.getProgramStudents({ 
+        data: { programId }, 
+        filters 
+      });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);

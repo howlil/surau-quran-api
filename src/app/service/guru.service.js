@@ -276,8 +276,9 @@ class GuruService {
     }
   }
 
-  async getAllGuruWithSchedules(filters = {}) {
+  async getAllGuruWithSchedules(options = {}) {
     try {
+      const { filters = {} } = options;
       const { page = 1, limit = 10, nama } = filters;
 
       const where = {};
@@ -333,7 +334,9 @@ class GuruService {
     }
   }
 
-  async getKelasProgramWithStudents(guruId) {
+  async getKelasProgramWithStudents(options) {
+    const { data } = options;
+    const { guruId } = data;
     try {
       const kelasPrograms = await prisma.kelasProgram.findMany({
         where: { guruId: guruId },
@@ -436,7 +439,9 @@ class GuruService {
     }
   }
 
-  async getContractFile(guruId) {
+  async getContractFile(options) {
+    const { data } = options;
+    const { guruId } = data;
     try {
       const guru = await prisma.guru.findUnique({
         where: { id: guruId },

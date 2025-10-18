@@ -41,7 +41,7 @@ class VoucherController {
   getAll = async (req, res, next) => {
     try {
       const filters = req.extract.getQuery(['page', 'limit', 'nama']);
-      const result = await voucherService.getAll({ data: filters });
+      const result = await voucherService.getAll({ filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -52,7 +52,7 @@ class VoucherController {
   getVoucherByKode = async (req, res, next) => {
     try {
       const { kodeVoucher } = req.extract.getParams(['kodeVoucher']);
-      const result = await voucherService.getVoucherByKode(kodeVoucher);
+      const result = await voucherService.getVoucherByKode({ data: { kodeVoucher } });
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);

@@ -7,8 +7,9 @@ const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const logger = require('../../lib/config/logger.config');
 class AbsensiService {
 
-    async getAbsensiSiswaForAdmin(filters = {}) {
+    async getAbsensiSiswaForAdmin(options = {}) {
         try {
+            const { filters = {} } = options;
             const { kelasId, tanggal } = filters;
 
             if (!kelasId) {
@@ -115,8 +116,9 @@ class AbsensiService {
     }
 
 
-    async getAbsensiGuruByDate(filters = {}) {
+    async getAbsensiGuruByDate(options = {}) {
         try {
+            const { filters = {} } = options;
             const { tanggal, page = 1, limit = 10 } = filters;
 
             // Parse tanggal untuk mendapatkan hari
@@ -338,7 +340,7 @@ class AbsensiService {
             return {
                 tanggal,
                 data: transformedData,
-                pagination: result.pagination
+                meta: result.pagination
             };
         } catch (error) {
             logger.error(error);
@@ -361,8 +363,11 @@ class AbsensiService {
         }
     }
 
-    async updateAbsensiGuru(id, data) {
+    async updateAbsensiGuru(options) {
         try {
+            const { data, where } = options;
+            const { id } = where;
+            
             const absensi = await prisma.absensiGuru.findUnique({
                 where: { id },
                 include: {
@@ -504,8 +509,10 @@ class AbsensiService {
         }
     }
 
-    async updateAbsensiSiswa(kelasProgramId, siswaId, guruId, statusKehadiran) {
+    async updateAbsensiSiswa(options) {
         try {
+            const { data } = options;
+            const { kelasProgramId, siswaId, guruId, statusKehadiran } = data;
             const tanggal = CommonServiceUtils.getCurrentDate();
 
             // Cek apakah siswa ada di kelas pengganti untuk kelas program ini
@@ -648,8 +655,11 @@ class AbsensiService {
     }
 
 
-    async findOriginalScheduleForTemporaryStudent(siswaId, tanggal, jamMulai, jamSelesai) {
+    async findOriginalScheduleForTemporaryStudent(options) {
         try {
+            const { data } = options;
+            const { siswaId, tanggal, jamMulai, jamSelesai } = data;
+            
             // Parse tanggal untuk mendapatkan hari
             const dateObj = new Date(tanggal.split('-').reverse().join('-'));
             const hariAbsensi = this.getDayFromDate(tanggal);
@@ -712,8 +722,11 @@ class AbsensiService {
         }
     }
 
-    async updateAbsensiSiswaTemporary(kelasProgramId, siswaId, guruId, statusKehadiran, tanggal) {
+    async updateAbsensiSiswaTemporary(options) {
         try {
+            const { data } = options;
+            const { kelasProgramId, siswaId, guruId, statusKehadiran, tanggal } = data;
+            
             // Validasi tanggal tidak boleh masa lalu
             const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
@@ -758,12 +771,14 @@ class AbsensiService {
             }
 
             // Cari jadwal asli siswa
-            const originalSchedule = await this.findOriginalScheduleForTemporaryStudent(
-                siswaId,
-                tanggal,
-                kelasProgram.jamMengajar.jamMulai,
-                kelasProgram.jamMengajar.jamSelesai
-            );
+            const originalSchedule = await this.findOriginalScheduleForTemporaryStudent({
+                data: {
+                    siswaId,
+                    tanggal,
+                    jamMulai: kelasProgram.jamMengajar.jamMulai,
+                    jamSelesai: kelasProgram.jamMengajar.jamSelesai
+                }
+            });
 
             if (!originalSchedule) {
                 throw ErrorFactory.badRequest('Tidak dapat menemukan jadwal asli siswa');
@@ -845,8 +860,12 @@ class AbsensiService {
         }
     }
 
-    async getAbsensiSiswaByKelasProgram(kelasProgramId, guruId, tanggal = null) {
+    async getAbsensiSiswaByKelasProgram(options) {
         try {
+            const { data, filters = {} } = options;
+            const { kelasProgramId, guruId } = data;
+            const { tanggal } = filters;
+            
             // Use provided date or default to today's date
             const targetDate = tanggal || CommonServiceUtils.getCurrentDate();
 
@@ -968,8 +987,11 @@ class AbsensiService {
         }
     }
 
-    async createAbsensiSiswa(kelasProgramId, tanggal) {
+    async createAbsensiSiswa(options) {
         try {
+            const { data } = options;
+            const { kelasProgramId, tanggal } = data;
+            
             // Validasi format tanggal dan konversi ke hari
             const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {
@@ -1186,8 +1208,11 @@ class AbsensiService {
      * @param {string} jam - Jam dalam format HH:MM
      * @returns {Object} Data absensi yang dibuat/diupdate
      */
-    async updateAbsensiGuruWithRfid(rfid, tanggal, jam) {
+    async updateAbsensiGuruWithRfid(options) {
         try {
+            const { data } = options;
+            const { rfid, tanggal, jam } = data;
+            
             // Parse tanggal untuk mendapatkan hari
             const dateObj = CommonServiceUtils.validateDateFormat(tanggal);
             if (!dateObj.isValid()) {

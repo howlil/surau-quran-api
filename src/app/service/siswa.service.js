@@ -25,10 +25,10 @@ class SiswaService {
    */
   async getAll(options = {}) {
     try {
-      const { data: filters = {}, where: additionalWhere = {} } = options;
+      const { filters = {} } = options;
       const { nama, programId, page = 1, limit = 10 } = filters;
 
-      const where = { ...additionalWhere };
+      const where = {};
 
       if (nama) {
         where.OR = [
@@ -183,8 +183,10 @@ class SiswaService {
     }
   }
 
-  async getProfile(userId, filters = {}) {
+  async getProfile(options) {
     try {
+      const { data, filters = {} } = options;
+      const { userId } = data;
       const { bulan, page = 1, limit = 10 } = filters;
 
       const siswa = await prisma.siswa.findUnique({
@@ -323,7 +325,7 @@ class SiswaService {
         siswa: transformedSiswa,
         absensi: {
           data: absensi,
-          pagination: {
+          meta: {
             total: totalAbsensi,
             limit,
             page,
@@ -350,7 +352,9 @@ class SiswaService {
     return days[date.getDay()];
   }
 
-  async adminUpdateSiswa(id, data) {
+  async adminUpdateSiswa(options) {
+    const { data, where } = options;
+    const { id } = where;
     try {
       const siswa = await prisma.siswa.findUnique({
         where: { id },
@@ -867,7 +871,9 @@ class SiswaService {
     }
   }
 
-  async getJadwalSiswa(rfid) {
+  async getJadwalSiswa(options) {
+    const { data } = options;
+    const { rfid } = data;
     try {
       let siswa;
 
@@ -1123,7 +1129,9 @@ class SiswaService {
   }
 
 
-  async pindahProgram(siswaId, data) {
+  async pindahProgram(options) {
+    const { data, where } = options;
+    const { siswaId } = where;
     try {
       const { programBaruId, jadwal = [] } = data;
 

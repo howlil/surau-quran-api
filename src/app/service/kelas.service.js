@@ -122,7 +122,9 @@ class KelasService {
     }
 
 
-    async getCCTVByUserId(siswaUserId) {
+    async getCCTVByUserId(options) {
+        const { data } = options;
+        const { userId: siswaUserId } = data;
         try {
             // 1. Cari siswa berdasarkan user ID
             const siswa = await prisma.siswa.findUnique({

@@ -4,8 +4,9 @@ const logger = require('../../lib/config/logger.config');
 const moment = require('moment');
 
 class StatisticsService {
-    async getStudentCounts(filters = {}) {
+    async getStudentCounts(options = {}) {
         try {
+            const { filters = {} } = options;
             const { startDate, endDate } = filters;
 
             // Build date filter based on user requirement
@@ -86,8 +87,9 @@ class StatisticsService {
         }
     }
 
-    async getFinancialStatistics(filters = {}) {
+    async getFinancialStatistics(options = {}) {
         try {
+            const { filters = {} } = options;
             const { startDate, endDate, groupBy = 'month' } = filters;
 
             // Build date filter based on user requirement
@@ -300,7 +302,7 @@ class StatisticsService {
         }
     }
 
-    async getStudentDistribution() {
+    async getStudentDistribution(options = {}) {
         try {
             // Get kelas distribution
             const kelasDistribution = await prisma.kelas.findMany({
@@ -481,7 +483,7 @@ class StatisticsService {
         return result;
     }
 
-    async getTodaySchedule() {
+    async getTodaySchedule(options = {}) {
         try {
             // Get today's date
             const today = CommonServiceUtils.getCurrentDate();

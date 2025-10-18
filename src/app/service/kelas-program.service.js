@@ -6,8 +6,9 @@ const logger = require('../../lib/config/logger.config');
 
 class KelasProgramService {
 
-    async getInitialStudentIntoClass() {
+    async getInitialStudentIntoClass(options = {}) {
         try {
+            const { filters = {} } = options;
             const kelasList = await prisma.kelas.findMany({
                 include: {
                     kelasProgram: {
@@ -142,8 +143,10 @@ class KelasProgramService {
         return false;
     }
 
-    async patchInitialStudentIntoClass(kelasProgramId, data) {
+    async patchInitialStudentIntoClass(options) {
         try {
+            const { data, where } = options;
+            const { kelasProgramId } = where;
             const {
                 programId,
                 hari,
@@ -482,8 +485,9 @@ class KelasProgramService {
         }
     }
 
-    async createKelasProgram(data) {
+    async createKelasProgram(options) {
         try {
+            const { data } = options;
             const { kelasId, programId, hari, jamMengajarId, guruId, siswaIds = [] } = data;
 
             return await prisma.$transaction(async (tx) => {
@@ -652,8 +656,10 @@ class KelasProgramService {
         }
     }
 
-    async deleteKelasProgram(kelasProgramId) {
+    async deleteKelasProgram(options) {
         try {
+            const { where } = options;
+            const { kelasProgramId } = where;
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: { id: kelasProgramId },
                 include: {
@@ -705,8 +711,10 @@ class KelasProgramService {
         }
     }
 
-    async addKelasPengganti(guruId, data) {
+    async addKelasPengganti(options) {
         try {
+            const { data, where } = options;
+            const { guruId } = where;
             const { kelasProgramId, siswaId, tanggal } = data;
 
             // Validasi bahwa kelas program ada
@@ -974,8 +982,10 @@ class KelasProgramService {
         }
     }
 
-    async removeKelasPengganti(guruId, kelasProgramId) {
+    async removeKelasPengganti(options) {
         try {
+            const { where } = options;
+            const { guruId, kelasProgramId } = where;
             // Validasi bahwa kelas program ada
             const kelasProgram = await prisma.kelasProgram.findUnique({
                 where: {
@@ -1059,8 +1069,9 @@ class KelasProgramService {
         }
     }
 
-    async getSiswaKelasPengganti(filters = {}) {
+    async getSiswaKelasPengganti(options = {}) {
         try {
+            const { filters = {} } = options;
             const { search, page = 1, limit = 10 } = filters;
 
             // Filter hanya siswa yang sudah memiliki kelas program aktif

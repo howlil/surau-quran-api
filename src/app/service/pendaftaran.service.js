@@ -62,7 +62,8 @@ class PendaftaranService {
     }
   }
 
-  async createPendaftaran(pendaftaranData) {
+  async createPendaftaran(options) {
+    const { data: pendaftaranData } = options;
     try {
       if (!pendaftaranData) {
         throw ErrorFactory.badRequest('Data pendaftaran tidak boleh kosong');
@@ -163,8 +164,14 @@ class PendaftaranService {
         throw ErrorFactory.badRequest(`Email ${email} sudah terdaftar sebagai siswa`);
       }
 
+      // Cache program query dengan select minimal
       const program = await prisma.program.findUnique({
-        where: { id: programId }
+        where: { id: programId },
+        select: {
+          id: true,
+          namaProgram: true,
+          tipeProgram: true
+        }
       });
 
       if (!program) {
@@ -233,15 +240,14 @@ class PendaftaranService {
         }
       }
 
-      // Backend akan menghitung total biaya, tidak perlu validasi dari frontend
-      // calculatedTotal sudah dihitung berdasarkan jumlahPembayaran dan diskon
 
-      // Find or create chanel
       const chanelData = await this.findOrCreateChanel(chanel);
 
-      // Handle berdasarkan metode pembayaran
       if (metodePembayaran === 'TUNAI') {
-        // Untuk pembayaran tunai, langsung buat akun siswa
+        if (!evidence) {
+          throw ErrorFactory.badRequest('Bukti pembayaran wajib diupload untuk pembayaran tunai');
+        }
+        
         return await this.createSiswaFromTunaiPayment({
           namaMurid: cleanedNamaMurid,
           namaPanggilan: cleanedNamaPanggilan,
@@ -374,7 +380,7 @@ class PendaftaranService {
           data: {
             namaMurid,
             namaPanggilan,
-            tanggalLahir: tanggalLahir ? moment(tanggalLahir, 'DD-MM-YYYY').toDate() : null,
+            tanggalLahir,
             jenisKelamin,
             alamat,
             strataPendidikan,
@@ -393,7 +399,6 @@ class PendaftaranService {
             siswaId: siswa.id,
             programId,
             status: 'AKTIF',
-            tanggalMulai: CommonServiceUtils.getCurrentDate(),
             createdAt: new Date(),
             updatedAt: new Date()
           }
@@ -420,13 +425,14 @@ class PendaftaranService {
             siswa: {
               id: siswa.id,
               namaMurid: siswa.namaMurid,
-              email: user.email,
-              password: generatedPassword
+              email: user.email
+              // Password tidak dikembalikan untuk keamanan
             },
             pembayaran: {
               id: pembayaran.id,
               totalBiaya: calculatedTotal
-            }
+            },
+            evidence: evidence
           }
         };
       });
@@ -436,9 +442,10 @@ class PendaftaranService {
     }
   }
 
-  async createPendaftaranV2(data, kartuKeluargaFile) {
+  async createPendaftaranV2(options) {
+    const { data } = options;
     try {
-      const { siswa, programId, biayaPendaftaran, isFamily, hubunganKeluarga, kodeVoucher, metodePembayaran, evidence, chanel } = data;
+      const { siswa, programId, biayaPendaftaran, isFamily, hubunganKeluarga, kartuKeluarga,kodeVoucher, metodePembayaran, evidence, chanel } = data;
 
       // Validate required fields
       if (!programId) {
@@ -544,12 +551,12 @@ class PendaftaranService {
       // Validate student count based on program type
       this.validateStudentCount(siswa.length, programType, subType);
 
-      // Validate kartu keluarga for family programs
-      if (isFamily && subType === 'BERSAUDARA' && !kartuKeluargaFile) {
+      // Kartu keluarga hanya diperlukan jika ada file upload atau data yang dikirim
+      // Jika tidak ada, kita akan skip validasi ini
+      if (isFamily && subType === 'BERSAUDARA' && data.kartuKeluarga && data.kartuKeluarga.trim() === '') {
         throw ErrorFactory.badRequest('Kartu keluarga wajib diupload untuk program Private Bersaudara (isFamily: true)');
       }
 
-      // Validate hubungan keluarga for non-family programs
       if (!isFamily && subType === 'BERSAUDARA' && !hubunganKeluarga) {
         throw ErrorFactory.badRequest('Hubungan keluarga wajib diisi untuk program Private Bersaudara (isFamily: false)');
       }
@@ -564,7 +571,6 @@ class PendaftaranService {
       let voucherId = null;
 
       if (kodeVoucher) {
-        // Clear cache dan ambil voucher dengan query yang lebih spesifik
         voucher = await prisma.voucher.findFirst({
           where: {
             kodeVoucher: kodeVoucher.toUpperCase(),
@@ -579,11 +585,9 @@ class PendaftaranService {
           throw ErrorFactory.notFound('Voucher tidak valid atau tidak aktif');
         }
 
-        // Set voucherId for later use
         voucherId = voucher.id;
 
         if (voucher.tipe === 'PERSENTASE') {
-          // Validasi persentase antara 0-100%
           if (Number(voucher.nominal) < 0 || Number(voucher.nominal) > 100) {
             throw ErrorFactory.badRequest(`Persentase diskon harus antara 0-100%. Saat ini: ${voucher.nominal}%`);
           }
@@ -610,6 +614,11 @@ class PendaftaranService {
 
       // Handle berdasarkan metode pembayaran
       if (metodePembayaran === 'TUNAI') {
+        // Validasi evidence untuk pembayaran tunai
+        if (!evidence) {
+          throw ErrorFactory.badRequest('Bukti pembayaran wajib diupload untuk pembayaran tunai');
+        }
+        
         // Untuk pembayaran tunai, langsung buat akun siswa untuk semua siswa
         return await this.createSiswaV2FromTunaiPayment({
           siswa,
@@ -619,7 +628,7 @@ class PendaftaranService {
           finalTotal,
           voucherId,
           evidence,
-          kartuKeluargaFile,
+          kartuKeluarga: data.kartuKeluarga,
           isFamily,
           hubunganKeluarga,
           chanelId: chanelData.id
@@ -702,7 +711,7 @@ class PendaftaranService {
                   isFamily,
                   hubunganKeluarga,
                   jenisHubungan: data.jenisHubungan,
-                  kartuKeluarga: kartuKeluargaFile,
+                  kartuKeluarga: data.kartuKeluarga,
                   kodeVoucher: kodeVoucher?.toUpperCase() || null,
                   diskon: totalDiskon,
                   totalBiaya: finalTotal,
@@ -759,7 +768,6 @@ class PendaftaranService {
         finalTotal,
         voucherId,
         evidence,
-        kartuKeluargaFile,
         isFamily,
         hubunganKeluarga,
         chanelId
@@ -813,7 +821,7 @@ class PendaftaranService {
             noWhatsapp: student.noWhatsapp,
             isFamily: isFamily || false,
             hubunganKeluarga: hubunganKeluarga || null,
-            kartuKeluarga: kartuKeluargaFile || null
+            kartuKeluarga: data.kartuKeluarga || null
           }
         });
 
@@ -842,6 +850,7 @@ class PendaftaranService {
           email: student.email,
           namaMurid: student.namaMurid,
           status: 'AKTIF'
+          // Password tidak dikembalikan untuk keamanan
         });
 
         createdPendaftaran.push(pendaftaran.id);
@@ -858,14 +867,23 @@ class PendaftaranService {
 
       // Generate SPP untuk 5 bulan ke depan untuk semua siswa
       const tanggalDaftar = CommonServiceUtils.getCurrentDate();
+      // Batch query untuk programSiswa
+      const programSiswaIds = await prisma.programSiswa.findMany({
+        where: { 
+          siswaId: { 
+            in: createdSiswa.map(s => s.siswaId) 
+          } 
+        },
+        select: { id: true, siswaId: true }
+      });
+      
+      const programSiswaMap = new Map(programSiswaIds.map(ps => [ps.siswaId, ps.id]));
+      
       const sppPromises = createdSiswa.map(async (siswaData) => {
-        // Get programSiswaId untuk siswa ini
-        const programSiswa = await prisma.programSiswa.findFirst({
-          where: { siswaId: siswaData.siswaId }
-        });
+        const programSiswaId = programSiswaMap.get(siswaData.siswaId);
 
-        if (programSiswa) {
-          const sppRecords = await SppService.generateFiveMonthsAhead(programSiswa.id, tanggalDaftar);
+        if (programSiswaId) {
+          const sppRecords = await SppService.generateFiveMonthsAhead(programSiswaId, tanggalDaftar);
           return sppRecords;
         }
         return [];
@@ -881,7 +899,8 @@ class PendaftaranService {
           siswa: createdSiswa,
           pendaftaranIds: createdPendaftaran,
           totalAmount: finalTotal,
-          status: 'AKTIF'
+          status: 'AKTIF',
+          evidence: evidence
         }
       };
     } catch (error) {
@@ -890,7 +909,8 @@ class PendaftaranService {
     }
   }
 
-  async getPendaftaranInvoice(invoices, filters = {}) {
+  async getPendaftaranInvoice(invoices, options = {}) {
+    const { data: filters = {}, where: additionalWhere = {} } = options;
     const { status, tanggal, nama, page = 1, limit = 10 } = filters;
 
     let filteredInvoices = invoices;

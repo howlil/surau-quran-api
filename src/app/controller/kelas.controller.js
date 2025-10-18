@@ -52,7 +52,9 @@ class KelasController {
     getCCTV = async (req, res, next) => {
         try {
             const userId = req.user.id;
-            const result = await kelasService.getCCTVByUserId(userId);
+            const result = await kelasService.getCCTVByUserId({ 
+                data: { userId } 
+            });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
             logger.error(error);

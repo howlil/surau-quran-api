@@ -1,6 +1,5 @@
 const pendaftaranService = require('../service/pendaftaran.service');
 const ResponseFactory = require('../../lib/factories/response.factory');
-const FileUtils = require('../../lib/utils/file.utils');
 const logger = require('../../lib/config/logger.config');
 
 class PendaftaranController {
@@ -11,19 +10,21 @@ class PendaftaranController {
 
       if (req.file && req.file.fieldname === 'evidence') {
         data.evidence = req.file.filename;
+      } else if (req.files) {
+        if (Array.isArray(req.files)) {
+          const evidenceFile = req.files.find(file => file.fieldname === 'evidence');
+          if (evidenceFile) {
+            data.evidence = evidenceFile.filename;
+          }
+        } else if (req.files.evidence) {
+          data.evidence = req.files.evidence.filename;
+        }
       }
 
-      const result = await pendaftaranService.createPendaftaran(data);
+      const result = await pendaftaranService.createPendaftaran({ data });
 
-      if (result.success && result.data) {
-        const transformedResult = FileUtils.transformPembayaranFiles(result.data);
-        return ResponseFactory.get(transformedResult).send(res);
-      } else {
-        return ResponseFactory.get({
-          redirectUrl: result.redirectUrl,
-          expireDate: result.expireDate
-        }).send(res);
-      }
+      return ResponseFactory.get(result).send(res);
+
     } catch (error) {
       logger.error(error);
       next(error)
@@ -76,17 +77,14 @@ class PendaftaranController {
         data.evidence = evidenceFile;
       }
 
-      const result = await pendaftaranService.createPendaftaranV2(data, kartuKeluargaFile);
-
-      if (result.success && result.data) {
-        const transformedResult = FileUtils.transformPembayaranFiles(result.data);
-        return ResponseFactory.get(transformedResult).send(res);
-      } else {
-        return ResponseFactory.get({
-          redirectUrl: result.redirectUrl,
-          expireDate: result.expireDate
-        }).send(res);
+      if (kartuKeluargaFile) {
+        data.kartuKeluarga = kartuKeluargaFile;
       }
+
+      const result = await pendaftaranService.createPendaftaranV2({ data });
+
+      return ResponseFactory.get(result).send(res);
+
     } catch (error) {
       logger.error(error);
       next(error)

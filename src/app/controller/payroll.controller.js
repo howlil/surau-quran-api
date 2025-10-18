@@ -11,7 +11,10 @@ class PayrollController {
     try {
       const { id } = req.extract.getParams(['id']);
       const data = req.extract.getBody();
-      const result = await payrollService.updatePayroll(id, data);
+      const result = await payrollService.updatePayroll({ 
+        data, 
+        where: { id } 
+      });
       return ResponseFactory.updated(result).send(res);
     } catch (error) {
       logger.error(error);
@@ -24,7 +27,7 @@ class PayrollController {
       const filters = req.extract.getQuery([
         'page', 'limit', 'monthYear'
       ]);
-      const result = await payrollService.getAllPayrollsForAdmin(filters);
+      const result = await payrollService.getAllPayrollsForAdmin({ filters });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -47,7 +50,10 @@ class PayrollController {
         throw ErrorFactory.badRequest('Guru tidak ditemukan');
       }
 
-      const result = await payrollService.getAllPayrollsForGuru(guru.id, filters);
+      const result = await payrollService.getAllPayrollsForGuru({ 
+        data: { guruId: guru.id }, 
+        filters 
+      });
       return ResponseFactory.getAll(result.data, result.meta).send(res);
     } catch (error) {
       logger.error(error);
@@ -58,7 +64,9 @@ class PayrollController {
   batchPayrollDisbursement = async (req, res, next) => {
     try {
       const { payrollIds } = req.extract.getBody(['payrollIds']);
-      const result = await payrollService.batchPayrollDisbursement(payrollIds);
+      const result = await payrollService.batchPayrollDisbursement({ 
+        data: { payrollIds } 
+      });
       return ResponseFactory.get(result).send(res);
     } catch (error) {
       logger.error(error);

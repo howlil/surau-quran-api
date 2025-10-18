@@ -7,7 +7,7 @@ class StatisticsController {
     getStudentCounts = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['startDate', 'endDate']);
-            const result = await statisticsService.getStudentCounts(filters);
+            const result = await statisticsService.getStudentCounts({ filters });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
       logger.error(error);
@@ -19,7 +19,7 @@ class StatisticsController {
     getFinancialStatistics = async (req, res, next) => {
         try {
             const filters = req.extract.getQuery(['startDate', 'endDate', 'groupBy']);
-            const result = await statisticsService.getFinancialStatistics(filters);
+            const result = await statisticsService.getFinancialStatistics({ filters });
             return ResponseFactory.get(result).send(res);
         } catch (error) {
       logger.error(error);
@@ -30,7 +30,7 @@ class StatisticsController {
     // Get student distribution across classes
     getStudentDistribution = async (req, res, next) => {
         try {
-            const result = await statisticsService.getStudentDistribution();
+            const result = await statisticsService.getStudentDistribution({});
             return ResponseFactory.get(result).send(res);
         } catch (error) {
       logger.error(error);
@@ -41,7 +41,7 @@ class StatisticsController {
     // Get today's schedule with student counts
     getTodaySchedule = async (req, res, next) => {
         try {
-            const result = await statisticsService.getTodaySchedule();
+            const result = await statisticsService.getTodaySchedule({});
             return ResponseFactory.get(result).send(res);
         } catch (error) {
       logger.error(error);

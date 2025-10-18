@@ -9,8 +9,9 @@ const logger = require('../../lib/config/logger.config');
 class PayrollService {
 
 
-  async getAllPayrollsForAdmin(filters = {}) {
+  async getAllPayrollsForAdmin(options = {}) {
     try {
+      const { filters = {} } = options;
       const { page = 1, limit = 10, monthYear } = filters;
       const { bulan, tahun } = CommonServiceUtils.parseMonthYearFilter(monthYear);
 
@@ -228,7 +229,7 @@ class PayrollService {
 
       return {
         data: paginatedData,
-        pagination: {
+        meta: {
           page: parseInt(page),
           limit: parseInt(limit),
           totalItems,
@@ -634,8 +635,9 @@ class PayrollService {
     return stats;
   }
 
-  async getAllPayrollsForGuru(guruId, filters = {}) {
+  async getAllPayrollsForGuru(guruId, options = {}) {
     try {
+      const { filters = {} } = options;
       const { page = 1, limit = 10, monthYear } = filters;
       const { bulan, tahun } = this.parseMonthYearFilter(monthYear);
 
@@ -825,7 +827,7 @@ class PayrollService {
 
       return {
         data: paginatedData,
-        pagination: {
+        meta: {
           page: parseInt(page),
           limit: parseInt(limit),
           totalItems,

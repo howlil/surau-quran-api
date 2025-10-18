@@ -5,8 +5,9 @@ const CommonServiceUtils = require('../../lib/utils/common.service.utils');
 const logger = require('../../lib/config/logger.config');
 
 class RfidService {
-    async searchUser(filters = {}) {
+    async searchUser(options = {}) {
         try {
+            const { filters = {} } = options;
             const { search, role, page = 1, limit = 10 } = filters;
 
             let users = [];
@@ -96,7 +97,7 @@ class RfidService {
 
             return {
                 data: paginatedUsers,
-                pagination: {
+                meta: {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     totalItems,
@@ -111,7 +112,9 @@ class RfidService {
         }
     }
 
-    async registerRfid(userId, rfidCode) {
+    async registerRfid(options) {
+        const { data } = options;
+        const { userId, rfidCode } = data;
         try {
             // Check if user exists
             const user = await prisma.user.findUnique({
@@ -166,7 +169,10 @@ class RfidService {
         }
     }
 
-    async updateRfid(userId, newRfidCode) {
+    async updateRfid(options) {
+        const { data, where } = options;
+        const { newRfidCode } = data;
+        const { userId } = where;
         try {
             // Check if user exists
             const user = await prisma.user.findUnique({
@@ -226,7 +232,9 @@ class RfidService {
         }
     }
 
-    async deleteRfid(userId) {
+    async deleteRfid(options) {
+        const { where } = options;
+        const { userId } = where;
         try {
             // Check if user exists
             const user = await prisma.user.findUnique({
@@ -269,8 +277,9 @@ class RfidService {
         }
     }
 
-    async getRfidList(filters = {}) {
+    async getRfidList(options = {}) {
         try {
+            const { filters = {} } = options;
             const { search, role, hasRfid, page = 1, limit = 10 } = filters;
 
             let users = [];
@@ -385,7 +394,7 @@ class RfidService {
 
             return {
                 data: paginatedUsers,
-                pagination: {
+                meta: {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     totalItems,
